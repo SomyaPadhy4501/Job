@@ -210,6 +210,13 @@ a { color: inherit; }
 .nowrap { white-space: nowrap; }
 .sort-indicator { color: var(--text-subtle); font-size: 11px; margin-left: 4px; }
 
+/* Posted column — relative time is the freshness signal (slightly emphasized
+   in default text color); absolute date stays muted as secondary metadata. */
+.posted-cell { display: inline-flex; align-items: baseline; gap: 0; }
+.posted-rel  { color: var(--text); font-weight: 500; }
+.posted-sep  { color: var(--text-subtle); padding: 0 2px; }
+.posted-abs  { color: var(--text-muted); }
+
 /* ─── Pills and badges ───────────────────────────────────────────────────── */
 .pill {
   display: inline-flex;

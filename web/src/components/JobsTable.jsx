@@ -18,20 +18,59 @@ function fmtDate(s) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// Relative time for the past week. Returns null for older or future
+// timestamps so callers can fall back to the absolute date alone.
+function fmtRelative(s) {
+  if (!s) return null;
+  const ms = Date.now() - new Date(s).getTime();
+  if (Number.isNaN(ms) || ms < 0) return null;
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'Just posted';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(ms / 86_400_000);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return null;
+}
+
+function fmtPreciseTooltip(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
+
 // Render a row's date column: prefer the upstream posting date, fall back to
 // `first_seen_at` (when we first observed the row) so users always see *some*
 // temporal context. The "Seen" label distinguishes the two — the upstream
 // date is authoritative, the first-seen stamp is our best guess.
+//
+// Layout: `{relative} · {absolute}` for items in the past week, falling back
+// to just the absolute date for older items. Tooltip on hover always shows
+// precise date+time. Relative ticks naturally with the 60s TanStack Query
+// refetch — it'll re-render as new data lands.
 function PostedCell({ row }) {
-  if (row.date_posted) return <>{fmtDate(row.date_posted)}</>;
-  if (row.first_seen_at) {
-    return (
-      <span title="Upstream didn't provide a posting date; this is when we first observed the role.">
-        Seen {fmtDate(row.first_seen_at)}
-      </span>
-    );
-  }
-  return <>—</>;
+  const ts = row.date_posted || row.first_seen_at;
+  if (!ts) return <>—</>;
+  const isStamped = !row.date_posted;
+  const rel = fmtRelative(ts);
+  const abs = fmtDate(ts);
+  const tooltip = isStamped
+    ? `Upstream didn't provide a posting date; first observed ${fmtPreciseTooltip(ts)}`
+    : fmtPreciseTooltip(ts);
+  const relText = rel ? (isStamped ? `Seen ${rel}` : rel) : null;
+  return (
+    <span className="posted-cell" title={tooltip}>
+      {relText && <span className="posted-rel">{relText}</span>}
+      {relText && <span className="posted-sep"> · </span>}
+      <span className="posted-abs">{abs}</span>
+    </span>
+  );
 }
 
 function LevelPill({ row }) {
