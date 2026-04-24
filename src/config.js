@@ -3,6 +3,7 @@
 // Sample companies. Shape depends on source:
 //   greenhouse / lever / ashby:  { source, slug, displayName }
 //   workday:                     { source, slug, tenant, wd, site, displayName }
+//   oracle_hcm:                  { source, slug, apiHost, siteNumber, uiBaseUrl, displayName }
 //   amazon / microsoft:          { source, displayName }  (single-tenant scrapers)
 //
 // Unknown/invalid entries just log a warning and are skipped — safe to over-include.
@@ -32,6 +33,10 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'affirm',      displayName: 'Affirm' },
   { source: 'greenhouse', slug: 'chime',       displayName: 'Chime' },
   { source: 'greenhouse', slug: 'scaleai',     displayName: 'Scale AI' },
+
+  // ─── Greenhouse — big-company additions (verified 2026-04-24) ───────────
+  { source: 'greenhouse', slug: 'doordashusa', displayName: 'DoorDash' },
+  { source: 'greenhouse', slug: 'hubspotjobs', displayName: 'HubSpot' },
 
   // ─── Greenhouse — YC US-hiring (discovered by scripts/probe-yc-ats.js, verified 2026-04-24) ───
   { source: 'greenhouse', slug: 'algolia', displayName: 'Algolia' }, // YC Winter 2014
@@ -694,6 +699,10 @@ const COMPANIES = [
   { source: 'ashby', slug: 'workwhilejobs', displayName: 'WorkWhile' },
   { source: 'ashby', slug: 'wrapbook', displayName: 'Wrapbook' },
 
+  // ─── Ashby — big-company additions (verified 2026-04-24) ────────────────
+  { source: 'ashby', slug: 'cohere', displayName: 'Cohere' },
+  { source: 'ashby', slug: 'snowflake', displayName: 'Snowflake' },
+
   // ─── Workday (big tech + enterprise) ─────────────────────────────────────
   { source: 'workday', slug: 'nvidia',     tenant: 'nvidia',     wd: '5',  site: 'NVIDIAExternalCareerSite', displayName: 'Nvidia' },
   { source: 'workday', slug: 'adobe',      tenant: 'adobe',      wd: '5',  site: 'external_experienced',    displayName: 'Adobe' },
@@ -701,6 +710,30 @@ const COMPANIES = [
   { source: 'workday', slug: 'salesforce', tenant: 'salesforce', wd: '12', site: 'External_Career_Site',    displayName: 'Salesforce' },
   { source: 'workday', slug: 'intel',      tenant: 'intel',      wd: '1',  site: 'External',                displayName: 'Intel' },
   { source: 'workday', slug: 'walmart',    tenant: 'walmart',    wd: '5',  site: 'WalmartExternal',         displayName: 'Walmart' },
+  { source: 'workday', slug: 'accenture',  tenant: 'accenture',  wd: '103', site: 'AccentureCareers',       displayName: 'Accenture' },
+  { source: 'workday', slug: 'boeing',     tenant: 'boeing',     wd: '1',   site: 'EXTERNAL_CAREERS',       displayName: 'Boeing' },
+  { source: 'workday', slug: 'capitalone', tenant: 'capitalone', wd: '12',  site: 'Capital_One',            displayName: 'Capital One' },
+  { source: 'workday', slug: 'mastercard', tenant: 'mastercard', wd: '1',   site: 'CorporateCareers',       displayName: 'Mastercard' },
+  { source: 'workday', slug: 'redhat',     tenant: 'redhat',     wd: '5',   site: 'Jobs',                   displayName: 'Red Hat' },
+  { source: 'workday', slug: 'samsung',    tenant: 'sec',        wd: '3',   site: 'Samsung_Careers',        displayName: 'Samsung Electronics' },
+  { source: 'workday', slug: 'morganstanley', tenant: 'ms',      wd: '5',   site: 'External',               displayName: 'Morgan Stanley' },
+  { source: 'workday', slug: 'gehealthcare',  tenant: 'gehc',    wd: '5',   site: 'GEHC_ExternalSite',      displayName: 'GE HealthCare' },
+
+  // ─── Oracle HCM / Candidate Experience ───────────────────────────────────
+  { source: 'oracle_hcm', slug: 'oracle', displayName: 'Oracle', apiHost: 'eeho.fa.us2.oraclecloud.com', siteNumber: 'CX_45001', uiBaseUrl: 'https://careers.oracle.com/en/sites/jobsearch' },
+  { source: 'oracle_hcm', slug: 'jpmorgan-chase', displayName: 'JPMorgan Chase', apiHost: 'jpmc.fa.oraclecloud.com', siteNumber: 'CX_1001', uiBaseUrl: 'https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001' },
+
+  // ─── PCSX (Phenom Cloud) — same API shape as Microsoft ──────────────────
+  { source: 'pcsx', slug: 'qualcomm', displayName: 'Qualcomm', apiBase: 'https://careers.qualcomm.com/api/pcsx/search', domain: 'qualcomm.com', applyUrlBase: 'https://careers.qualcomm.com/careers' },
+
+  // ─── Capgemini (standalone job-stream API) ──────────────────────────────
+  { source: 'capgemini', slug: 'capgemini', displayName: 'Capgemini' },
+
+  // ─── Wipro (SAP SuccessFactors-backed in-house API) ─────────────────────
+  { source: 'wipro', slug: 'wipro', displayName: 'Wipro' },
+
+  // ─── Goldman Sachs (higher.gs.com GraphQL) ──────────────────────────────
+  { source: 'goldman_sachs', slug: 'goldman-sachs', displayName: 'Goldman Sachs' },
 
   // ─── Single-tenant collectors ────────────────────────────────────────────
   { source: 'amazon',       displayName: 'Amazon' },
@@ -754,6 +787,11 @@ const CONFIG = {
   //   'permissive' – drop explicit senior/staff/principal/manager/II+ roles (DEFAULT)
   //   'strict'     – require an explicit entry-level signal (intern, new grad, I, associate…)
   entryLevelMode: process.env.ENTRY_LEVEL_MODE || 'permissive',
+
+  // Retention: only keep jobs posted (or last seen) within the last N days.
+  // Enforced at normalize time (dated rows older than window are rejected)
+  // and again at the end of each collect run (post-upsert sweep).
+  retentionDays: Number(process.env.RETENTION_DAYS || 30),
 
   requestTimeoutMs: 20_000,
   fetchConcurrency: 4, // parallel companies per run

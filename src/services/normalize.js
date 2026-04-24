@@ -243,7 +243,7 @@ function buildDedupeKey(company, title, location) {
 }
 
 // Main entry. Returns a DB-ready row or null if filtered out.
-function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode } = {}) {
+function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, retentionDays } = {}) {
   const company_name = (raw.company_name || '').trim();
   const job_title = (raw.job_title || '').trim();
   const location = normalizeLocation(raw.location);
@@ -252,6 +252,14 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode } 
   const date_posted = parseDateToIso(raw.date_posted);
 
   if (!company_name || !job_title || !apply_url) return null;
+
+  // Retention: reject rows we already know are older than the window.
+  // Null-dated rows fall through here — the DB sweep prunes them later via
+  // last_seen_at if they stop appearing in upstream feeds.
+  if (retentionDays && date_posted) {
+    const ageMs = Date.now() - new Date(date_posted).getTime();
+    if (ageMs > retentionDays * 24 * 60 * 60 * 1000) return null;
+  }
 
   const role_type = classifyRole(job_title);
   if (filterSoftwareOnly && role_type === 'OTHER') return null;

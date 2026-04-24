@@ -12,9 +12,11 @@ entry-level and 1-2 YOE mid-level software/ML/AI/DS/DevOps roles from
 ~12 free public sources + an opt-in Playwright scraper. Surfaces them in a
 lightweight web UI with role / level / sponsorship / search filters.
 
-Last verified live state (2026-04-24): **3,144+ jobs across 10 sources**
-(pre-`hn_hiring` snapshot: 3,144 / 9 sources). Entry≈1,464, Mid≈190,
-Sponsorship-YES≈131, Sponsorship-NO≈93.
+Last verified live state (2026-04-24, post-retention + enterprise-pass):
+**~2,900 jobs across 16 sources** (700 companies OK, 0 failures, runId 30).
+Count is lower than the pre-retention 5,505 snapshot because the DB now
+only holds rows posted (or last-seen) within the retention window — see
+"Retention" below.
 
 `COMPANIES` in `src/config.js` now holds **682 entries** after the YC ATS +
 topstartups.io merges (up from ~47). Re-run `npm run collect` to pick up
@@ -25,6 +27,15 @@ removes existing `apply_url` duplicates (kept oldest row, ran cleanly on
 
 **Recently added (2026-04-24):**
 - Source `hn_hiring` — HN "Who is hiring?" threads filtered by a maintained YC US-hiring allowlist. Only source with clean per-comment `date_posted`.
+- Source `oracle_hcm` — generic Oracle Recruiting Cloud / Candidate Experience collector. Verified live against Oracle (`careers.oracle.com`) and JPMorgan Chase (`jpmc.fa.oraclecloud.com`) on 2026-04-24.
+- Enterprise-coverage pass (2026-04-24): added verified entries for DoorDash + HubSpot (Greenhouse), Cohere + Snowflake (Ashby), Accenture + Boeing + Capital One + Mastercard + Red Hat + Samsung + Morgan Stanley + GE HealthCare (Workday), Oracle + JPMorgan Chase (Oracle HCM), Qualcomm (PCSX), Capgemini (standalone). HubSpot is wired but currently normalizes to 0 rows — only `Principal Software Engineer` postings are open, rejected by the senior filter. All others yield 100–1,284 raw rows per run.
+- Source `pcsx` — generic Phenom Cloud "PCSX" collector (`src/collectors/pcsx.js`). Same API shape as Microsoft's `/api/pcsx/search` but configurable via `{ apiBase, domain, applyUrlBase }` so the collector is reusable. Currently wired to Qualcomm (884 raw rows). Microsoft remains on its dedicated collector for legacy URL conventions.
+- Source `capgemini` — standalone Azure-hosted API at `cg-jobstream-api.azurewebsites.net/api/job-search`. Paginates to Capgemini's full 6.5k-row global catalog; filter-to-`country_code === 'en-us'` pre-slice keeps ingestion to ~500 US rows. Note: Capgemini uses locale codes in `country_code`, **not** ISO 3166 — don't "fix" the `en-us` literal.
+- Source `wipro` — Wipro's SAP-SuccessFactors-backed in-house API at `careers.wipro.com/services/recruiting/v1/jobs` (POST). Uses `location: "United States"` request param to narrow the 11k global catalog to ~663 US rows.
+- Source `goldman_sachs` — Goldman Sachs's `api-higher.gs.com/gateway/api/v1/graphql` endpoint. Anonymous GraphQL; pulls all ~1.4k global roles and filters to US client-side (no reliable server-side location filter schema).
+- Scraper target `deloitte` (`scraper/src/targets/deloitte.js`) — SSR DOM scrape of `apply.deloitte.com/en_US/careers/SearchJobs/?locationTextInput=United+States`. Paginates `?jobOffset=N` in 10-row steps, capped at 30 pages (~300 rows/run). No JSON API exists for Deloitte, so this is the only option. Lives in the scraper microservice because DOM selectors break on layout change — keeping it out of the main collector process insulates the rest.
+- Scraper target `phenom` (`scraper/src/targets/phenom.js`) — generic Phenom People DOM scraper, shared across Cisco + Cognizant. Uses anchor-pattern selectors (`/global/en/job/{id}` for Cisco, `/global-en/jobs/{id}` for Cognizant) and falls back on visible DOM location text. Coverage is bounded: Phenom's infinite-scroll usually stalls around 10 visible results unless we click a specific "Show more" button that each tenant styles differently. Ships with the accepted limit; revisit if first-page coverage is insufficient.
+- Retention: the DB now only holds jobs whose `date_posted` (or, if null, `last_seen_at`) is within `CONFIG.retentionDays` (default 30). Enforced at normalize time (old dated rows rejected) and again at the end of each collect run via `pruneStaleJobs()` in [src/db/index.js](src/db/index.js). Tunable via the `RETENTION_DAYS` env var.
 - `scripts/probe-yc-ats.js` — discovers YC companies that publish on Greenhouse/Lever/Ashby. Writes config-ready blocks to stdout; redirect into a file for the verifier.
 - `scripts/verify-yc-ats.js` — verifies probe output before merge (Greenhouse exact-name match via `/boards/{slug}` metadata; Lever/Ashby via slug-variant provenance). 12 collisions caught on the first run (e.g. `greenhouse:beam` → "Bridge to Enter Advanced Mathematics" nonprofit, not YC Beam). 357 entries verified and merged into `src/config.js` on 2026-04-24.
 - `scripts/probe-topstartups.js` — discovers non-YC curated startups (Anduril, ClickHouse, Chainguard, Harvey, Abridge, Semgrep, …) from topstartups.io. Scrapes the infinite-scroll page, filters US-HQ, reuses the same ATS probe + name-match verification as the YC flow. 277 entries merged.
@@ -162,7 +173,14 @@ All collectors return jobs in this common shape:
 | `greenhouse` | ATS API | `src/collectors/greenhouse.js` | Pull 25 companies from `boards-api.greenhouse.io` |
 | `lever` | ATS API | `src/collectors/lever.js` | Pull 2 companies from `api.lever.co` |
 | `ashby` | ATS API | `src/collectors/ashby.js` | Pull 8 companies from `api.ashbyhq.com` |
-| `workday` | ATS API | `src/collectors/workday.js` | Pull 6 tenants (Nvidia/Adobe/PayPal/Salesforce/Intel/Walmart). Quirk: `total` only on page 1; we cap at 500/company. Description enrichment via per-job detail call, capped to 80/run. |
+| `workday` | ATS API | `src/collectors/workday.js` | Pull a growing set of tenants (now includes Nvidia, Adobe, PayPal, Salesforce, Intel, Walmart, Accenture, Boeing, Capital One, Mastercard, Red Hat, Samsung). Quirk: `total` only on page 1; we cap at 500/company. Description enrichment via per-job detail call, capped to 80/run. |
+| `oracle_hcm` | ATS API | `src/collectors/oracle_hcm.js` | Oracle Recruiting Cloud / Candidate Experience list API (`.../recruitingCEJobRequisitions`). Currently wired to Oracle + JPMorgan Chase. Public job detail URLs are deterministic from `uiBaseUrl + /job/{id}` so no browser needed. To add a new tenant, open the public careers page in DevTools, find the XHR to `{apiHost}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?...siteNumber={siteNumber}...`, then add `{ source: 'oracle_hcm', slug, displayName, apiHost, siteNumber, uiBaseUrl }` to `COMPANIES`. |
+| `pcsx` | ATS API | `src/collectors/pcsx.js` | Generic Phenom Cloud PCSX collector — same shape as Microsoft's `/api/pcsx/search` but accepts `{ apiBase, domain, applyUrlBase }` per tenant. Currently wired to Qualcomm. To add a tenant, confirm the host exposes `/api/pcsx/search?domain={domain}&query=&start=0&num=10` (most Phenom-Cloud tenants do) and add `{ source: 'pcsx', slug, displayName, apiBase, domain, applyUrlBase }` to `COMPANIES`. |
+| `capgemini` | Single-tenant | `src/collectors/capgemini.js` | Capgemini's in-house Azure-hosted search API. Paginates all 6,550 global rows then filters to `country_code === 'en-us'` client-side (the server's country filter is ignored). |
+| `wipro` | Single-tenant | `src/collectors/wipro.js` | SAP SuccessFactors-backed in-house endpoint at `careers.wipro.com/services/recruiting/v1/jobs` (POST). `location: "United States"` param narrows the catalog server-side. |
+| `goldman_sachs` | Single-tenant | `src/collectors/goldman_sachs.js` | Anonymous GraphQL at `api-higher.gs.com/gateway/api/v1/graphql`. Pulls all ~1.4k global roles (server-side location filter schema is undocumented) and filters to US client-side via `locations[].country`. |
+| *(scraper)* `deloitte` | Playwright | `scraper/src/targets/deloitte.js` | SSR DOM scrape of `apply.deloitte.com/en_US/careers/SearchJobs`. 10 rows/page via `?jobOffset=N`, capped at 30 pages. |
+| *(scraper)* `phenom` | Playwright | `scraper/src/targets/phenom.js` | Generic Phenom People DOM scraper (Cisco + Cognizant). Infinite-scroll gives ~10 rows/tenant/run; deeper coverage gated behind tenant-specific "show more" buttons. |
 | `amazon` | Single-tenant | `src/collectors/amazon.js` | `amazon.jobs/en/search.json`, 9 role queries, deduped by id |
 | `uber` | Single-tenant | `src/collectors/uber.js` | `uber.com/api/loadSearchJobsResults`. Has authoritative `level` field (3=entry, 4=mid, 5+=senior) — used for overrides |
 | `microsoft` | Single-tenant | `src/collectors/microsoft.js` | `apply.careers.microsoft.com/api/pcsx/search`. 887 jobs. **Found via scraper's debug-urls.js** — replace endpoint if PCSX disappears |
@@ -185,6 +203,15 @@ All collectors return jobs in this common shape:
 | TCS / Infosys | Custom closed ATSes (`ibegin.tcs.com` DNS unresolvable, Infosys uses Oracle Taleo). No public JSON search. |
 | Cognizant | Workday tenant rejects anonymous CxS calls (HTTP 422 on every facet/site combination). |
 | Cisco | Same as Cognizant — `cisco.wd1.myworkdayjobs.com` returns 422 anonymously. |
+| Visa | All known Visa careers entry URLs are 404 or DNS-dark (`corporate.visa.com/en/jobs*`, `usa.visa.com/careers*`, `careers.visa.com`, `jobs.visa.com`). No confirmed endpoint. |
+| ~~Cisco~~ / ~~Cognizant~~ | Partially implemented via the `phenom` scraper target — see Sources table above. Coverage bounded at ~10 rows per tenant per run. |
+| Goldman Sachs | Workday CxS returns 422 anonymously under `goldmansachs.wd1`/`wd5` for `External`, `GS_External_Careers`, `Professional`, `Campus`, and the `goldman`/`gs` tenant aliases (2026-04-24). |
+| ~~Deloitte~~ | Implemented as the `deloitte` Playwright target (SSR DOM scrape) — see Sources table above. |
+| General Electric / Vernova / Aerospace | `ge.wd1/wd5` returns 422; `jobs.gevernova.com` and `jobs.geaerospace.com` are both DNS-unresolvable. Unknown backends. (GE HealthCare is implemented — see `gehealthcare` Workday entry.) |
+| ~~Wipro~~ | Implemented via the `wipro` collector (SAP SuccessFactors endpoint at `careers.wipro.com/services/recruiting/v1/jobs`) — see Sources table above. |
+| HCL America | `careers.hcltech.com` loads but exposes no public job-search JSON — just an OneTrust cookie banner + internal telemetry beacon. No job links on the homepage. `www.hcltech.com/careers` returns HTTP/2 protocol error; `careers.hcltech.com`, `jobs.hcltech.com`, `apply.hcltech.com` are all DNS-dark (2026-04-24). |
+| Shopify | Career site is an in-house Shopify Next.js SPA (`shopify.com/careers/search`) — no public JSON API. Greenhouse/Lever/Ashby all 404; `shopify.wd1.myworkdayjobs.com/shopify_careers` returns 422 (2026-04-24). |
+| Atlassian | Lever board `atlassian` exists but returns 0 postings (migrated off). Greenhouse 404 under every tried slug; Ashby 404; SmartRecruiters `atlassian`/`Atlassian` returns 0. Current destination ATS appears non-public (2026-04-24). |
 | Tesla direct | `tesla.com/cua-api/apps/careers/state` returns 403 (Cloudflare UA-filtered). We get Tesla via ghlistings instead (~68 rows). |
 | startup.jobs | Cloudflare "Just a moment..." challenge on every endpoint (homepage, `/feed` RSS, `/api/v1/*`). Same bucket as LinkedIn/Indeed. Won't ship. |
 | wellfound.com (AngelList) | robots.txt explicitly disallows `/_jobs/`, `*?jobId=*`, `*?jobSlug=*`, `/job_listings/*`, `/job_profiles/embed`, `/jobs/applications`. Legal/ToS red line. Won't ship. |
@@ -422,6 +449,7 @@ Every env var the code actually reads, grouped by process.
 - `FILTER_US` — drop non-US rows in `normalize.js` (default: `true`)
 - `FILTER_SOFTWARE` — drop `role_type === 'OTHER'` (default: `true`)
 - `ENTRY_LEVEL_MODE` — `off` | `permissive` | `strict` (default: `permissive`)
+- `RETENTION_DAYS` — drop jobs older than N days (default: `30`; see "Retention" below)
 - `COLLECT_TOKEN` — bearer for `/admin/collect` and `/admin/ingest` (default: none = open)
 - `DEBUG` — verbose logger (default: quiet)
 

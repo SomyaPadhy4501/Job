@@ -26,7 +26,7 @@ const CONFIG = {
   // Microsoft is handled by the main service now (it has a public /api/pcsx/search
   // endpoint that doesn't need a real browser). This scraper is only for the
   // genuinely-gated sites. Set SCRAPER_TARGETS=microsoft to force it here too.
-  targets: (process.env.SCRAPER_TARGETS || 'apple,meta,google')
+  targets: (process.env.SCRAPER_TARGETS || 'apple,meta,google,deloitte,phenom')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),

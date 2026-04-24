@@ -167,6 +167,22 @@ function upsertJob(job) {
   return { inserted: 1, updated: 0 };
 }
 
+// Delete jobs whose posted date is older than `days` days, OR whose last_seen_at
+// is older than `days` days when date_posted is unknown. Returns the count
+// removed. Called at the end of every collect run.
+function pruneStaleJobs(days) {
+  if (!days || days <= 0) return 0;
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const r = getDb()
+    .prepare(
+      `DELETE FROM jobs
+       WHERE (date_posted IS NOT NULL AND date_posted < @cutoff)
+          OR (date_posted IS NULL AND last_seen_at < @cutoff)`
+    )
+    .run({ cutoff });
+  return r.changes;
+}
+
 function startRun() {
   return getDb().prepare('INSERT INTO collection_runs DEFAULT VALUES').run().lastInsertRowid;
 }
@@ -287,4 +303,5 @@ module.exports = {
   queryJobs,
   getJobById,
   statsSummary,
+  pruneStaleJobs,
 };

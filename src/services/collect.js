@@ -4,7 +4,7 @@ const { COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
-const { upsertJob, startRun, finishRun, getDb } = require('../db');
+const { upsertJob, startRun, finishRun, getDb, pruneStaleJobs } = require('../db');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -76,6 +76,7 @@ async function collectAll({ companies = COMPANIES } = {}) {
       filterUSOnly: CONFIG.filterUSOnly,
       filterSoftwareOnly: CONFIG.filterSoftwareOnly,
       entryLevelMode: CONFIG.entryLevelMode,
+      retentionDays: CONFIG.retentionDays,
     });
     if (n) normalized.push(n);
   }
@@ -94,6 +95,13 @@ async function collectAll({ companies = COMPANIES } = {}) {
     }
   });
   tx(deduped);
+
+  // Retention sweep: delete rows older than the retention window. Hits both
+  // dated rows that slipped past normalize (e.g. curated lists that re-publish
+  // stale items) and null-dated rows whose last_seen_at has aged out (source
+  // stopped listing them — role filled or pulled).
+  const pruned = pruneStaleJobs(CONFIG.retentionDays);
+  if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
 
   finishRun(runId, {
     companies_ok: companiesOk,
