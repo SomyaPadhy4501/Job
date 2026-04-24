@@ -1,0 +1,37 @@
+name: scrape
+
+on:
+  schedule:
+    - cron: '30 */6 * * *'  # Every 6h at :30 — offset from collect's :00 to avoid overlapping writes
+  workflow_dispatch:         # Manual trigger for testing
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20      # Playwright + Chromium fan-out takes ~12 min
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install scraper dependencies
+        working-directory: scraper
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        working-directory: scraper
+        run: npx playwright install --with-deps chromium
+
+      - name: Run one-shot scrape (all targets)
+        working-directory: scraper
+        run: npm run scrape
+        env:
+          # Scraper POSTs results to the Vercel /admin/ingest endpoint.
+          # It never touches the DB directly — keeps the boundary clean.
+          INGEST_URL:    ${{ secrets.INGEST_URL }}
+          COLLECT_TOKEN: ${{ secrets.COLLECT_TOKEN }}
+          HEADLESS:      'true'

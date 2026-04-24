@@ -1,0 +1,33 @@
+name: collect
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # Every 2 hours UTC (matches local COLLECT_CRON default)
+  workflow_dispatch:         # Manual "Run workflow" button in GitHub UI
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15       # Full fan-out across 700+ companies takes ~7 min
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run one-shot collect
+        run: npm run collect
+        env:
+          DATABASE_URL:      ${{ secrets.DATABASE_URL }}
+          FILTER_US:         'true'
+          FILTER_SOFTWARE:   'true'
+          ENTRY_LEVEL_MODE:  'permissive'
+          RETENTION_DAYS:    '30'
+          # COLLECT_TOKEN is only needed if you want to also hit /admin/collect.
+          # The npm run collect script writes directly to Neon via DATABASE_URL.

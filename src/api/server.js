@@ -3,7 +3,7 @@
 const path = require('path');
 const express = require('express');
 const { CONFIG } = require('../config');
-const { queryJobs, getJobById, statsSummary, upsertJob, getDb } = require('../db');
+const { queryJobs, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
 const { jobsCache } = require('./cache');
 const { collectAll } = require('../services/collect');
 const { normalizeJob } = require('../services/normalize');
@@ -25,11 +25,12 @@ function createApp() {
     res.json({ ok: true, uptime: process.uptime() });
   });
 
-  app.get('/stats', (_req, res) => {
-    res.json(statsSummary());
+  app.get('/stats', async (_req, res) => {
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+    res.json(await statsSummary());
   });
 
-  app.get('/jobs', (req, res) => {
+  app.get('/jobs', async (req, res) => {
     const search = (req.query.search || '').toString().trim();
     const title = (req.query.title || '').toString().trim();
     const sponsorshipRaw = (req.query.sponsorship || '').toString().toUpperCase();
@@ -66,7 +67,7 @@ function createApp() {
       return res.json(cached);
     }
 
-    const { total, rows } = queryJobs({
+    const { total, rows } = await queryJobs({
       search, title, sponsorship, company, role, level, source, limit, offset,
     });
     const body = {
@@ -82,13 +83,15 @@ function createApp() {
 
     jobsCache.set(cacheKey, body);
     res.setHeader('x-cache', 'MISS');
+    // Vercel edge cache: serve fresh for 30 s, then stale while revalidating.
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
     res.json(body);
   });
 
-  app.get('/jobs/:id', (req, res) => {
+  app.get('/jobs/:id', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
-    const row = getJobById(id);
+    const row = await getJobById(id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
   });
@@ -98,7 +101,7 @@ function createApp() {
   //   { source: "google" | "meta" | ..., jobs: [ <raw-job-shape> ] }
   // Each job runs through the same normalize/dedupe/upsert pipeline as our
   // in-process collectors. Token-protected via COLLECT_TOKEN if set.
-  app.post('/admin/ingest', (req, res) => {
+  app.post('/admin/ingest', async (req, res) => {
     const expected = process.env.COLLECT_TOKEN;
     if (expected) {
       const given = req.get('x-collect-token');
@@ -114,26 +117,24 @@ function createApp() {
     }
 
     let inserted = 0, updated = 0, rejected = 0;
-    const db = getDb();
-    const tx = db.transaction((rows) => {
-      for (const raw of rows) {
-        const n = normalizeJob(
-          { ...raw, source },
-          {
-            filterUSOnly: CONFIG.filterUSOnly,
-            filterSoftwareOnly: CONFIG.filterSoftwareOnly,
-            entryLevelMode: CONFIG.entryLevelMode,
-          }
-        );
-        if (!n) { rejected++; continue; }
-        const r = upsertJob(n);
-        inserted += r.inserted;
-        updated += r.updated;
-      }
-    });
+    const toUpsert = [];
+    for (const raw of jobs) {
+      const n = normalizeJob(
+        { ...raw, source },
+        {
+          filterUSOnly: CONFIG.filterUSOnly,
+          filterSoftwareOnly: CONFIG.filterSoftwareOnly,
+          entryLevelMode: CONFIG.entryLevelMode,
+        }
+      );
+      if (!n) { rejected++; continue; }
+      toUpsert.push(n);
+    }
 
     try {
-      tx(jobs);
+      const result = await bulkUpsert(toUpsert);
+      inserted = result.inserted;
+      updated = result.updated;
       jobsCache.clear();
       log.info('ingest.ok', { source, received: jobs.length, inserted, updated, rejected });
       res.json({ ok: true, source, received: jobs.length, inserted, updated, rejected });

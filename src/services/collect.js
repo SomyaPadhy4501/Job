@@ -4,7 +4,7 @@ const { COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
-const { upsertJob, startRun, finishRun, getDb, pruneStaleJobs } = require('../db');
+const { bulkUpsert, startRun, finishRun, pruneStaleJobs } = require('../db');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -83,18 +83,8 @@ async function collectAll({ companies = COMPANIES } = {}) {
 
   const deduped = dedupeBatch(normalized);
 
-  // Bulk upsert in a single transaction.
-  const db = getDb();
-  let inserted = 0;
-  let updated = 0;
-  const tx = db.transaction((rows) => {
-    for (const row of rows) {
-      const r = upsertJob(row);
-      inserted += r.inserted;
-      updated += r.updated;
-    }
-  });
-  tx(deduped);
+  // Bulk upsert in a single transaction (works for both SQLite and Postgres).
+  const { inserted, updated } = await bulkUpsert(deduped);
 
   // Retention sweep: delete rows older than the retention window. Hits both
   // dated rows that slipped past normalize (e.g. curated lists that re-publish
