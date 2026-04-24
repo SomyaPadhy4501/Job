@@ -1,0 +1,21 @@
+{
+  "name": "job-aggregator",
+  "version": "1.0.0",
+  "description": "Aggregates US software engineering jobs from Greenhouse, Lever, and Ashby with visa sponsorship classification.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "collect": "node src/scripts/collect-once.js",
+    "api": "node src/scripts/api-only.js",
+    "init-db": "node src/scripts/init-db.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3"
+  }
+}

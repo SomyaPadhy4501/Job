@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>US SWE Job Board</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <h1>US SWE Jobs</h1>
+        <span id="stats" class="stats">—</span>
+      </div>
+      <div class="controls">
+        <input
+          id="search"
+          type="search"
+          placeholder="Search by title or company…"
+          autocomplete="off"
+        />
+        <select id="role">
+          <option value="">Any role</option>
+          <option value="SWE">SWE / SDE</option>
+          <option value="MLE">ML Engineer</option>
+          <option value="AI">AI / Research</option>
+          <option value="DS">Data Scientist</option>
+          <option value="DATA_ENG">Data Engineer</option>
+          <option value="SRE">DevOps / SRE / Platform</option>
+          <option value="SECURITY">Security</option>
+          <option value="MOBILE">Mobile</option>
+        </select>
+        <select id="sponsorship">
+          <option value="">Any sponsorship</option>
+          <option value="YES">Sponsorship: YES</option>
+          <option value="NO">Sponsorship: NO</option>
+          <option value="UNKNOWN">Sponsorship: UNKNOWN</option>
+        </select>
+        <label class="toggle">
+          <input type="checkbox" id="entry" />
+          <span>Entry-level only</span>
+        </label>
+        <button id="refresh" type="button" title="Refresh">↻</button>
+      </div>
+    </header>
+
+    <main>
+      <table id="jobs">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Role</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Sponsorship</th>
+            <th>Posted</th>
+            <th>Apply</th>
+          </tr>
+        </thead>
+        <tbody id="jobs-body">
+          <tr>
+            <td colspan="7" class="empty">Loading…</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <nav class="pager" id="pager" hidden>
+        <button id="prev" type="button">← Prev</button>
+        <span id="page-info"></span>
+        <button id="next" type="button">Next →</button>
+      </nav>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
