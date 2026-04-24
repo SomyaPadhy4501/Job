@@ -23,6 +23,22 @@ function normalizeLocation(loc) {
   return String(loc).replace(/\s+/g, ' ').trim();
 }
 
+// Normalize any source's date string / number to ISO 8601.
+// Handles: ISO strings, "Month DD, YYYY" (Amazon), Unix epoch seconds or ms.
+// Returns null if unparseable — callers treat null as "unknown date".
+function parseDateToIso(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') {
+    const ms = v > 1e12 ? v : v * 1000; // seconds vs ms
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const s = String(v).trim();
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // ─── US location heuristic ─────────────────────────────────────────────────
 const US_STATES = new Set([
   'al','ak','az','ar','ca','co','ct','de','fl','ga','hi','id','il','in','ia',
@@ -116,12 +132,14 @@ const INTERN_REJECT = [
   /\bintern(ship)?s?\b/, /\bco-?op\b/, /\bsummer\s+20\d\d\b/,
 ];
 
+// II is allowed through — at most companies "Software Engineer II" means 1-3 YOE
+// which matches the user's target range. III/IV/V/VI are always senior.
 const SENIOR_REJECT = [
   /\bsenior\b/, /\bsr\.?\b/, /\bstaff\b/, /\bprincipal\b/, /\bdistinguished\b/,
   /\blead\b/, /\bdirector\b/, /\bmanager\b/, /\bhead of\b/,
   /\bvp\b/, /\bvice\s+president\b/, /\barchitect\b/,
-  /\s(ii|iii|iv|v|vi)\b/i, // space + II/III/…
-  /\s-\s*(ii|iii|iv|v)\b/i,
+  /\s(iii|iv|v|vi)\b/i, // space + III/IV/…  (II is intentionally NOT rejected)
+  /\s-\s*(iii|iv|v|vi)\b/i,
 ];
 
 const ENTRY_POSITIVE = [
@@ -130,6 +148,14 @@ const ENTRY_POSITIVE = [
   /\bentry[\s-]level\b/, /\bassociate\b/, /\bjunior\b/, /\bjr\.?\b/,
   /\b(engineer|developer|scientist)\s+(i|1)\b/i,
   /\bgraduate\s+(engineer|developer)\b/,
+];
+
+// Explicit mid-level (1-3 YOE) signals. Used to stamp an is_mid_level flag so
+// the UI can show a "mid" pill and users can filter by level.
+const MID_POSITIVE = [
+  /\b(engineer|developer|scientist)\s+(ii|2)\b/i,
+  /\bmid[\s-]?(level|career)\b/,
+  /\b(1|2)\s*-\s*(2|3|4)\s+years?\b/i,
 ];
 
 function looksIntern(title) {
@@ -145,6 +171,11 @@ function looksSeniorReject(title) {
 function looksExplicitEntry(title) {
   const t = (title || '').toLowerCase();
   return ENTRY_POSITIVE.some((r) => r.test(t));
+}
+
+function looksMidLevel(title) {
+  const t = (title || '').toLowerCase();
+  return MID_POSITIVE.some((r) => r.test(t));
 }
 
 function passesLevel(title, mode) {
@@ -172,7 +203,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode } 
   const location = normalizeLocation(raw.location);
   const apply_url = (raw.apply_url || '').trim();
   const description = stripHtml(raw.description || '');
-  const date_posted = raw.date_posted || null;
+  const date_posted = parseDateToIso(raw.date_posted);
 
   if (!company_name || !job_title || !apply_url) return null;
 
@@ -194,6 +225,14 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode } 
       ? raw.entry_level_override ? 1 : 0
       : looksExplicitEntry(job_title) ? 1 : 0;
 
+  // Mid-level stamp: Uber supplies this via its authoritative level field.
+  // Otherwise fall back to title-based detection. Don't double-stamp if entry.
+  let is_mid_level = 0;
+  if (!is_entry_level) {
+    if (raw.mid_level_override != null) is_mid_level = raw.mid_level_override ? 1 : 0;
+    else if (looksMidLevel(job_title)) is_mid_level = 1;
+  }
+
   return {
     dedupe_key: buildDedupeKey(company_name, job_title, location),
     source: raw.source,
@@ -207,6 +246,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode } 
     sponsorship,
     role_type,
     is_entry_level,
+    is_mid_level,
   };
 }
 
@@ -220,5 +260,6 @@ module.exports = {
   looksIntern,
   looksSeniorReject,
   looksExplicitEntry,
+  looksMidLevel,
   passesLevel,
 };

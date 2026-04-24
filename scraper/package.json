@@ -1,0 +1,21 @@
+{
+  "name": "job-aggregator-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright-based scraper microservice for Google/Meta/Apple/Microsoft careers. Isolated from the main API so its failures don't take the job board down.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "scrape": "node src/run-once.js",
+    "scrape:one": "node src/run-one.js",
+    "install-browsers": "playwright install chromium"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "node-cron": "^3.0.3",
+    "playwright": "^1.48.0"
+  }
+}

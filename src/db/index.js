@@ -35,6 +35,7 @@ function initSchema(database) {
       sponsorship    TEXT    NOT NULL DEFAULT 'UNKNOWN',
       role_type      TEXT    NOT NULL DEFAULT 'OTHER',
       is_entry_level INTEGER NOT NULL DEFAULT 0,
+      is_mid_level   INTEGER NOT NULL DEFAULT 0,
       first_seen_at  TEXT    NOT NULL DEFAULT (datetime('now')),
       last_seen_at   TEXT    NOT NULL DEFAULT (datetime('now'))
     );
@@ -70,6 +71,10 @@ function migrate(database) {
     database.exec('ALTER TABLE jobs ADD COLUMN is_entry_level INTEGER NOT NULL DEFAULT 0');
     database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_entry ON jobs (is_entry_level)');
   }
+  if (!cols.includes('is_mid_level')) {
+    database.exec('ALTER TABLE jobs ADD COLUMN is_mid_level INTEGER NOT NULL DEFAULT 0');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_mid ON jobs (is_mid_level)');
+  }
 }
 
 function upsertJob(job) {
@@ -89,7 +94,8 @@ function upsertJob(job) {
              date_posted    = COALESCE(@date_posted, date_posted),
              sponsorship    = @sponsorship,
              role_type      = @role_type,
-             is_entry_level = @is_entry_level
+             is_entry_level = @is_entry_level,
+             is_mid_level   = @is_mid_level
          WHERE id = @id`
       )
       .run({ ...job, id: existing.id });
@@ -100,10 +106,12 @@ function upsertJob(job) {
     .prepare(
       `INSERT INTO jobs
         (dedupe_key, source, external_id, company_name, job_title, location,
-         apply_url, description, date_posted, sponsorship, role_type, is_entry_level)
+         apply_url, description, date_posted, sponsorship, role_type,
+         is_entry_level, is_mid_level)
        VALUES
         (@dedupe_key, @source, @external_id, @company_name, @job_title, @location,
-         @apply_url, @description, @date_posted, @sponsorship, @role_type, @is_entry_level)`
+         @apply_url, @description, @date_posted, @sponsorship, @role_type,
+         @is_entry_level, @is_mid_level)`
     )
     .run(job);
   return { inserted: 1, updated: 0 };
@@ -128,7 +136,7 @@ function finishRun(id, stats) {
     .run({ id, ...stats, errors: stats.errors ? JSON.stringify(stats.errors) : null });
 }
 
-function queryJobs({ search, sponsorship, company, role, entryOnly, limit, offset }) {
+function queryJobs({ search, sponsorship, company, role, level, limit, offset }) {
   const database = getDb();
   const clauses = [];
   const params = {};
@@ -148,9 +156,13 @@ function queryJobs({ search, sponsorship, company, role, entryOnly, limit, offse
     clauses.push('role_type = @role');
     params.role = role;
   }
-  if (entryOnly) {
-    clauses.push('is_entry_level = 1');
-  }
+  // level: 'entry' → is_entry_level=1
+  //        'mid'   → is_mid_level=1
+  //        'early' → either entry OR mid (entry + 1-2 YOE bucket)
+  //        ''      → any level that passed collection filters (i.e. not senior)
+  if (level === 'entry') clauses.push('is_entry_level = 1');
+  else if (level === 'mid') clauses.push('is_mid_level = 1');
+  else if (level === 'early') clauses.push('(is_entry_level = 1 OR is_mid_level = 1)');
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
   const total = database.prepare(`SELECT COUNT(*) AS c FROM jobs ${where}`).get(params).c;
@@ -158,14 +170,22 @@ function queryJobs({ search, sponsorship, company, role, entryOnly, limit, offse
   params.limit = limit;
   params.offset = offset;
 
+  // Newest first. Rows with a known date_posted always come before rows
+  // without one, so "no-date" Workday postings don't crowd out dated ones.
+  // Within "no-date" rows, fall back to first_seen_at + id.
   const rows = database
     .prepare(
       `SELECT id, source, company_name, job_title, location, apply_url,
-              date_posted, sponsorship, role_type, is_entry_level,
+              date_posted, sponsorship, role_type,
+              is_entry_level, is_mid_level,
               first_seen_at, last_seen_at
        FROM jobs
        ${where}
-       ORDER BY COALESCE(date_posted, first_seen_at) DESC, id DESC
+       ORDER BY
+         CASE WHEN date_posted IS NULL THEN 1 ELSE 0 END,
+         date_posted DESC,
+         first_seen_at DESC,
+         id DESC
        LIMIT @limit OFFSET @offset`
     )
     .all(params);
@@ -192,10 +212,13 @@ function statsSummary() {
   const entryLevel = database
     .prepare('SELECT COUNT(*) AS c FROM jobs WHERE is_entry_level = 1')
     .get().c;
+  const midLevel = database
+    .prepare('SELECT COUNT(*) AS c FROM jobs WHERE is_mid_level = 1')
+    .get().c;
   const lastRun = database
     .prepare('SELECT * FROM collection_runs ORDER BY id DESC LIMIT 1')
     .get();
-  return { total, entryLevel, bySponsor, byRole, bySource, lastRun };
+  return { total, entryLevel, midLevel, bySponsor, byRole, bySource, lastRun };
 }
 
 module.exports = {

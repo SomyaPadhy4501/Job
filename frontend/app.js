@@ -7,7 +7,7 @@
     search: '',
     sponsorship: '',
     role: '',
-    entryOnly: false,
+    level: '',
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -20,7 +20,7 @@
   const searchInput = $('#search');
   const sponsorshipSelect = $('#sponsorship');
   const roleSelect = $('#role');
-  const entryCheckbox = $('#entry');
+  const levelSelect = $('#level');
   const refreshBtn = $('#refresh');
 
   const ROLE_LABEL = {
@@ -64,13 +64,15 @@
       .map((j) => {
         const sponsor = j.sponsorship || 'UNKNOWN';
         const role = ROLE_LABEL[j.role_type] || j.role_type || '—';
-        const entryBadge = j.is_entry_level
+        const levelBadge = j.is_entry_level
           ? `<span class="pill pill-entry">entry</span>`
+          : j.is_mid_level
+          ? `<span class="pill pill-mid">mid · 1-2y</span>`
           : '';
         return `
           <tr>
             <td>${escapeHtml(j.company_name)}<div class="muted">${escapeHtml(j.source)}</div></td>
-            <td class="role">${escapeHtml(j.job_title)}${entryBadge}</td>
+            <td class="role">${escapeHtml(j.job_title)}${levelBadge}</td>
             <td><span class="pill">${escapeHtml(role)}</span></td>
             <td>${escapeHtml(j.location || '—')}</td>
             <td><span class="badge badge-${sponsor}">${sponsor}</span></td>
@@ -90,7 +92,7 @@
     if (state.search) params.set('search', state.search);
     if (state.sponsorship) params.set('sponsorship', state.sponsorship);
     if (state.role) params.set('role', state.role);
-    if (state.entryOnly) params.set('entry', 'true');
+    if (state.level) params.set('level', state.level);
 
     try {
       const res = await fetch(`/jobs?${params.toString()}`);
@@ -141,8 +143,8 @@
     load();
   });
 
-  entryCheckbox.addEventListener('change', () => {
-    state.entryOnly = entryCheckbox.checked;
+  levelSelect.addEventListener('change', () => {
+    state.level = levelSelect.value;
     state.page = 1;
     load();
   });

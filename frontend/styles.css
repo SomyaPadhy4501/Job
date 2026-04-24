@@ -66,6 +66,17 @@ html, body {
   border-color: rgba(106,169,255,0.35);
   margin-left: 6px;
 }
+.pill-mid {
+  background: rgba(200,160,100,0.15);
+  color: #e0c089;
+  border-color: rgba(200,160,100,0.4);
+  margin-left: 6px;
+}
+.sort-indicator {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 2px;
+}
 
 input[type="search"], select, button {
   background: #0b0d13;

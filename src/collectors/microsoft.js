@@ -2,98 +2,84 @@
 
 const { fetchJson } = require('./http');
 
-// Microsoft's public careers search: paginated JSON, no auth.
-// Description is only in the detail endpoint, which we fetch for relevant rows.
+// Microsoft's apply.careers.microsoft.com fetches from a public PCSX API:
+//   GET /api/pcsx/search?domain=microsoft.com&query=…&start=…&sort_by=…
+// Anonymous access works (no auth, no cookies, no TLS issues) — earlier probes
+// failed because they targeted the wrong path. Confirmed via network
+// interception: the real frontend hits /api/pcsx/search, never /api/apply/v2.
+//
+// Response shape:
+//   { status, error, data: { positions: [...], count: <totalCount>, … }, metadata }
 
+const BASE = 'https://apply.careers.microsoft.com/api/pcsx/search';
 const QUERIES = [
-  'Software Engineer',
-  'Machine Learning',
-  'Data Scientist',
-  'Data Engineer',
-  'Applied Scientist',
+  'software engineer',
+  'machine learning',
+  'data scientist',
+  'data engineer',
+  'applied scientist',
+  'research engineer',
+  'security engineer',
+  'site reliability',
+  'devops',
 ];
+const PAGE_SIZE = 10; // server-defined, can't override
+const MAX_PAGES_PER_QUERY = 20; // 200 rows per query
 
-const PAGE_SIZE = 20;
-const MAX_PAGES = 10; // 200 per query
-
-async function fetchSearchPage(q, page) {
-  const url =
-    `https://gcsservices.careers.microsoft.com/search/api/v1/search` +
-    `?q=${encodeURIComponent(q)}&lc=United%20States&l=en_us` +
-    `&pg=${page}&pgSz=${PAGE_SIZE}&o=Recent&flt=true`;
-  const data = await fetchJson(url, { retries: 1 });
-  return data?.operationResult?.result?.jobs || [];
-}
-
-async function fetchDetail(jobId) {
-  try {
-    const data = await fetchJson(
-      `https://gcsservices.careers.microsoft.com/search/api/v1/job/${encodeURIComponent(jobId)}?lang=en_us`,
-      { retries: 1 }
-    );
-    const info = data?.operationResult?.result || {};
-    return [info.description, info.qualifications, info.responsibilities]
-      .filter(Boolean)
-      .join('\n');
-  } catch {
-    return '';
+async function fetchQuery(query) {
+  const rows = [];
+  for (let start = 0; start < MAX_PAGES_PER_QUERY * PAGE_SIZE; start += PAGE_SIZE) {
+    const url =
+      `${BASE}?domain=microsoft.com&query=${encodeURIComponent(query)}` +
+      `&location=&start=${start}&sort_by=recent`;
+    let data;
+    try {
+      data = await fetchJson(url, { retries: 1 });
+    } catch {
+      break;
+    }
+    const positions = Array.isArray(data?.data?.positions) ? data.data.positions : [];
+    if (!positions.length) break;
+    rows.push(...positions);
+    const total = Number(data.data?.count || 0);
+    if (start + PAGE_SIZE >= total) break;
   }
+  return rows;
 }
 
 async function fetchCompany({ displayName }) {
-  const rowsById = new Map();
-
+  const byId = new Map();
   for (const q of QUERIES) {
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      let jobs = [];
-      try {
-        jobs = await fetchSearchPage(q, page);
-      } catch {
-        break;
-      }
-      if (!jobs.length) break;
-      for (const j of jobs) {
-        const id = j.jobId || j.JobId || j.id;
-        if (!id || rowsById.has(id)) continue;
-        rowsById.set(id, j);
-      }
-      if (jobs.length < PAGE_SIZE) break;
+    try {
+      const rows = await fetchQuery(q);
+      for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, r);
+    } catch {
+      /* one query failing is fine */
     }
   }
 
-  const merged = Array.from(rowsById.entries());
   const out = [];
-  // Cap detail enrichment to keep network traffic bounded.
-  const ENRICH_CAP = 80;
-  let enriched = 0;
-
-  for (const [id, j] of merged) {
-    const title = j.title || j.Title || '';
-    const location =
-      j.primaryLocation ||
-      j.properties?.primaryLocation ||
-      j.locations?.[0]?.location ||
-      j.jobPropertiesFormatted?.primaryLocation ||
-      '';
-    let description = j.shortDescription || j.description || '';
-
-    if (!description && enriched < ENRICH_CAP) {
-      description = await fetchDetail(id);
-      enriched++;
-    }
-
+  for (const p of byId.values()) {
+    const id = p.id || p.displayJobId || p.atsJobId;
+    const loc =
+      Array.isArray(p.standardizedLocations) && p.standardizedLocations.length
+        ? p.standardizedLocations.join(', ')
+        : Array.isArray(p.locations)
+        ? p.locations.join(', ')
+        : p.locations || '';
     out.push({
       source: 'microsoft',
-      external_id: String(id),
+      external_id: id ? String(id) : null,
       company_name: displayName || 'Microsoft',
-      job_title: title,
-      location,
-      apply_url: `https://jobs.careers.microsoft.com/global/en/job/${encodeURIComponent(id)}`,
-      description: description || '',
-      date_posted: j.postingDate || j.postedDate || null,
+      job_title: p.name || '',
+      location: loc,
+      apply_url: p.positionUrl
+        ? `https://jobs.careers.microsoft.com${p.positionUrl}`
+        : `https://jobs.careers.microsoft.com/global/en/job/${id}`,
+      description: '', // detail body requires a separate /api/pcsx/position_details call
+      date_posted: p.postedTs || p.creationTs || null, // Unix seconds; normalize handles it
     });
   }
-
   return out;
 }
 

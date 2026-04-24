@@ -53,17 +53,35 @@ const COMPANIES = [
   { source: 'workday', slug: 'paypal',     tenant: 'paypal',     wd: '1',  site: 'jobs',                    displayName: 'PayPal' },
   { source: 'workday', slug: 'salesforce', tenant: 'salesforce', wd: '12', site: 'External_Career_Site',    displayName: 'Salesforce' },
   { source: 'workday', slug: 'intel',      tenant: 'intel',      wd: '1',  site: 'External',                displayName: 'Intel' },
+  { source: 'workday', slug: 'walmart',    tenant: 'walmart',    wd: '5',  site: 'WalmartExternal',         displayName: 'Walmart' },
 
   // ─── Single-tenant collectors ────────────────────────────────────────────
   { source: 'amazon',       displayName: 'Amazon' },
-  // Microsoft excluded by default: their public careers endpoint currently
-  // serves an invalid TLS certificate (wildcard *.azureedge.net). Re-enable
-  // if Microsoft fixes it, or set NODE_TLS_REJECT_UNAUTHORIZED=0 (unsafe).
-  // { source: 'microsoft', displayName: 'Microsoft' },
+  { source: 'uber',         displayName: 'Uber' },
+  { source: 'netflix',      displayName: 'Netflix' },
+  // Microsoft: their new apply.careers.microsoft.com frontend fetches jobs
+  // from a public /api/pcsx/search endpoint. No auth, no TLS workaround
+  // needed — the earlier 404s were because we were targeting the wrong path.
+  { source: 'microsoft',    displayName: 'Microsoft' },
 
-  // Curated new-grad 2027 list — gives us Google/Apple/Meta/Tesla/TikTok/…
-  // coverage that we can't reach via their own career-site APIs.
-  { source: 'newgrad2027',  displayName: 'NewGrad-2027 (GitHub)' },
+  // ─── Community-curated GitHub new-grad lists ─────────────────────────────
+  // These give us broad FAANG + enterprise coverage (Google, Apple, Meta,
+  // Microsoft, Goldman Sachs, JP Morgan, SpaceX, Boeing, Lockheed, …) that
+  // we can't reach through the companies' own career-site APIs.
+  //
+  // Same schema across both repos. Add more lists by dropping another entry.
+  {
+    source: 'ghlistings',
+    slug: 'vanshb03-newgrad2027',
+    displayName: 'vanshb03/New-Grad-2027',
+    url: 'https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/.github/scripts/listings.json',
+  },
+  {
+    source: 'ghlistings',
+    slug: 'simplify-newgrad',
+    displayName: 'SimplifyJobs/New-Grad-Positions',
+    url: 'https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json',
+  },
 ];
 
 const CONFIG = {

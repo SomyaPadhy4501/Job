@@ -36,10 +36,12 @@
           <option value="NO">Sponsorship: NO</option>
           <option value="UNKNOWN">Sponsorship: UNKNOWN</option>
         </select>
-        <label class="toggle">
-          <input type="checkbox" id="entry" />
-          <span>Entry-level only</span>
-        </label>
+        <select id="level">
+          <option value="">Any level (entry + mid)</option>
+          <option value="entry">Entry-level only</option>
+          <option value="mid">Mid-level (1-2 YOE)</option>
+          <option value="early">Entry or mid</option>
+        </select>
         <button id="refresh" type="button" title="Refresh">↻</button>
       </div>
     </header>
@@ -53,7 +55,7 @@
             <th>Type</th>
             <th>Location</th>
             <th>Sponsorship</th>
-            <th>Posted</th>
+            <th>Posted <span class="sort-indicator" title="Sorted newest first">↓</span></th>
             <th>Apply</th>
           </tr>
         </thead>

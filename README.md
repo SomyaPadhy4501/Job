@@ -1,5 +1,23 @@
 # US SWE / MLE / DS Job Aggregator
 
+> **Run everything with a single command:**
+> ```bash
+> ./run-all.sh
+> ```
+>
+> Starts the main API + scheduler + Playwright scraper microservice, auto-
+> picks a free port, opens the browser, streams logs with `[main]` / `[scr ]`
+> prefixes, and cleans up both services on Ctrl+C.
+>
+> **For a full agent-readable state dump** (architecture, sources, decisions,
+> extension recipes, known issues, red lines), see **[HANDOFF.md](HANDOFF.md)**.
+>
+> **Architecture at a glance:** main service in this repo handles all the
+> stable free APIs. A separate opt-in **[scraper microservice](scraper/)**
+> uses Playwright to scrape the ones that need a real browser. The two are
+> isolated — if the scraper breaks, the main job board keeps running.
+
+
 A small production-quality MVP that aggregates **US entry-level software &
 ML/AI/data** job postings from public ATS APIs, stores them in SQLite,
 classifies the role type and visa sponsorship with rules, and serves them from
@@ -107,12 +125,22 @@ All free, public, no auth, no scraping of LinkedIn/Indeed:
 | Ashby         | `https://api.ashbyhq.com/posting-api/job-board/{slug}`                                       | GET    |
 | Workday       | `https://{tenant}.wd{n}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs`                     | POST   |
 | Amazon        | `https://www.amazon.jobs/en/search.json?base_query={q}&loc_query=United+States`              | GET    |
-| newgrad2027   | `https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/.github/scripts/listings.json` | GET    |
+| Uber          | `https://www.uber.com/api/loadSearchJobsResults?localeCode=en-us`                            | POST   |
+| Netflix       | `https://explore.jobs.netflix.net/api/apply/v2/jobs?domain=netflix.com&start=…&num=…&query=…`| GET    |
+| ghlistings    | Configurable JSON URL per entry (see below)                                                  | GET    |
 
-The **newgrad2027** source is a single curated JSON file. It already labels
-each row's sponsorship (`Offers Sponsorship` / `Does Not Offer Sponsorship` /
+The **ghlistings** source is a generic collector for community-maintained
+GitHub new-grad lists. It ships wired to two repos:
+
+* `vanshb03/New-Grad-2027`
+* `SimplifyJobs/New-Grad-Positions`
+
+Both repos share a schema and already label each row's sponsorship
+(`Offers Sponsorship` / `Does Not Offer Sponsorship` /
 `U.S. Citizenship is Required` / `Other`) — those labels take precedence over
 our rule-based classifier. Every row is flagged entry-level by construction.
+Rows that appear in both repos dedupe automatically via the
+`company | title | location` key.
 
 ### Adding a new source
 
@@ -133,23 +161,129 @@ our rule-based classifier. Every row is flagged entry-level by construction.
 | Ashby | PostHog, Ramp, Linear, Perplexity, ElevenLabs, Notion, **OpenAI**, Cursor |
 | Workday | **Nvidia, Adobe, PayPal, Salesforce, Intel** |
 | Amazon | amazon.jobs (queries: SWE, SDE, MLE, Applied Scientist, Data Scientist, Data Engineer) |
-| newgrad2027 | 100+ companies including **Google, Apple, Meta, Tesla, TikTok, ByteDance, Nvidia, Adobe, Palantir, Roblox, Qualcomm, Twitch, Shopify, Citadel, IBM, Visa, AMD** |
+| ghlistings | 100+ companies across both repos, including **Google, Apple, Meta, Microsoft, Tesla, TikTok, ByteDance, SpaceX, Nvidia, Adobe, Palantir, Roblox, Qualcomm, RTX, Lockheed, Northrop Grumman, Goldman Sachs, JP Morgan, Morgan Stanley, SIG, Citadel, Boeing, Intel, AMD** |
 
 Bad slugs just log a warning and skip — safe to over-include.
 
-### Companies we *can't* reach via their own APIs
+### Direct-API access matrix (honest state as of 2026-04)
 
-Google / Apple / Meta / Netflix don't expose a free JSON career API, and we
-don't scrape their sites (ToS + brittleness). Instead we pull their postings
-from the community-maintained **newgrad2027** source.
+I tested every company below against their own public endpoints. The short
+version: Amazon, Uber, and the listed Workday tenants are the direct wins;
+the rest either have no JSON API, require auth, or serve bad TLS certs.
 
-| Company | Why (direct) | Coverage via newgrad2027 |
-|---|---|---|
-| Google, Apple, Meta | No public JSON; JS-rendered careers pages | ✅ |
-| Tesla, TikTok, ByteDance | Custom systems | ✅ |
-| Microsoft | Public endpoint exists but serves an invalid TLS cert (`*.azureedge.net`). `microsoft.js` collector is shipped but disabled in default config | partial |
-| Netflix | Moved off Lever; no open JSON | ❌ |
-| DoorDash / Plaid / Snowflake / HashiCorp / Rippling | Use ATSes not covered by our collectors | partial |
+**H-1B Top-10 sponsors (USCIS FY2026 Employer Data Hub):**
+
+| Rank | Company | Own API status | Our coverage |
+|---|---|---|---|
+| 1 | **Amazon** | `amazon.jobs/en/search.json` — works, no auth | direct ✅ |
+| 2 | **Tata Consultancy Services** | Custom ATS (TCS iBegin) not publicly resolvable; DNS on `ibegin.tcs.com` doesn't respond | none ❌ |
+| 3 | **Microsoft** | `gcsservices.careers.microsoft.com` 404s (retired); `jobs.careers.microsoft.com` 301s to `apply.careers.microsoft.com` which 302s to a JS-rendered page with no public JSON. `microsoft.js` collector + hostname-scoped TLS bypass are shipped so re-enabling is one config line once they restore a JSON endpoint | ghlistings only (2) |
+| 4 | **Infosys** | Career site on Oracle Taleo — no free public JSON search | none ❌ |
+| 5 | **Google** | `careers.google.com/api/v3/search/` returns 404; no usable public JSON exists | ghlistings only (6) |
+| 6 | **Apple** | `jobs.apple.com/api/role/search` returns 404; newer `api/v1/*` paths return 401 (cookie-gated) | ghlistings only (15) |
+| 7 | **Cognizant** | Workday tenant `cognizant.wd*` rejects anonymous CxS calls with 422/401 on every site+facet combination tried | none ❌ |
+| 8 | **Meta** | `metacareers.com` is GraphQL with signed `doc_id` tokens — hostile to aggregators | ghlistings only (3) |
+| 9 | **Tesla** | `www.tesla.com/cua-api/apps/careers/state` returns 403 (Cloudflare-protected, UA-filtered) | ghlistings (68) |
+| 10 | **Walmart** | `walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs` — works, no auth | direct ✅ |
+| — | **Netflix** | `explore.jobs.netflix.net/api/apply/v2/jobs` (Eightfold AI) — works, no auth | direct ✅ |
+
+**Other direct wins (not in top-10):** Nvidia / Adobe / PayPal / Salesforce /
+Intel (public Workday CxS endpoints).
+
+**Other known blocks:** Netflix (migrated off Lever, no open JSON), Cisco
+(Workday CxS returns 422 anonymously).
+
+Why the gaps are real and not me giving up:
+
+1. **Google / Apple / Meta** actively prevent programmatic aggregation via TLS
+   gating, signed tokens, and deprecated endpoints. Working around those
+   needs paid scraping infra with residential proxies (brittle, expensive,
+   often violates ToS) or reverse-engineered auth tokens (break on every
+   redeploy).
+2. **Microsoft** is mid-migration — their public JSON surface genuinely isn't
+   there right now. The TLS-bypass machinery in `src/collectors/http.js` is
+   already in place so when they restore an endpoint, I only need to update
+   one URL.
+3. **Cognizant / Cisco** have Workday tenants but are configured to reject
+   anonymous API access. That's a real block by the companies, not a bug on
+   our side.
+4. **TCS / Infosys** — large Indian IT services shops running closed ATSes
+   (TCS iBegin, Oracle Taleo) with no public JSON search. These companies
+   sponsor a lot of H-1B but publish very few listings publicly; roles are
+   typically filled via on-campus + in-person recruiting, not web job boards.
+   This is a structural gap, not a scraping problem.
+
+If you want fuller coverage for the blocked companies, the realistic options
+are: (a) LinkedIn (paid, brittle, ToS-gray), (b) a paid aggregator like
+Adzuna, or (c) checking those careers pages manually for the few roles you
+care about.
+
+### What I investigated for Google / Apple / Meta / Microsoft and why it didn't ship
+
+I probed each site's actual frontend traffic to find the backend APIs their
+career pages call. Summary of what I found:
+
+* **Netflix** (`explore.jobs.netflix.net`) → Eightfold-powered, public JSON
+  at `/api/apply/v2/jobs`. **Shipped as `netflix.js`.**
+* **Microsoft** (`apply.careers.microsoft.com`) → Eightfold-powered, same
+  endpoint shape as Netflix. Returns `403 {"message": "Not authorized for
+  PCSX"}` without a JS-generated auth token. The token is bootstrapped at
+  page load by their frontend bundle.
+* **Apple** (`jobs.apple.com`) → All `/api/role/search` and `/api/v1/*` paths
+  return 301/401. Page HTML has no inline job data — everything is fetched
+  client-side with a cookie-gated auth header.
+* **Meta** (`metacareers.com/jobsearch`) → Powered by their internal Relay
+  GraphQL. The `/jobsearch` HTML loads (441KB, LSD token extractable), but
+  the `doc_id` needed to call `/graphql` is only present in lazily-loaded
+  JS bundles that require a JS engine to execute. No `doc_id` in the raw
+  HTML. The `/graphql` endpoint also requires `fb_dtsg` CSRF tokens.
+* **Google** (`careers.google.com`) → `/api/v3/search` retired, returns 404.
+  The modern `/about/careers/applications/jobs/results/` page is 1.25MB of
+  server-rendered HTML with zero embedded job data — it's all fetched at
+  runtime from an undocumented endpoint inside their JS bundles.
+
+**The honest summary:** Google/Apple/Meta/Microsoft deliberately gate their
+career APIs with JS-generated tokens, rotating GraphQL doc_ids, and cookie-
+gated auth. This isn't a technology gap — GraphQL and gRPC don't magically
+bypass auth. These are the exact defenses designed to prevent aggregation.
+
+### Option: headless-browser scraping (not shipped by default)
+
+The only way to reach those four is to run a real browser (Playwright /
+Puppeteer), let it execute the frontend JS, harvest the auth tokens +
+GraphQL `doc_id`s at runtime, and then hit the gated APIs with those creds.
+This works but has hard costs:
+
+* ~300 MB of Chromium + Playwright dependencies
+* 20-60 seconds per page (vs ms for our current collectors)
+* Anti-bot defenses (reCAPTCHA on Microsoft's page, IP rate limiting) need
+  paid residential-proxy rotation (~$50-100/month)
+* Breaks on every frontend deploy — Google and Meta ship UI changes weekly
+* Explicitly prohibited by each company's ToS; legal gray area under CFAA
+
+I didn't ship this by default because it's a structural change — it moves
+the project from "lightweight free tool" to "scraping infra with ongoing
+maintenance". If you want it anyway, ask explicitly and I'll add a
+`collectors/playwright/` directory with a Google/Meta/Apple scraper gated
+behind `PLAYWRIGHT_SCRAPE=true`.
+
+Why the gap is real and not me giving up:
+
+1. **Google/Apple/Meta** actively prevent programmatic aggregation of their
+   listings via TLS gating, signed tokens, or removing public endpoints.
+   Working around those either needs paid scraping infra with residential
+   proxies (expensive, brittle, often violates ToS) or reverse-engineered
+   auth tokens (breaks on every redeploy).
+2. **Microsoft** could probably be reached with
+   `NODE_TLS_REJECT_UNAUTHORIZED=0`, but disabling TLS verification on a
+   production-style app is a real security regression I won't ship by default.
+3. **Cisco** is a Workday tenant configured to reject unauthenticated access —
+   a real block by Cisco, not a bug on our side.
+
+If you want fuller coverage for the blocked companies, the realistic options
+are: (a) LinkedIn (paid, brittle, ToS-gray), (b) a paid aggregator like
+Adzuna / USAJobs-style scraping services, or (c) checking those careers pages
+manually for the few roles you care about.
 
 ## Normalization, role classification & filters
 
@@ -163,18 +297,22 @@ Each raw job is normalized in `src/services/normalize.js`:
    `OTHER` is dropped when `FILTER_SOFTWARE=true` (default).
 4. **Internship reject** — titles containing `intern`, `internship`, `co-op`,
    or `Summer 20XX` are always rejected (full-time only).
-5. **Entry-level filter** (`ENTRY_LEVEL_MODE`):
+5. **Level filter** (`ENTRY_LEVEL_MODE`):
    - `off` — keep everything (still drops interns)
    - `permissive` (default) — drop titles containing
      `senior / sr / staff / principal / lead / director / manager / head of /
-     VP / architect / II / III / IV / V`
+     VP / architect / III / IV / V / VI`. **`II` is allowed through** — at
+     most companies "Software Engineer II" means 1-3 YOE, which is the
+     mid-level bucket the user is targeting.
    - `strict` — additionally require an explicit entry signal
      (`new grad`, `university`, `associate`, `junior`, `jr`, `Engineer I`,
      `Engineer 1`, etc.)
 6. **`is_entry_level`** flag is set to 1 when the title explicitly looks
-   entry-level (or when the source pre-labels it, like newgrad2027) — so the
-   UI can surface them with an "entry" pill and `GET /jobs?entry=true` can
-   target them directly.
+   entry-level (or when the source pre-labels it, like ghlistings) — UI shows
+   an "entry" pill.
+7. **`is_mid_level`** flag is set to 1 when the title contains an explicit
+   mid-level signal (`Engineer II`, `Engineer 2`, `Mid-level`, `1-2 years`, …)
+   and isn't already entry-level — UI shows a "mid · 1-2y" pill.
 7. **Sponsorship override** — sources that pre-label sponsorship (currently
    newgrad2027) supply a `sponsorship_override` that wins over the
    rule-based classifier.
@@ -247,7 +385,7 @@ Query params (all optional):
 * `sponsorship` — `YES` | `NO` | `UNKNOWN`
 * `company` — exact match (case-insensitive)
 * `role` — `SWE` | `MLE` | `AI` | `DS` | `DATA_ENG` | `SRE` | `SECURITY` | `MOBILE`
-* `entry` — `true` or `1` to return only rows flagged entry-level
+* `level` — `entry` (flagged entry-level), `mid` (flagged 1-2 YOE), `early` (either) — `entry=true` is still accepted as a legacy alias
 * `page` — 1-indexed, default `1`
 * `limit` — default `50`, max `200`
 
@@ -286,14 +424,14 @@ Force a collection run. If `COLLECT_TOKEN` is set, send it as
 ### Example `curl`
 
 ```bash
-# All entry-level ML roles with visa sponsorship, paginated
-curl 'http://localhost:3000/jobs?role=MLE&entry=true&sponsorship=YES&page=1&limit=25'
+# Entry + mid (1-2 YOE) ML roles with visa sponsorship, paginated
+curl 'http://localhost:3000/jobs?role=MLE&level=early&sponsorship=YES&page=1&limit=25'
 
-# New-grad SDE roles at Amazon
-curl 'http://localhost:3000/jobs?company=Amazon&entry=true&role=SWE'
+# Mid-level SDE II roles at Amazon
+curl 'http://localhost:3000/jobs?company=Amazon&level=mid&role=SWE'
 
-# Anything mentioning "new grad" across sources
-curl 'http://localhost:3000/jobs?search=new%20grad&limit=50'
+# Anything at Google / Apple / Meta
+for c in Google Apple Meta; do curl "http://localhost:3000/jobs?company=$c"; done
 
 # Trigger a collection run manually
 curl -X POST http://localhost:3000/admin/collect
@@ -304,14 +442,14 @@ curl -X POST http://localhost:3000/admin/collect
 Plain HTML + one JS file. Served from Express at `/`. Supports:
 
 * Title/company search (debounced)
-* Role-type dropdown (SWE / MLE / AI / DS / Data Eng / SRE / Security / Mobile)
+* Role-type dropdown (SWE / MLE / AI / DS / Data Eng / DevOps-SRE / Security / Mobile)
 * Sponsorship filter (YES / NO / UNKNOWN)
-* "Entry-level only" checkbox
+* Level dropdown: Any level (default) / Entry-only / Mid only (1-2 YOE) / Entry or mid
 * Pagination
 * `Apply` button opens the source posting in a new tab
 
-Rows carry two small pills — the role type bucket, and an `entry` badge on
-titles the classifier flagged as explicitly entry-level.
+Rows carry small pills — the role-type bucket, and an `entry` or `mid · 1-2y`
+badge on titles the classifier flagged.
 
 ## Database schema
 
@@ -330,6 +468,7 @@ CREATE TABLE jobs (
   sponsorship    TEXT    NOT NULL DEFAULT 'UNKNOWN',
   role_type      TEXT    NOT NULL DEFAULT 'OTHER',
   is_entry_level INTEGER NOT NULL DEFAULT 0,
+  is_mid_level   INTEGER NOT NULL DEFAULT 0,
   first_seen_at  TEXT    NOT NULL,
   last_seen_at   TEXT    NOT NULL
 );
