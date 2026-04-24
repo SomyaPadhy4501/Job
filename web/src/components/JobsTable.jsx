@@ -10,11 +10,28 @@ const ROLE_LABEL = {
   OTHER: 'Other',
 };
 
+
 function fmtDate(s) {
   if (!s) return '—';
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Render a row's date column: prefer the upstream posting date, fall back to
+// `first_seen_at` (when we first observed the row) so users always see *some*
+// temporal context. The "Seen" label distinguishes the two — the upstream
+// date is authoritative, the first-seen stamp is our best guess.
+function PostedCell({ row }) {
+  if (row.date_posted) return <>{fmtDate(row.date_posted)}</>;
+  if (row.first_seen_at) {
+    return (
+      <span title="Upstream didn't provide a posting date; this is when we first observed the role.">
+        Seen {fmtDate(row.first_seen_at)}
+      </span>
+    );
+  }
+  return <>—</>;
 }
 
 function LevelPill({ row }) {
@@ -68,7 +85,9 @@ export default function JobsTable({ rows, isLoading, error }) {
             <tr key={r.id}>
               <td>
                 <div className="company-name">{r.company_name}</div>
-                <div className="muted small">{r.source}</div>
+                {r.category === 'STARTUP' && (
+                  <span className="pill pill-cat pill-cat-startup">Startup</span>
+                )}
               </td>
               <td>
                 <div className="role-cell">
@@ -85,7 +104,7 @@ export default function JobsTable({ rows, isLoading, error }) {
                   {r.sponsorship || 'UNKNOWN'}
                 </span>
               </td>
-              <td className="muted nowrap">{fmtDate(r.date_posted)}</td>
+              <td className="muted nowrap"><PostedCell row={r} /></td>
               <td>
                 <a
                   className="apply-btn"

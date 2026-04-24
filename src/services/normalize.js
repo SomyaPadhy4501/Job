@@ -1,6 +1,7 @@
 'use strict';
 
 const { classifySponsorship } = require('./classifier');
+const { classifyCategory } = require('./category');
 
 function stripHtml(html) {
   if (!html) return '';
@@ -98,45 +99,120 @@ function looksUS(location) {
 }
 
 // ─── Role-type classifier ──────────────────────────────────────────────────
-// Order matters: most specific first. Data-eng runs BEFORE the SRE family so
-// "Cloud Data Engineer" buckets as DATA_ENG, not SRE.
+// Computer-science roles only: SWE, MLE, AI, DS, DATA_ENG, SRE, SECURITY,
+// MOBILE. Everything else → OTHER (which the collect pipeline drops by
+// default via `FILTER_SOFTWARE=true`).
+//
+// Strategy:
+//   1. Early reject for titles that include a non-CS engineering discipline
+//      (electrical, mechanical, aerospace, …) or an adjacent-but-not-CS role
+//      (sales engineer, test engineer without "software", hardware, etc.).
+//   2. Whitelist for each CS role — strict phrase matches, no bare "engineer"
+//      fallback. If nothing matches → OTHER.
+//
+// The old classifier's bare `\bengineer\b → SWE` fallback was catching
+// electrical/industrial/propulsion/chief engineer roles as "software".
+
+// Hardware / physical-discipline cue words. If any of these appear in the
+// title WITHOUT a compensating software cue (see HAS_SOFTWARE_CUE below),
+// the role is hardware/physical engineering, not CS. Catches "Hardware
+// Reliability Engineer", "Hardware Platform Engineer", "RF Engineer",
+// "Silicon Design Engineer", etc., where the keywords "reliability" /
+// "platform" / "engineer" might otherwise trigger a CS match.
+const HARDWARE_CUE =
+  /\b(hardware|firmware|asic|chip|silicon|physical[-\s]?design|\brf\b|radio[-\s]?frequency|antenna|photonic|microwave|fiber|laser|analog\s+design)\b/i;
+
+// Software/CS cue words. Presence of any of these on a title that ALSO has a
+// hardware cue means the role is software *for* hardware (e.g. embedded
+// software engineer, FPGA software engineer) — keep it.
+const HAS_SOFTWARE_CUE =
+  /\b(software|\bml\b|machine\s+learning|\bai\b|artificial\s+intelligence|\bsde\b|\bswe\b|site\s+reliability|\bsre\b|devops|simulation|algorithm|compiler|embedded\s+software|data\s+(?:engineer|scientist)|programmer|backend|frontend|full[-\s]?stack)\b/i;
+
+// Non-CS engineering disciplines as the prefix to "engineer/developer".
+// Catches "Electrical Engineer", "Propulsion Engineer", "Industrial Engineer",
+// "Aerospace Engineer", etc.
+const NON_CS_DISCIPLINE =
+  /\b(electrical|mechanical|industrial|civil|chemical|aerospace|aeronautical|astronautical|propulsion|manufacturing|optical|structural|materials|nuclear|environmental|petroleum|biomedical|biochemical|thermal|acoustic|hydraulic|pneumatic|fluid|combustion|automotive|avionics|power|electronics?|instrumentation|flight|marine|ocean|welding|geotechnical|mining|agricultural|food|textile|paper)\s+(engineer|developer|specialist|scientist|technician)/i;
+
+// "Title starts with a non-CS discipline" — catches "Propulsion Test
+// Infrastructure Engineer" etc. where the discipline prefix gives the role
+// away even when the rest of the title contains CS-ish words.
+const STARTS_NON_CS_DISCIPLINE =
+  /^\s*(electrical|mechanical|industrial|civil|chemical|aerospace|aeronautical|astronautical|propulsion|manufacturing|optical|structural|materials|nuclear|environmental|petroleum|biomedical|biochemical|thermal|acoustic|hydraulic|combustion|automotive|avionics|instrumentation|flight)\b/i;
+
+// "Research Engineer, Mechanical" / "Research Scientist - Chemistry" / etc.
+// A research title followed by a physical-science suffix. Strong non-CS
+// signal — reject outright.
+const RESEARCH_DISCIPLINE_SUFFIX =
+  /\bresearch\s+(?:engineer|scientist)\s*[,\-]\s*(mechanical|electrical|industrial|civil|chemical|aerospace|aeronautical|propulsion|manufacturing|structural|materials|nuclear|biomedical|thermal|hydraulic|acoustic|automotive|avionics|power|optical|chemistry|physics|biology|biochemistry|neuroscience)\b/i;
+
+// Adjacent-to-software roles that share keywords but aren't CS work.
+const ADJACENT_NON_CS =
+  /\b(quality|test(?!\s+automation)|process|project|program(?!ing|mer)|field|sales|pre[-\s]?sales|solutions|customer(?:\s+success)?|technical\s+support|service|safety|traffic|facilities|controls|integration|supply\s+chain|deployment|chief)\s+(engineer|architect|specialist|manager|analyst)\b/i;
+
+// Business/finance analyst-adjacent titles that occasionally include
+// "engineer" or "scientist". Reject.
+const NON_CS_OTHER =
+  /\b(business\s+(?:analyst|developer)|marketing|growth(?:\s+manager)?|finance|accountant|recruiter|hr|legal|counsel|paralegal|graphic\s+designer|ux\s+(?:designer|researcher(?!.*\bml\b))|content|writer|copywriter|operations\s+manager|program\s+manager|project\s+manager|product\s+manager|clinical|research\s+associate|lab\s+technician)\b/i;
+
+// ─── CS whitelist — phrase-anchored, most specific first ───────────────────
+
+const MLE_PATTERN =
+  /\b(machine\s+learning\s+(?:engineer|developer)|\bml\s+(?:engineer|developer)|\bmle\b|applied\s+(?:scientist|researcher)|machine\s+learning\s+scientist|computer\s+vision\s+engineer|nlp\s+engineer|deep\s+learning\s+engineer)/i;
+
+const AI_PATTERN =
+  /\b(ai\s+(?:engineer|developer|researcher|scientist)|artificial\s+intelligence\s+(?:engineer|scientist)|research\s+engineer|research\s+scientist|ml\s+scientist|nlp\s+scientist|computer\s+vision\s+scientist|llm\s+(?:engineer|researcher|scientist))/i;
+
+const DS_PATTERN =
+  /\b(data\s+scientist|analytics\s+scientist|quantitative\s+(?:analyst|researcher)|quant\s+researcher|decision\s+scientist)/i;
+
+const DATA_ENG_PATTERN =
+  /\b(data\s+(?:engineer|developer)|analytics\s+engineer|etl\s+developer|bi\s+engineer|business\s+intelligence\s+engineer)/i;
+
+const SECURITY_PATTERN =
+  /\b(security\s+engineer|application\s+security|appsec|cybersecurity\s+(?:engineer|analyst)|infosec\s+engineer|offensive\s+security|detection\s+engineer|incident\s+response\s+engineer|security\s+software\s+engineer)/i;
+
+const MOBILE_PATTERN =
+  /\b((?:ios|android)\s+(?:engineer|developer)|mobile\s+(?:engineer|developer|software))/i;
+
+// Note: removed bare `reliability engineer` — too ambiguous (hardware
+// reliability engineers are common in defense/aerospace). Require "site
+// reliability" or "sre" explicitly.
+const SRE_PATTERN =
+  /\b(site\s+reliability\s+engineer|\bsre\b|dev\s*ops\s+(?:engineer|developer)|platform\s+(?:engineer|developer|software\s+engineer)|infrastructure\s+(?:engineer|developer|software\s+engineer)|cloud\s+(?:engineer|developer|software\s+engineer)|production\s+engineer(?:ing)?|build\s+engineer|release\s+engineer|kubernetes\s+(?:engineer|developer)|observability\s+engineer)/i;
+
+const SWE_PATTERN =
+  /\b(software\s+(?:engineer|developer)|software\s+development\s+engineer|\bsde\b|\bswe\b|full[-\s]?stack\s+(?:engineer|developer)|front[-\s]?end\s+(?:engineer|developer)|back[-\s]?end\s+(?:engineer|developer)|web\s+(?:engineer|developer)|applications?\s+developer|embedded\s+software(?:\s+engineer)?|software\s+architect|systems\s+software\s+engineer|distributed\s+systems\s+engineer|programmer|game\s+(?:engineer|developer|programmer)|ios\s+developer|android\s+developer|robotics\s+software\s+engineer|autonomy\s+software\s+engineer|compiler\s+engineer|graphics\s+software\s+engineer)/i;
+
 function classifyRole(title) {
   const t = (title || '').toLowerCase();
-  if (/\b(machine learning|ml)[\s-]+engineer\b/.test(t)) return 'MLE';
-  if (/\bapplied\s+(scientist|researcher)\b/.test(t)) return 'MLE';
-  if (/\bresearch\s+engineer\b/.test(t)) return 'AI';
-  if (/\bai\s+(engineer|research|scientist)\b/.test(t)) return 'AI';
-  if (/\bresearch\s+scientist\b/.test(t)) return 'AI';
-  if (/\bdata\s+scientist\b/.test(t)) return 'DS';
-  if (/\bdata\s+engineer\b/.test(t)) return 'DATA_ENG';
+  if (!t) return 'OTHER';
 
-  // DevOps / SRE / Platform / Infrastructure / Cloud family.
-  if (
-    /\b(site\s+reliability|reliability|sre|dev\s*ops|platform|infrastructure|systems|production|release|build)\s+(engineer|developer|specialist)\b/.test(
-      t
-    )
-  )
-    return 'SRE';
-  if (
-    /\bcloud\s+(engineer|developer|specialist|infrastructure|platform|ops|operations)\b/.test(
-      t
-    )
-  )
-    return 'SRE';
-  // Bare-word fallbacks for titles without "engineer" suffix
-  if (/\b(devops|sre|kubernetes|terraform)\b/.test(t)) return 'SRE';
+  // Early rejects — anything flagged here is NOT a CS role, even if the rest
+  // of the title would otherwise match a CS pattern.
+  if (NON_CS_DISCIPLINE.test(t)) return 'OTHER';
+  if (RESEARCH_DISCIPLINE_SUFFIX.test(t)) return 'OTHER';
+  if (STARTS_NON_CS_DISCIPLINE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
+  if (HARDWARE_CUE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
+  if (ADJACENT_NON_CS.test(t)) return 'OTHER';
+  if (NON_CS_OTHER.test(t)) return 'OTHER';
 
-  if (/\bsecurity\s+engineer\b/.test(t)) return 'SECURITY';
-  if (/\b(ios|android|mobile)\s+engineer\b/.test(t)) return 'MOBILE';
-  if (
-    /\b(software|applications|full[-\s]?stack|front[-\s]?end|back[-\s]?end|web)\s+(engineer|developer)\b/.test(
-      t
-    )
-  )
-    return 'SWE';
-  if (/\bsoftware\s+development\s+engineer\b/.test(t)) return 'SWE'; // Amazon's SDE
-  if (/\b(swe|sde)\b/.test(t)) return 'SWE';
-  if (/\bengineer\b/.test(t)) return 'SWE'; // generic engineer → bucket as SWE
+  // Tighten SRE detection: `reliability engineer` alone is often hardware
+  // (e.g. "Hardware Reliability Engineer"). Require "site reliability" or
+  // "sre" explicitly — handled via SRE_PATTERN below (no bare reliability).
+
+  // Most specific → least specific. Data-family before SRE-family so "Cloud
+  // Data Engineer" lands as DATA_ENG rather than SRE. MLE/AI before plain
+  // "Software Engineer" so "ML Software Engineer" is MLE not SWE.
+  if (MLE_PATTERN.test(t)) return 'MLE';
+  if (AI_PATTERN.test(t)) return 'AI';
+  if (DS_PATTERN.test(t)) return 'DS';
+  if (DATA_ENG_PATTERN.test(t)) return 'DATA_ENG';
+  if (SECURITY_PATTERN.test(t)) return 'SECURITY';
+  if (MOBILE_PATTERN.test(t)) return 'MOBILE';
+  if (SRE_PATTERN.test(t)) return 'SRE';
+  if (SWE_PATTERN.test(t)) return 'SWE';
+
   return 'OTHER';
 }
 
@@ -158,6 +234,7 @@ const SENIOR_REJECT = [
   /\bsenior\b/, /\bsr\.?\b/, /\bstaff\b/, /\bprincipal\b/, /\bdistinguished\b/,
   /\blead\b/, /\bdirector\b/, /\bmanager\b/, /\bhead of\b/,
   /\bvp\b/, /\bvice\s+president\b/, /\barchitect\b/,
+  /\bchief\b/, // "Programs Chief Engineer", "Chief of Staff", etc.
   /\s(iii|iv|v|vi)\b/i, // space + III/IV/…  (II is intentionally NOT rejected)
   /\s-\s*(iii|iv|v|vi)\b/i,
 ];
@@ -301,6 +378,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
     role_type,
     is_entry_level,
     is_mid_level,
+    category: classifyCategory(company_name, raw.source),
   };
 }
 

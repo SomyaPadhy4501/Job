@@ -34,6 +34,7 @@ function initSchema(database) {
       date_posted    TEXT,
       sponsorship    TEXT    NOT NULL DEFAULT 'UNKNOWN',
       role_type      TEXT    NOT NULL DEFAULT 'OTHER',
+      category       TEXT    NOT NULL DEFAULT 'SMALL',
       is_entry_level INTEGER NOT NULL DEFAULT 0,
       is_mid_level   INTEGER NOT NULL DEFAULT 0,
       first_seen_at  TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -76,6 +77,91 @@ function migrate(database) {
     database.exec('ALTER TABLE jobs ADD COLUMN is_mid_level INTEGER NOT NULL DEFAULT 0');
     database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_mid ON jobs (is_mid_level)');
   }
+  if (!cols.includes('category')) {
+    database.exec("ALTER TABLE jobs ADD COLUMN category TEXT NOT NULL DEFAULT 'SMALL'");
+    // Backfill existing rows with their computed category. Runs once when the
+    // column is first added; a no-op on subsequent boots.
+    // eslint-disable-next-line global-require
+    const { classifyCategory } = require('../services/category');
+    const rows = database
+      .prepare('SELECT id, company_name, source FROM jobs')
+      .all();
+    const upd = database.prepare('UPDATE jobs SET category = ? WHERE id = ?');
+    const tx = database.transaction((list) => {
+      for (const r of list) upd.run(classifyCategory(r.company_name, r.source), r.id);
+    });
+    tx(rows);
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] backfilled category on ${rows.length} rows`);
+  }
+  // Always ensure the category index exists — outside the ADD-COLUMN branch
+  // so fresh DBs (where the column was created by initSchema) also get it.
+  database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_category ON jobs (category)');
+
+  // Reclassify category on every boot so a tightened/loosened startup list
+  // propagates immediately. The classifier collapses to { 'STARTUP', '' }
+  // now — no Big Tech / Mid / Small distinctions.
+  // eslint-disable-next-line global-require
+  const { classifyCategory } = require('../services/category');
+  const catRows = database
+    .prepare('SELECT id, company_name, source, category FROM jobs')
+    .all();
+  let catUpdated = 0;
+  const updCat = database.prepare('UPDATE jobs SET category = ? WHERE id = ?');
+  const catTx = database.transaction((list) => {
+    for (const r of list) {
+      const next = classifyCategory(r.company_name, r.source);
+      if (next !== r.category) { updCat.run(next, r.id); catUpdated++; }
+    }
+  });
+  catTx(catRows);
+  if (catUpdated > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] reclassified category on ${catUpdated} rows`);
+  }
+
+  // Reclassify role_type + level on every boot and drop rows that no longer
+  // pass the filters. This is the escape hatch when we tighten the classifier
+  // (e.g. excluding electrical/propulsion engineer from SWE): existing rows
+  // stay stuck with their old role_type until they're refetched, so this
+  // migration converges the DB to the current rules immediately.
+  // eslint-disable-next-line global-require
+  const { classifyRole, passesLevel } = require('../services/normalize');
+  const allRows = database
+    .prepare('SELECT id, job_title, role_type FROM jobs')
+    .all();
+  let reclassified = 0;
+  const updRole = database.prepare('UPDATE jobs SET role_type = ? WHERE id = ?');
+  const killIds = [];
+  const tx = database.transaction((list) => {
+    for (const r of list) {
+      const nextRole = classifyRole(r.job_title);
+      if (nextRole !== r.role_type) {
+        updRole.run(nextRole, r.id);
+        reclassified++;
+      }
+      // Drop rows that would fail the current collector-time filters. We
+      // assume FILTER_SOFTWARE=true (the default) — any OTHER row isn't
+      // supposed to be in the DB. Also drop rows whose title no longer
+      // passes the senior/intern rejects.
+      if (nextRole === 'OTHER' || !passesLevel(r.job_title, 'permissive')) {
+        killIds.push(r.id);
+      }
+    }
+  });
+  tx(allRows);
+  let deleted = 0;
+  if (killIds.length) {
+    const del = database.prepare('DELETE FROM jobs WHERE id = ?');
+    const delTx = database.transaction((ids) => {
+      for (const id of ids) { del.run(id); deleted++; }
+    });
+    delTx(killIds);
+  }
+  if (reclassified || deleted) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] reclassified role_type on ${reclassified} rows; deleted ${deleted} that no longer match filters`);
+  }
   // 2026-04-24: add apply_url index so upsertJob can do a secondary dedupe
   // lookup by URL (catches near-duplicates where the dedupe_key differs only
   // due to cosmetic drift — "Google LLC" vs "Google", "SF, CA, USA" vs "SF, CA").
@@ -116,24 +202,24 @@ function migrate(database) {
     console.log(`[db.migrate] removed broken-url rows: workday=${brokenWd}, microsoft=${brokenMs}`);
   }
 
-  // Backfill null `date_posted` rows with `first_seen_at`. This matches the
-  // new-insert behavior (stamp today's date when the upstream has no date)
-  // and, importantly, makes the retention sweep consistent — post-backfill,
-  // every row has a real `date_posted` so the OR-branch in pruneStaleJobs
-  // that checks `last_seen_at` for null-dated rows is rarely hit. The
-  // `strftime('%Y-%m-%dT%H:%M:%fZ', ...)` dance converts SQLite's default
-  // `YYYY-MM-DD HH:MM:SS` format into the ISO format the rest of the code
-  // uses. No-op on a DB that's already fully dated.
-  const backfilled = database
+  // Undo the earlier "stamp date_posted on first insert" experiment. Those
+  // stamps collide with real upstream-provided dates in the sort order —
+  // rows with no real posting date ended up appearing ahead of genuinely
+  // dated rows (e.g. HN comments from April 1-15 getting buried under
+  // Workday rows stamped today). We detect an auto-stamped row by the tight
+  // time proximity of `date_posted` to `first_seen_at` (within 5 seconds).
+  // Real upstream dates are rarely that close to our insert time.
+  const unstamped = database
     .prepare(
       `UPDATE jobs
-       SET date_posted = strftime('%Y-%m-%dT%H:%M:%fZ', first_seen_at)
-       WHERE date_posted IS NULL`
+       SET date_posted = NULL
+       WHERE date_posted IS NOT NULL
+         AND ABS(strftime('%s', date_posted) - strftime('%s', first_seen_at)) <= 5`
     )
     .run().changes;
-  if (backfilled > 0) {
+  if (unstamped > 0) {
     // eslint-disable-next-line no-console
-    console.log(`[db.migrate] backfilled date_posted on ${backfilled} rows`);
+    console.log(`[db.migrate] un-stamped date_posted on ${unstamped} rows`);
   }
 
   // Re-apply the current looksUS() to every row and purge ones that no longer
@@ -186,6 +272,7 @@ function upsertJob(job) {
              date_posted    = COALESCE(@date_posted, date_posted),
              sponsorship    = @sponsorship,
              role_type      = @role_type,
+             category       = @category,
              is_entry_level = @is_entry_level,
              is_mid_level   = @is_mid_level
          WHERE id = @id`
@@ -194,30 +281,36 @@ function upsertJob(job) {
     return { inserted: 0, updated: 1 };
   }
 
-  // If the upstream source doesn't publish a posting date (Microsoft PCSX,
-  // Workday-without-detail, Goldman GraphQL, …), stamp today's date on first
-  // insert. From our perspective this *is* when the role became visible.
-  // Subsequent refetches hit the UPDATE branch above where `date_posted` is
-  // preserved via COALESCE — so the stamped date never drifts.
-  const insertRow = { ...job, date_posted: job.date_posted || new Date().toISOString() };
+  // Leave `date_posted` null when upstream didn't provide one. We used to
+  // stamp today's date at insert time, but that conflated "newly discovered"
+  // with "newly posted" and pushed stamped rows to the top of the sort —
+  // burying real-dated rows like HN-hiring comments (which have accurate
+  // timestamps from April but lose to Workday rows stamped today). The UI
+  // now falls back to `first_seen_at` for display of null-dated rows, and
+  // the retention sweep uses `first_seen_at` as the age proxy.
   database
     .prepare(
       `INSERT INTO jobs
         (dedupe_key, source, external_id, company_name, job_title, location,
-         apply_url, description, date_posted, sponsorship, role_type,
+         apply_url, description, date_posted, sponsorship, role_type, category,
          is_entry_level, is_mid_level)
        VALUES
         (@dedupe_key, @source, @external_id, @company_name, @job_title, @location,
-         @apply_url, @description, @date_posted, @sponsorship, @role_type,
+         @apply_url, @description, @date_posted, @sponsorship, @role_type, @category,
          @is_entry_level, @is_mid_level)`
     )
-    .run(insertRow);
+    .run(job);
   return { inserted: 1, updated: 0 };
 }
 
-// Delete jobs whose posted date is older than `days` days, OR whose last_seen_at
+// Delete jobs whose posted date is older than `days` days, OR whose first_seen_at
 // is older than `days` days when date_posted is unknown. Returns the count
 // removed. Called at the end of every collect run.
+//
+// Why `first_seen_at` instead of `last_seen_at` for null-dated rows: we want
+// "30 days since we discovered it", not "30 days since we last saw it on an
+// upstream feed". The latter is effectively never-aging because last_seen_at
+// refreshes every successful collect run.
 function pruneStaleJobs(days) {
   if (!days || days <= 0) return 0;
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -225,7 +318,7 @@ function pruneStaleJobs(days) {
     .prepare(
       `DELETE FROM jobs
        WHERE (date_posted IS NOT NULL AND date_posted < @cutoff)
-          OR (date_posted IS NULL AND last_seen_at < @cutoff)`
+          OR (date_posted IS NULL AND first_seen_at < @cutoff)`
     )
     .run({ cutoff });
   return r.changes;
@@ -250,7 +343,7 @@ function finishRun(id, stats) {
     .run({ id, ...stats, errors: stats.errors ? JSON.stringify(stats.errors) : null });
 }
 
-function queryJobs({ search, title, sponsorship, company, role, level, limit, offset }) {
+function queryJobs({ search, title, sponsorship, company, role, level, source, limit, offset }) {
   const database = getDb();
   const clauses = [];
   const params = {};
@@ -278,6 +371,10 @@ function queryJobs({ search, title, sponsorship, company, role, level, limit, of
     clauses.push('role_type = @role');
     params.role = role;
   }
+  if (source) {
+    clauses.push('source = @source');
+    params.source = source;
+  }
   // level: 'entry' → is_entry_level=1
   //        'mid'   → is_mid_level=1
   //        'early' → either entry OR mid (entry + 1-2 YOE bucket)
@@ -298,7 +395,7 @@ function queryJobs({ search, title, sponsorship, company, role, level, limit, of
   const rows = database
     .prepare(
       `SELECT id, source, company_name, job_title, location, apply_url,
-              date_posted, sponsorship, role_type,
+              date_posted, sponsorship, role_type, category,
               is_entry_level, is_mid_level,
               first_seen_at, last_seen_at
        FROM jobs

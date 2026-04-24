@@ -46,6 +46,11 @@ function createApp() {
     const sponsorship = ['YES', 'NO', 'UNKNOWN'].includes(sponsorshipRaw) ? sponsorshipRaw : '';
     const role = VALID_ROLES.includes(roleRaw) ? roleRaw : '';
     const level = VALID_LEVELS.includes(levelRaw) ? levelRaw : entryLegacy ? 'entry' : '';
+    // Source filter — only let through sources we actually have. Pulled live
+    // from the DB rather than hardcoded so new collectors become filterable
+    // without a second edit.
+    const sourceRaw = (req.query.source || '').toString().trim();
+    const source = sourceRaw || '';
 
     const limit = Math.min(
       CONFIG.maxPageSize,
@@ -54,7 +59,7 @@ function createApp() {
     const page = Math.max(1, Number(req.query.page) || 1);
     const offset = (page - 1) * limit;
 
-    const cacheKey = JSON.stringify({ search, title, sponsorship, company, role, level, limit, offset });
+    const cacheKey = JSON.stringify({ search, title, sponsorship, company, role, level, source, limit, offset });
     const cached = jobsCache.get(cacheKey);
     if (cached) {
       res.setHeader('x-cache', 'HIT');
@@ -62,7 +67,7 @@ function createApp() {
     }
 
     const { total, rows } = queryJobs({
-      search, title, sponsorship, company, role, level, limit, offset,
+      search, title, sponsorship, company, role, level, source, limit, offset,
     });
     const body = {
       data: rows,
@@ -72,7 +77,7 @@ function createApp() {
         total,
         totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      filters: { search, title, sponsorship, company, role, level },
+      filters: { search, title, sponsorship, company, role, level, source },
     };
 
     jobsCache.set(cacheKey, body);
