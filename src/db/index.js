@@ -162,6 +162,35 @@ function migrate(database) {
     // eslint-disable-next-line no-console
     console.log(`[db.migrate] reclassified role_type on ${reclassified} rows; deleted ${deleted} that no longer match filters`);
   }
+
+  // Reclassify sponsorship on every boot using the updated classifier
+  // (USCIS H-1B lookup added 2026-04-24). This converges all existing rows
+  // to the improved signal immediately without requiring a re-collect.
+  // eslint-disable-next-line global-require
+  const { classifySponsorship } = require('../services/classifier');
+  const { stripHtml } = require('../services/normalize');
+  const sponsorRows = database
+    .prepare('SELECT id, job_title, description, company_name FROM jobs')
+    .all();
+  let sponsorUpdated = 0;
+  const updSpons = database.prepare('UPDATE jobs SET sponsorship = ? WHERE id = ?');
+  const sponsorTx = database.transaction((list) => {
+    for (const r of list) {
+      const text = `${r.job_title || ''}\n${stripHtml(r.description || '')}`;
+      const next = classifySponsorship(text, r.company_name);
+      // Only update if changed — avoids unnecessary writes on every boot
+      const cur = database.prepare('SELECT sponsorship FROM jobs WHERE id = ?').get(r.id);
+      if (cur && next !== cur.sponsorship) {
+        updSpons.run(next, r.id);
+        sponsorUpdated++;
+      }
+    }
+  });
+  sponsorTx(sponsorRows);
+  if (sponsorUpdated > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] reclassified sponsorship on ${sponsorUpdated} rows`);
+  }
   // 2026-04-24: add apply_url index so upsertJob can do a secondary dedupe
   // lookup by URL (catches near-duplicates where the dedupe_key differs only
   // due to cosmetic drift — "Google LLC" vs "Google", "SF, CA, USA" vs "SF, CA").

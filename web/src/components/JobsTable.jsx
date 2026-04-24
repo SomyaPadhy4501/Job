@@ -85,9 +85,6 @@ export default function JobsTable({ rows, isLoading, error }) {
             <tr key={r.id}>
               <td>
                 <div className="company-name">{r.company_name}</div>
-                {r.category === 'STARTUP' && (
-                  <span className="pill pill-cat pill-cat-startup">Startup</span>
-                )}
               </td>
               <td>
                 <div className="role-cell">

@@ -348,7 +348,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   const sponsorship =
     raw.sponsorship_override && ['YES', 'NO', 'UNKNOWN'].includes(raw.sponsorship_override)
       ? raw.sponsorship_override
-      : classifySponsorship(`${job_title}\n${description}`);
+      : classifySponsorship(`${job_title}\n${description}`, company_name);
 
   // Same for entry-level: a curated new-grad source can force the flag.
   const is_entry_level =
