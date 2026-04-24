@@ -67,6 +67,10 @@ async function fetchCompany({ displayName }) {
         : Array.isArray(p.locations)
         ? p.locations.join(', ')
         : p.locations || '';
+    // The real Microsoft jobs site lives on apply.careers.microsoft.com — the
+    // PCSX `positionUrl` field correctly encodes the path ("/careers/job/{id}")
+    // but we were prefixing it with `jobs.careers.microsoft.com`, which 301s
+    // to `apply.careers.microsoft.com/careers` (dropping the ID entirely).
     out.push({
       source: 'microsoft',
       external_id: id ? String(id) : null,
@@ -74,8 +78,8 @@ async function fetchCompany({ displayName }) {
       job_title: p.name || '',
       location: loc,
       apply_url: p.positionUrl
-        ? `https://jobs.careers.microsoft.com${p.positionUrl}`
-        : `https://jobs.careers.microsoft.com/global/en/job/${id}`,
+        ? `https://apply.careers.microsoft.com${p.positionUrl}`
+        : `https://apply.careers.microsoft.com/careers/job/${id}`,
       description: '', // detail body requires a separate /api/pcsx/position_details call
       date_posted: p.postedTs || p.creationTs || null, // Unix seconds; normalize handles it
     });

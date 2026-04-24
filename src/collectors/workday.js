@@ -115,7 +115,11 @@ async function fetchCompany(company) {
     company_name: displayName || slug,
     job_title: j.title || '',
     location: j.locationsText || '',
-    apply_url: `https://${tenant}.wd${wd}.myworkdayjobs.com${j.externalPath}`,
+    // The CxS API returns `externalPath` like "/job/Leeds/Quality-Automation-Engineer_R00289257-1",
+    // but the public URL needs the "/en-US/{site}" prefix — without it Workday
+    // redirects through a resolver that eventually lands on
+    // community.workday.com/invalid-url.
+    apply_url: `https://${tenant}.wd${wd}.myworkdayjobs.com/en-US/${site}${j.externalPath}`,
     description: descByPath.get(j.externalPath) || '',
     date_posted: parsePostedOn(j.postedOn),
   }));

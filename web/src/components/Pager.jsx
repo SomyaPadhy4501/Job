@@ -1,6 +1,8 @@
 const PAGE_SIZES = [10, 25, 50, 100];
 
 export default function Pager({ page, totalPages, limit, onPage, onLimit }) {
+  const atFirst = page <= 1;
+  const atLast = page >= totalPages;
   return (
     <nav className="pager">
       <label className="pager-size">
@@ -19,8 +21,18 @@ export default function Pager({ page, totalPages, limit, onPage, onLimit }) {
       </label>
       <button
         type="button"
+        onClick={() => onPage(1)}
+        disabled={atFirst}
+        className="pager-btn pager-btn--icon"
+        aria-label="First page"
+        title="First page"
+      >
+        «
+      </button>
+      <button
+        type="button"
         onClick={() => onPage(page - 1)}
-        disabled={page <= 1}
+        disabled={atFirst}
         className="pager-btn"
       >
         ← Prev
@@ -31,10 +43,20 @@ export default function Pager({ page, totalPages, limit, onPage, onLimit }) {
       <button
         type="button"
         onClick={() => onPage(page + 1)}
-        disabled={page >= totalPages}
+        disabled={atLast}
         className="pager-btn"
       >
         Next →
+      </button>
+      <button
+        type="button"
+        onClick={() => onPage(totalPages)}
+        disabled={atLast}
+        className="pager-btn pager-btn--icon"
+        aria-label="Last page"
+        title="Last page"
+      >
+        »
       </button>
     </nav>
   );

@@ -94,6 +94,48 @@ function migrate(database) {
     console.log(`[db.migrate] removed ${removed} apply_url duplicates across ${dupes} URLs`);
   }
 
+  // One-shot: delete rows with known-broken apply_urls left over from before
+  // the 2026-04-24 Workday/Microsoft URL fixes. Workday rows without an
+  // `/en-US/{site}/` path segment redirect through a resolver to
+  // `community.workday.com/invalid-url`; Microsoft rows under
+  // `jobs.careers.microsoft.com` 301 to the bare homepage, dropping the job
+  // ID. If these roles are still open, the next collect run re-inserts them
+  // under the correct URL.
+  const brokenWd = database
+    .prepare(
+      "DELETE FROM jobs WHERE source = 'workday' AND apply_url LIKE '%myworkdayjobs.com/job/%'"
+    )
+    .run().changes;
+  const brokenMs = database
+    .prepare(
+      "DELETE FROM jobs WHERE source = 'microsoft' AND apply_url LIKE 'https://jobs.careers.microsoft.com%'"
+    )
+    .run().changes;
+  if (brokenWd + brokenMs > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] removed broken-url rows: workday=${brokenWd}, microsoft=${brokenMs}`);
+  }
+
+  // Backfill null `date_posted` rows with `first_seen_at`. This matches the
+  // new-insert behavior (stamp today's date when the upstream has no date)
+  // and, importantly, makes the retention sweep consistent — post-backfill,
+  // every row has a real `date_posted` so the OR-branch in pruneStaleJobs
+  // that checks `last_seen_at` for null-dated rows is rarely hit. The
+  // `strftime('%Y-%m-%dT%H:%M:%fZ', ...)` dance converts SQLite's default
+  // `YYYY-MM-DD HH:MM:SS` format into the ISO format the rest of the code
+  // uses. No-op on a DB that's already fully dated.
+  const backfilled = database
+    .prepare(
+      `UPDATE jobs
+       SET date_posted = strftime('%Y-%m-%dT%H:%M:%fZ', first_seen_at)
+       WHERE date_posted IS NULL`
+    )
+    .run().changes;
+  if (backfilled > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] backfilled date_posted on ${backfilled} rows`);
+  }
+
   // Re-apply the current looksUS() to every row and purge ones that no longer
   // qualify. The filter was tightened 2026-04-24 to reject "Remote, United
   // Arab Emirates" / "Vancouver, BC, CA" and friends — without this, rows
@@ -152,6 +194,12 @@ function upsertJob(job) {
     return { inserted: 0, updated: 1 };
   }
 
+  // If the upstream source doesn't publish a posting date (Microsoft PCSX,
+  // Workday-without-detail, Goldman GraphQL, …), stamp today's date on first
+  // insert. From our perspective this *is* when the role became visible.
+  // Subsequent refetches hit the UPDATE branch above where `date_posted` is
+  // preserved via COALESCE — so the stamped date never drifts.
+  const insertRow = { ...job, date_posted: job.date_posted || new Date().toISOString() };
   database
     .prepare(
       `INSERT INTO jobs
@@ -163,7 +211,7 @@ function upsertJob(job) {
          @apply_url, @description, @date_posted, @sponsorship, @role_type,
          @is_entry_level, @is_mid_level)`
     )
-    .run(job);
+    .run(insertRow);
   return { inserted: 1, updated: 0 };
 }
 
