@@ -93,6 +93,27 @@ function migrate(database) {
     // eslint-disable-next-line no-console
     console.log(`[db.migrate] removed ${removed} apply_url duplicates across ${dupes} URLs`);
   }
+
+  // Re-apply the current looksUS() to every row and purge ones that no longer
+  // qualify. The filter was tightened 2026-04-24 to reject "Remote, United
+  // Arab Emirates" / "Vancouver, BC, CA" and friends — without this, rows
+  // admitted by the old looser filter keep lingering until they'd naturally
+  // age out. Lazy-required here to avoid a circular import at module load.
+  // eslint-disable-next-line global-require
+  const { looksUS } = require('../services/normalize');
+  const rowsWithLoc = database
+    .prepare("SELECT id, location FROM jobs WHERE location IS NOT NULL AND location != ''")
+    .all();
+  const nonUsIds = rowsWithLoc.filter((r) => !looksUS(r.location)).map((r) => r.id);
+  if (nonUsIds.length > 0) {
+    const del = database.prepare('DELETE FROM jobs WHERE id = ?');
+    const tx = database.transaction((ids) => {
+      for (const id of ids) del.run(id);
+    });
+    tx(nonUsIds);
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] removed ${nonUsIds.length} non-US rows after looksUS tightening`);
+  }
 }
 
 function upsertJob(job) {
@@ -165,13 +186,21 @@ function finishRun(id, stats) {
     .run({ id, ...stats, errors: stats.errors ? JSON.stringify(stats.errors) : null });
 }
 
-function queryJobs({ search, sponsorship, company, role, level, limit, offset }) {
+function queryJobs({ search, title, sponsorship, company, role, level, limit, offset }) {
   const database = getDb();
   const clauses = [];
   const params = {};
+  // `search` is strict company-name match now. "Meta" should surface Meta's
+  // roles, not every title containing the word "meta" (e.g. GitLab's
+  // "Professional Services Engineer - META"). A separate `title` param
+  // handles free-text search within role titles.
   if (search) {
-    clauses.push('(LOWER(job_title) LIKE @q OR LOWER(company_name) LIKE @q)');
+    clauses.push('LOWER(company_name) LIKE @q');
     params.q = `%${search.toLowerCase()}%`;
+  }
+  if (title) {
+    clauses.push('LOWER(job_title) LIKE @t');
+    params.t = `%${title.toLowerCase()}%`;
   }
   if (sponsorship) {
     clauses.push('sponsorship = @sponsorship');

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import TopBar from './components/TopBar.jsx';
 import Filters from './components/Filters.jsx';
@@ -6,34 +6,14 @@ import JobsTable from './components/JobsTable.jsx';
 import Pager from './components/Pager.jsx';
 import NewJobsToast from './components/NewJobsToast.jsx';
 import { useJobs } from './hooks/useJobs.js';
-
-// Reducer-style filter state so all mutations go through one well-typed path.
-// `page` is bundled here because it participates in the TanStack Query cache
-// key — changing any filter should reset to page 1 in one atomic update.
-const INITIAL_FILTERS = {
-  search: '',
-  sponsorship: '',
-  role: '',
-  level: '',
-  page: 1,
-  limit: 50,
-};
-
-function filtersReducer(state, action) {
-  switch (action.type) {
-    case 'set':
-      return { ...state, [action.key]: action.value, page: 1 };
-    case 'setPage':
-      return { ...state, page: action.value };
-    case 'clamp':
-      return { ...state, page: Math.min(state.page, Math.max(1, action.max)) };
-    default:
-      return state;
-  }
-}
+import useUrlFilters from './hooks/useUrlFilters.js';
 
 export default function App() {
-  const [filters, dispatch] = useReducer(filtersReducer, INITIAL_FILTERS);
+  // Filters live in the URL query string (see useUrlFilters). Reloading the
+  // page keeps the user's search + paging position; TanStack Query's cache
+  // then serves the prior rows instantly while it revalidates in the
+  // background. No cold-boot flash on refresh.
+  const [filters, dispatch] = useUrlFilters();
   const { data, isFetching, isLoading, error, refetch } = useJobs(filters);
 
   // Detect new jobs on background refetch. `lastSeenTotal` is the total we

@@ -1,37 +1,50 @@
 import { useEffect, useState } from 'react';
 
-// Search box is locally buffered so typing doesn't fire a query per keystroke.
-// 200ms debounce matches the old vanilla UI.
-function useDebounce(value, ms) {
-  const [debounced, setDebounced] = useState(value);
+// Local buffer + debounce so typing doesn't fire a network request per
+// keystroke. 200ms matches the original vanilla UI's feel.
+function useDebouncedProp(value, ms, onDebounced) {
+  const [buf, setBuf] = useState(value);
+  // Sync buffer when external value changes (e.g. URL-driven initial load).
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), ms);
+    setBuf(value);
+  }, [value]);
+  useEffect(() => {
+    if (buf === value) return;
+    const t = setTimeout(() => onDebounced(buf), ms);
     return () => clearTimeout(t);
-  }, [value, ms]);
-  return debounced;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buf]);
+  return [buf, setBuf];
 }
 
 export default function Filters({ filters, onChange }) {
-  const [searchBuffer, setSearchBuffer] = useState(filters.search);
-  const debouncedSearch = useDebounce(searchBuffer, 200);
-
-  useEffect(() => {
-    if (debouncedSearch !== filters.search) onChange('search', debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
+  const [companyBuf, setCompanyBuf] = useDebouncedProp(filters.search, 200, (v) =>
+    onChange('search', v)
+  );
+  const [titleBuf, setTitleBuf] = useDebouncedProp(filters.title, 200, (v) =>
+    onChange('title', v)
+  );
 
   return (
     <section className="filters">
       <input
         type="search"
-        placeholder="Search by title or company…"
-        value={searchBuffer}
-        onChange={(e) => setSearchBuffer(e.target.value)}
+        placeholder="Company — e.g. Meta, Stripe"
+        value={companyBuf}
+        onChange={(e) => setCompanyBuf(e.target.value)}
+        autoComplete="off"
+        className="search"
+      />
+      <input
+        type="search"
+        placeholder="Role title — e.g. infrastructure, new grad"
+        value={titleBuf}
+        onChange={(e) => setTitleBuf(e.target.value)}
         autoComplete="off"
         className="search"
       />
       <select value={filters.role} onChange={(e) => onChange('role', e.target.value)}>
-        <option value="">Any role</option>
+        <option value="">Any role type</option>
         <option value="SWE">SWE / SDE</option>
         <option value="MLE">ML Engineer</option>
         <option value="AI">AI / Research</option>

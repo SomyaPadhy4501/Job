@@ -31,6 +31,7 @@ function createApp() {
 
   app.get('/jobs', (req, res) => {
     const search = (req.query.search || '').toString().trim();
+    const title = (req.query.title || '').toString().trim();
     const sponsorshipRaw = (req.query.sponsorship || '').toString().toUpperCase();
     const company = (req.query.company || '').toString().trim();
     const roleRaw = (req.query.role || '').toString().toUpperCase();
@@ -53,7 +54,7 @@ function createApp() {
     const page = Math.max(1, Number(req.query.page) || 1);
     const offset = (page - 1) * limit;
 
-    const cacheKey = JSON.stringify({ search, sponsorship, company, role, level, limit, offset });
+    const cacheKey = JSON.stringify({ search, title, sponsorship, company, role, level, limit, offset });
     const cached = jobsCache.get(cacheKey);
     if (cached) {
       res.setHeader('x-cache', 'HIT');
@@ -61,7 +62,7 @@ function createApp() {
     }
 
     const { total, rows } = queryJobs({
-      search, sponsorship, company, role, level, limit, offset,
+      search, title, sponsorship, company, role, level, limit, offset,
     });
     const body = {
       data: rows,
@@ -71,7 +72,7 @@ function createApp() {
         total,
         totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      filters: { search, sponsorship, company, role, level },
+      filters: { search, title, sponsorship, company, role, level },
     };
 
     jobsCache.set(cacheKey, body);

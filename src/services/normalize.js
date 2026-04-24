@@ -65,15 +65,35 @@ const US_CITY_MARKERS = [
   'redmond','bay area',
 ];
 
+// Any of these markers in a location string marks the row as non-US — they
+// override the "bare remote → US" heuristic and the US_STATES `ca` fallback
+// (which would otherwise match both California and Canada). Kept broad: it's
+// cheaper to let a few borderline US rows through than to leak foreign ones.
+const FOREIGN_MARKERS =
+  /\b(worldwide|global|anywhere|emea|apac|latam|eu|europe|european|asia|asian|india|uk|united kingdom|ireland|scotland|wales|germany|deutschland|france|spain|portugal|netherlands|belgium|poland|czech|romania|hungary|denmark|norway|sweden|finland|switzerland|austria|canada|canadian|ontario|toronto|montreal|quebec|vancouver|calgary|british columbia|alberta|manitoba|brazil|mexico|argentina|chile|colombia|peru|australia|japan|singapore|israel|nigeria|egypt|china|turkey|dubai|uae|united arab emirates|saudi|qatar|bahrain|new zealand|south africa|thailand|vietnam|philippines|indonesia|malaysia|pakistan|bangladesh|berlin|london|paris|amsterdam|sydney|melbourne|bangalore|bengaluru|hyderabad|delhi|mumbai|chennai|pune|tokyo|seoul|tel aviv|bogota|santiago|buenos aires|taipei|hong kong|madrid|rome|athens|oslo|stockholm|copenhagen|helsinki|zurich|geneva|brussels|prague|budapest|warsaw|bucharest|lisbon|istanbul)\b/i;
+
 function looksUS(location) {
   if (!location) return true; // unknown → don't drop
   const l = location.toLowerCase();
-  if (/\b(u\.?s\.?a?\.?|united states|usa)\b/.test(l)) return true;
-  if (/\bremote\b/.test(l) && !/\bemea|apac|europe|asia|uk|canada|india\b/.test(l)) return true;
+
+  // Explicit US → pass.
+  if (/\b(u\.?s\.?a?\.?|united states)\b/.test(l)) return true;
+
+  // Explicit non-US country/region/city → reject. This runs BEFORE the remote
+  // check so "Remote, United Arab Emirates" doesn't slip through via the
+  // bare `\bremote\b` match, and BEFORE the US_STATES tokenization so
+  // "Vancouver, BC, CA" doesn't register California via the `ca` token.
+  if (FOREIGN_MARKERS.test(l)) return false;
+
+  // Pure "remote" with no foreign marker → assume US for a US-centric board.
+  if (/\bremote\b/.test(l)) return true;
+
+  // US state or city mentions.
   for (const name of US_STATE_NAMES) if (l.includes(name)) return true;
   const tokens = l.split(/[\s,;/|()\-]+/).filter(Boolean);
   for (const tok of tokens) if (US_STATES.has(tok)) return true;
   for (const c of US_CITY_MARKERS) if (l.includes(c)) return true;
+
   return false;
 }
 

@@ -10,11 +10,20 @@ async function httpJson(url, init) {
   return res.json();
 }
 
-export async function fetchJobs({ page = 1, limit = 50, search = '', sponsorship = '', role = '', level = '' } = {}) {
+export async function fetchJobs({
+  page = 1,
+  limit = 50,
+  search = '',
+  title = '',
+  sponsorship = '',
+  role = '',
+  level = '',
+} = {}) {
   const params = new URLSearchParams();
   params.set('page', page);
   params.set('limit', limit);
   if (search) params.set('search', search);
+  if (title) params.set('title', title);
   if (sponsorship) params.set('sponsorship', sponsorship);
   if (role) params.set('role', role);
   if (level) params.set('level', level);
