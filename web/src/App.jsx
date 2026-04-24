@@ -74,7 +74,9 @@ export default function App() {
         <Pager
           page={filters.page}
           totalPages={totalPages}
+          limit={filters.limit}
           onPage={(p) => dispatch({ type: 'setPage', value: p })}
+          onLimit={(n) => dispatch({ type: 'setLimit', value: n })}
         />
       </main>
       {newJobs > 0 && <NewJobsToast count={newJobs} onClick={handleReloadToApplyNew} />}

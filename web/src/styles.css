@@ -283,6 +283,35 @@ a { color: inherit; }
 .pager-btn:hover:not(:disabled) { border-color: var(--border-strong); background: var(--panel-hover); }
 .pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .pager-info { color: var(--text-muted); font-size: 13px; }
+.pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 6px;
+}
+.pager-size-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.pager-size-select {
+  padding: 7px 28px 7px 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%238b8b9f' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.pager-size-select:hover {
+  border-color: var(--border-strong);
+  background-color: var(--panel-hover);
+}
 
 /* ─── Loading / empty ────────────────────────────────────────────────────── */
 .table-empty {
