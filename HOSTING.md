@@ -7,6 +7,12 @@ describes the target hosted deployment and the migration path to get there.
 Written 2026-04-24 for a next agent to pick up. Somya has not yet decided on
 all open questions — they are flagged at the bottom.
 
+Related: `SPONSORSHIP_PLAN.md` describes a planned USCIS H-1B data-backed
+sponsorship classifier. That plan is **explicitly hosting-neutral** (static
+~3 MB JSON file bundled in the repo, no runtime API calls, no new secrets)
+and does not affect anything in this document. If you execute that plan,
+the only deployment impact is one extra file to bundle.
+
 ---
 
 ## Goal
@@ -26,9 +32,9 @@ already in `HANDOFF.md`.
 
 Airflow's value is orchestrating **dependent** tasks across DAGs with retries,
 backfill, SLA alerts, and operator libraries for hundreds of systems. This app
-has ~12 collectors that:
+has 15 collectors (+ 5 Playwright scraper targets) that:
 - Run independently (no ordering, no shared state except the DB write)
-- Finish in under 2 minutes total
+- Finish in 6-7 minutes for the main collect, 10-12 minutes for the scraper
 - Already fail-soft in `src/services/collect.js` (one collector failing doesn't
   break the run)
 
@@ -78,15 +84,29 @@ None of those are on the roadmap.
 | Collectors (2 h)   | GitHub Actions    | Cron + compute + secrets, free 2000 min/mo       |
 | Scraper (6 h)      | GitHub Actions    | Chromium preinstalled, 7 GB RAM/run, free        |
 
-**Free-tier math:**
-- Collect cron: 12 runs/day × ~2 min = 24 min/day = ~12 h/month
-- Scrape cron: 4 runs/day × ~3 min = 12 min/day = ~6 h/month
-- Total: ~18 h/month against GitHub's 2000 min (~33 h) free allowance on
-  private repos, **unlimited on public repos**
+**Free-tier math (updated 2026-04-24 after measuring real run times):**
+- Collect cron: 12 runs/day × ~7 min = **~84 min/day = ~2,520 min/month**
+- Scrape cron: 4 runs/day × ~12 min = ~48 min/day = ~1,440 min/month
+- Total: **~3,960 min/month**
 
-**Cost estimate:** $0/month at current volume. First thing that pushes to paid
-is Neon storage if jobs table grows past 0.5 GB (~200k rows given current
-schema). Current state is 3,144 rows.
+GitHub Actions free tier:
+- Public repos: **unlimited** ← this budget fits.
+- Private repos: **2,000 min/month** ← this budget does **not** fit. Either
+  make the repo public, reduce collect frequency (e.g. every 3 h → 8 runs/day
+  cuts collect to ~1,680 min/month + scraper = 3,120, still over), or pay
+  GitHub Pro at $4/month for 3,000 min.
+
+The original HOSTING.md estimate ("~2 min per collect") was wrong — the
+collector fan-out now hits 700+ companies across 15 sources and runs 6-7
+minutes end-to-end even with concurrency=4. This is the single biggest
+gotcha for deploying: **verify the repo is public before relying on the free
+tier math.**
+
+**Cost estimate:** $0/month **only on a public repo**. DB size is no longer a
+concern — the 30-day retention sweep (`src/db/index.js::pruneStaleJobs`)
+holds the `jobs` table at ~1,600 rows (current state). The Neon 0.5 GB free
+tier is ~200k rows of headroom; retention prevents us from ever approaching
+it.
 
 ---
 
@@ -145,6 +165,19 @@ Schema changes:
   (optional; `smallint` also fine if you want to minimize app-layer changes)
 - `TEXT` stays `TEXT`
 - Indexes are identical syntax
+
+Columns added since this file was first written (make sure your
+`001_init.sql` includes them):
+- `category TEXT NOT NULL DEFAULT ''` (+ `idx_jobs_category`) — identifies
+  YC / HN-hiring rows as `'STARTUP'`, empty otherwise. See
+  `src/services/category.js`.
+- The retention sweep (`pruneStaleJobs(days)`) is pure SQL and ports cleanly
+  — just replace the SQLite date arithmetic with Postgres equivalents
+  (`date_posted < NOW() - INTERVAL '30 days'`).
+
+Migration strftime expressions in `src/db/index.js::migrate()` (used by a
+handful of one-shot backfills) translate to `TO_CHAR(...)` in Postgres;
+re-express them at port time.
 
 Migration tool: use a plain `.sql` file checked into `migrations/001_init.sql`.
 Run once manually against Neon via `psql`. Don't add a migration framework —
@@ -267,7 +300,8 @@ clean.
 | `INGEST_URL`     | GitHub Actions secret (scraper)    | `https://<vercel-domain>/api/admin/ingest`        |
 | `FILTER_US`      | Vercel env + Actions env           | `true`                                            |
 | `FILTER_SOFTWARE`| Vercel env + Actions env           | `true`                                            |
-| `ENTRY_LEVEL_MODE`| Vercel env + Actions env          | `any` (see `src/config.js`)                       |
+| `ENTRY_LEVEL_MODE`| Vercel env + Actions env          | `permissive` (see `src/config.js`)                |
+| `RETENTION_DAYS` | Vercel env + Actions env           | `30` (drops rows older than N days at collect end)|
 
 **Do not** commit any of these. Vercel has an env-var UI; GitHub Actions has
 repo Settings → Secrets and variables → Actions.
@@ -299,7 +333,11 @@ repo Settings → Secrets and variables → Actions.
 These require Somya's call before the next agent proceeds.
 
 1. **Public or private GitHub repo?** Public = unlimited Actions minutes.
-   Private = 2000 min/month (plenty, but finite). Is there anything sensitive
+   Private = 2000 min/month, which **no longer fits** (see "Free-tier math"
+   above — collect alone runs ~2,520 min/month). Options if the repo must be
+   private: reduce cadence to every 3-4 h (+loss of freshness), pay GitHub
+   Pro $4/mo for 3,000 min, or run the crons on a different free-tier runner
+   (Fly.io machines / Railway / a home server). Is there anything sensitive
    in the repo that rules out public?
 2. **Vercel free hobby tier is non-commercial only.** Does this qualify as
    personal use? (It does — it's Somya's job search tool — but confirm.)
@@ -339,7 +377,7 @@ Same spirit as `HANDOFF.md`:
 ## Appendix: file inventory added by this migration
 
 ```
-migrations/001_init.sql                   # Postgres schema + indexes
+migrations/001_init.sql                   # Postgres schema + indexes (incl. category col)
 .github/workflows/collect.yml             # 2 h cron
 .github/workflows/scrape.yml              # 6 h cron
 api/                                      # Vercel functions (if split)
@@ -351,6 +389,8 @@ api/                                      # Vercel functions (if split)
   admin/ingest.js
 vercel.json                               # build config if needed
 HOSTING.md                                # this file
+SPONSORSHIP_PLAN.md                       # planned USCIS-data classifier (hosting-neutral)
+src/data/h1b-sponsors.json                # ← only if SPONSORSHIP_PLAN is executed; ~500 KB gzipped
 ```
 
 And changed:
