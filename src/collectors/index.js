@@ -9,6 +9,7 @@ const microsoft = require('./microsoft');
 const uber = require('./uber');
 const netflix = require('./netflix');
 const ghlistings = require('./ghlistings');
+const hnHiring = require('./hn_hiring');
 
 // Registry keyed by source. Adding a new source = drop a module here.
 const REGISTRY = {
@@ -21,6 +22,7 @@ const REGISTRY = {
   [uber.source]: uber,
   [netflix.source]: netflix,
   [ghlistings.source]: ghlistings,
+  [hnHiring.source]: hnHiring,
 };
 
 function getCollector(source) {

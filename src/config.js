@@ -82,6 +82,12 @@ const COMPANIES = [
     displayName: 'SimplifyJobs/New-Grad-Positions',
     url: 'https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json',
   },
+
+  // ─── YC startups via HN "Who is hiring?" ─────────────────────────────────
+  // Pulls the last 2 monthly threads, parses "Company | Location | … | URL"
+  // headers, and keeps only comments whose company matches a US-based YC
+  // company currently marked `isHiring` in akshaybhalotia/yc_company_scraper.
+  { source: 'hn_hiring', displayName: 'HN Who is hiring (YC US)' },
 ];
 
 const CONFIG = {
