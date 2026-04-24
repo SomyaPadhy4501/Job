@@ -16,10 +16,26 @@ Last verified live state (2026-04-24): **3,144+ jobs across 10 sources**
 (pre-`hn_hiring` snapshot: 3,144 / 9 sources). Entry≈1,464, Mid≈190,
 Sponsorship-YES≈131, Sponsorship-NO≈93.
 
+`COMPANIES` in `src/config.js` now holds **682 entries** after the YC ATS +
+topstartups.io merges (up from ~47). Re-run `npm run collect` to pick up
+the new coverage — the stats above were captured before the merge. First
+collect after the merge also triggers a one-shot dedupe migration that
+removes existing `apply_url` duplicates (kept oldest row, ran cleanly on
+2026-04-24 removing 25 dupes).
+
 **Recently added (2026-04-24):**
 - Source `hn_hiring` — HN "Who is hiring?" threads filtered by a maintained YC US-hiring allowlist. Only source with clean per-comment `date_posted`.
-- `scripts/probe-yc-ats.js` — discovers YC companies that publish on Greenhouse/Lever/Ashby. Output is `scripts/yc-ats-discovered.txt`, waiting on Somya's review before rows get pasted into `src/config.js`.
+- `scripts/probe-yc-ats.js` — discovers YC companies that publish on Greenhouse/Lever/Ashby. Writes config-ready blocks to stdout; redirect into a file for the verifier.
+- `scripts/verify-yc-ats.js` — verifies probe output before merge (Greenhouse exact-name match via `/boards/{slug}` metadata; Lever/Ashby via slug-variant provenance). 12 collisions caught on the first run (e.g. `greenhouse:beam` → "Bridge to Enter Advanced Mathematics" nonprofit, not YC Beam). 357 entries verified and merged into `src/config.js` on 2026-04-24.
+- `scripts/probe-topstartups.js` — discovers non-YC curated startups (Anduril, ClickHouse, Chainguard, Harvey, Abridge, Semgrep, …) from topstartups.io. Scrapes the infinite-scroll page, filters US-HQ, reuses the same ATS probe + name-match verification as the YC flow. 277 entries merged.
 - `HOSTING.md` — plan to move off local to Vercel + Neon Postgres + GitHub Actions (free tier, zero-ops).
+
+**Investigated and rejected (2026-04-24):**
+- `startup.jobs` — Cloudflare 403 challenge on every endpoint (including RSS). Same bucket as LinkedIn/Indeed/Glassdoor.
+- `thehub.io` — Nordic/Danish focus; near-zero US yield after `FILTER_US=true`.
+- `theantijobboard.com` — not a listings site, landing page for a newsletter. No scrapeable jobs.
+- `wellfound.com` — robots.txt explicitly disallows `/_jobs/`, `*?jobId=*`, `*?jobSlug=*`, `/job_listings/*`. ToS/legal red line; same bucket as LinkedIn.
+- `builtin.com` — robots permissive but content Cloudflare-gated and US-tech startup coverage heavily overlaps with what we already get from Greenhouse/Lever/Ashby via the YC + topstartups probes. Not worth the effort given the duplicate-yield.
 
 ---
 
@@ -101,7 +117,8 @@ them together at the process level only.
 | `src/collectors/http.js` | Shared fetch wrapper with timeout, retries, hostname-scoped TLS bypass, `runWithConcurrency` helper |
 | `src/collectors/*.js` | One file per source (see next section) |
 | `src/collectors/yc_companies.js` | **Shared utility** (not a collector). Fetches `akshaybhalotia/yc_company_scraper` feed, filters to `regions` contains "United States of America" + `isHiring: true`, exposes `loadUsHiringCompanies()` and `slugName()`. In-process cache — fetched once per `collectAll()` run. Used by `hn_hiring` and `scripts/probe-yc-ats.js`. |
-| `frontend/index.html`, `styles.css`, `app.js` | Zero-dep static UI served by Express |
+| `web/src/*` | **React UI (Vite + TanStack Query).** Single-page SPA built to `web/dist/` which Express serves statically. See §UI notes. |
+| `web/dist/` | Built output — ~190 KB JS + 7 KB CSS, gzipped ~60 KB + 2 KB. Regenerated on demand by `run-all.sh` when `web/src/` is newer. |
 
 ### Scraper service (`/scraper/`)
 
@@ -125,8 +142,9 @@ them together at the process level only.
 | `README.md` | Project-level documentation (slightly stale re: cadence; defer to HANDOFF.md) |
 | `HANDOFF.md` | This file |
 | `HOSTING.md` | Target hosted-deployment plan (Vercel + Neon + GitHub Actions). Read if the user wants to move off local. |
-| `scripts/probe-yc-ats.js` | One-shot: discovers YC US-hiring companies on Greenhouse/Lever/Ashby and prints copy-paste-ready config entries. See §Tools & Scripts. |
-| `scripts/yc-ats-discovered.txt`, `.log` | Output + progress log of the most recent probe run. Regenerate by re-running the script. |
+| `scripts/probe-yc-ats.js` | One-shot: discovers YC US-hiring companies on Greenhouse/Lever/Ashby and prints copy-paste-ready config entries to stdout. See §Tools & Scripts. |
+| `scripts/verify-yc-ats.js` | Verifier: for each entry in a probe-output file, confirms the ATS board belongs to the claimed YC company. Greenhouse: exact-name match on `/boards/{slug}` metadata. Lever/Ashby: provenance (slug must be derivable from YC name or website). Writes `scripts/yc-ats-verified.txt` (config-ready) and `scripts/yc-ats-rejected.txt` (with reason). |
+| `scripts/probe-topstartups.js` | topstartups.io-sourced company discovery with built-in verification. Paginates the infinite-scroll homepage, filters US-HQ, probes Greenhouse/Lever/Ashby. Writes `scripts/topstartups-ats-discovered.txt` and `scripts/topstartups-ats-rejected.txt`. |
 
 ---
 
@@ -168,6 +186,12 @@ All collectors return jobs in this common shape:
 | Cognizant | Workday tenant rejects anonymous CxS calls (HTTP 422 on every facet/site combination). |
 | Cisco | Same as Cognizant — `cisco.wd1.myworkdayjobs.com` returns 422 anonymously. |
 | Tesla direct | `tesla.com/cua-api/apps/careers/state` returns 403 (Cloudflare UA-filtered). We get Tesla via ghlistings instead (~68 rows). |
+| startup.jobs | Cloudflare "Just a moment..." challenge on every endpoint (homepage, `/feed` RSS, `/api/v1/*`). Same bucket as LinkedIn/Indeed. Won't ship. |
+| wellfound.com (AngelList) | robots.txt explicitly disallows `/_jobs/`, `*?jobId=*`, `*?jobSlug=*`, `/job_listings/*`, `/job_profiles/embed`, `/jobs/applications`. Legal/ToS red line. Won't ship. |
+| thehub.io | Nordic/Danish focus; effectively zero US rows after `FILTER_US=true`. Not worth implementation effort. |
+| theantijobboard.com | Not actually a jobs site — landing page for an email newsletter. No scrapeable listings. |
+| builtin.com | robots permissive, sitemap published, but content Cloudflare-gated and US-tech startup coverage overlaps heavily with Greenhouse/Lever/Ashby via the YC + topstartups probes. Duplicate yield not worth the effort. |
+| topstartups.io (as a job collector) | Not a job board — company directory whose "View Jobs" links jump to per-company Notion/career pages. Instead used as a **company-discovery source** via `scripts/probe-topstartups.js`. |
 
 If the user asks for any of these again, check this list before re-investigating.
 
@@ -219,6 +243,65 @@ ORDER BY CASE WHEN date_posted IS NULL THEN 1 ELSE 0 END,
 i.e. dated rows first, newest first, "no-date" rows sink to the bottom.
 
 ---
+
+## UI notes (`web/`)
+
+React + Vite SPA. TanStack Query owns all server state (rows, pagination
+total, filter-scoped results); local component state owns the filter
+form. The whole thing builds to static files at `web/dist/` served by
+Express — no separate dev process needed in production. In dev,
+`npm run dev` inside `web/` runs Vite at :5173 with `/jobs`, `/stats`,
+`/health`, `/admin` proxied to the Express port.
+
+What to know:
+
+- **Auto-refresh doesn't flicker.** `useJobs()` sets `refetchInterval: 60_000`
+  with `placeholderData: keepPreviousData`. The query silently polls; the
+  UI keeps rendering the previous rows until the new ones arrive. No
+  "Loading…" flash on filter change or pagination.
+- **"N new jobs · click to add" toast.** Background refetches compare the
+  new `pagination.total` against `lastSeenTotal` (captured at last explicit
+  user interaction). If the total grew, the toast appears. Clicking it
+  sets `lastSeenTotal := total` and invalidates the query so the table
+  repopulates. Preserves scroll + reading position.
+- **Window-focus refetch.** `refetchOnWindowFocus: true` in the default
+  `QueryClient` config — returning to the tab triggers an immediate
+  revalidation.
+- **Retries.** Default 2 retries with capped exponential backoff (~1s,
+  2s, 4s). Covers the 503 window when the server clears its cache during
+  a collect run.
+- **Pagination clamp.** `App.jsx` watches `totalPages` and dispatches
+  `clamp` if a filter change drops the current page below the new max —
+  so narrowing filters never strands you on an empty page.
+- **Single QueryClient.** Defined in `main.jsx`. `staleTime: 15_000`
+  keeps us in sync with the server-side 30s cache; any longer would risk
+  showing post-cron-tick-stale data.
+
+### Styling
+`web/src/styles.css` is a handwritten CSS file — no Tailwind, no CSS-in-JS.
+All color/spacing/radius tokens at the top as custom properties; swap
+them to re-theme. Palette is light Figma-ish: off-white bg, pure white
+cards, violet accent, soft pastel pills for entry/mid/YES/NO/UNKNOWN.
+Inter via Google Fonts (loaded in `web/index.html`).
+
+### Running the dev server separately
+```bash
+# Terminal A — backend
+PORT=4000 npm start
+
+# Terminal B — Vite HMR with proxy to :4000
+cd web && npm run dev
+# open http://localhost:5173
+```
+For normal use, just `./run-all.sh` — it runs `npm run build` in `web/`
+when `web/src/*` is newer than `web/dist/index.html`, and Express serves
+the built bundle on the same port as the API.
+
+### Migration note: Vercel
+When moving to the hosted architecture in HOSTING.md, the React code here
+drops into a Next.js app as-is (components are framework-agnostic,
+TanStack Query runs identically on Next.js). The rewrite there is mostly
+wiring, not re-architecting.
 
 ## Normalize pipeline (`src/services/normalize.js`)
 
@@ -283,18 +366,37 @@ One line in `src/config.js`:
 Only works if the repo uses the same JSON schema as `vanshb03/New-Grad-2027` (see `src/collectors/ghlistings.js` — it accepts `active`/`is_visible`/`sponsorship` fields).
 
 ### Discover more YC companies on Greenhouse/Lever/Ashby
-Run the probe tool:
+Run the probe, then the verifier, then review the verified output before
+pasting into `src/config.js::COMPANIES`:
 ```bash
-node scripts/probe-yc-ats.js                 # full run, ~3 min
-node scripts/probe-yc-ats.js --limit=100     # quick sample
-node scripts/probe-yc-ats.js > scripts/yc-ats-discovered.txt
+node scripts/probe-yc-ats.js > scripts/yc-ats-discovered.txt   # ~3 min
+node scripts/verify-yc-ats.js                                  # reads the .txt, writes verified.txt + rejected.txt
+# Review scripts/yc-ats-verified.txt, copy desired rows into src/config.js
+# When done, the .txt artifacts can be deleted — they're reproducible.
 ```
-It loads the YC US-hiring company list, probes each against the three ATS
-public APIs with slug variants (YC slug, name-dashed, name-flat, website
-domain stem), and prints config-ready lines grouped by ATS. Copy-paste the
-rows you want into `src/config.js::COMPANIES`. **Does not auto-mutate config
-— user reviews.** Duplicates from the upstream YC feed are deduped on
+The probe loads the YC US-hiring company list and probes each against the
+three ATS public APIs with slug variants (YC slug, name-dashed, name-flat,
+website domain stem). The **verifier** then filters out slug collisions by
+(a) exact-matching the Greenhouse board name against the company name via
+`/boards/{slug}` and (b) requiring Lever/Ashby slugs to be derivable from
+the YC name or website (provenance check). Real collisions it has caught:
+`greenhouse:beam` → "Bridge to Enter Advanced Mathematics" nonprofit,
+`greenhouse:14` → a veterinary hospital, `greenhouse:apollo` → "Apollo
+Education Systems". **Duplicates** from the upstream YC feed are deduped on
 `(source, slug)`.
+
+### Discover more non-YC curated startups on Greenhouse/Lever/Ashby
+Run the topstartups probe:
+```bash
+node scripts/probe-topstartups.js                 # full run, ~5 min
+node scripts/probe-topstartups.js --max-pages=10  # quick sample
+```
+Paginates topstartups.io, extracts US-HQ companies, probes the three ATSes,
+and verifies with the same rules as the YC flow (Greenhouse name-match +
+Lever/Ashby provenance). Writes `scripts/topstartups-ats-discovered.txt`
+and `scripts/topstartups-ats-rejected.txt`. Review the discovered file
+before pasting into `src/config.js::COMPANIES`; delete the artifacts once
+merged.
 
 ---
 
@@ -388,7 +490,7 @@ Response body for `GET /jobs`:
 - **No LinkedIn / Indeed / Glassdoor.** Legal / ToS hostility.
 - **No headless Chromium stealth plugins.** Not worth the arms race for a personal tool.
 - **Hostname-scoped TLS bypass** in `src/collectors/http.js` (currently dormant but available for future use). Do NOT set `NODE_TLS_REJECT_UNAUTHORIZED=0` globally.
-- **Dedupe by company|title|location, not by external_id.** Same role from multiple sources (e.g. Nvidia appears in both Workday and ghlistings) merges into one row.
+- **Dedupe by company|title|location, not by external_id — with `apply_url` as a secondary key.** Same role from multiple sources (e.g. Nvidia appears in both Workday and ghlistings) merges into one row. The canonical key collapses cosmetic drift (strips `Inc/LLC/Corp`, parenthetical title modifiers like `(Remote)`, and trailing country codes from location). When two sources publish the same apply URL under slightly different metadata, `upsertJob` does a secondary lookup on `apply_url` and merges them.
 - **`II` is mid-level, not senior.** At most companies it means 1-3 YOE. Matches Somya's target range.
 - **YC coverage is dual-path, not single-source.** `hn_hiring` gets the dated-but-narrow feed (HN "Who is hiring?" filtered to US YC companies); the ATS probe tool expands the main collector list to include many more YC companies directly from Greenhouse/Lever/Ashby. workatastartup.com is not usable (no public API). Don't re-investigate.
 - **HN "Who is hiring?" comment parsing drops most rows deliberately.** From ~670 top-level comments/month we keep ~15–20 after: (a) YC allowlist filter, (b) "Company | Role | Location | URL" header format requirement, (c) role-keyword requirement (no generic "Engineer" fallback — would false-match sales/BD "Engineers"), (d) foreign-location early reject. Low yield is a feature, not a bug.
@@ -406,7 +508,7 @@ Response body for `GET /jobs`:
 - **Meta scraper is now DOM-based** and returned 26 raw rows in the last live validation. It still does not walk true pagination; coverage comes from multiple search views.
 - **`hn_hiring` yield is intentionally low** (~12 rows net after the first live run). Most HN comments don't match the YC allowlist; among those that do, many use non-standard headers or post foreign-remote roles. This is the accepted tradeoff for getting real `date_posted` from HN vs nothing from workatastartup.com.
 - **YC allowlist depends on a third-party feed** (`akshaybhalotia/yc_company_scraper`). It's actively maintained (monthly cadence, last commit 2026-04-13 as of this writing), but if it ever stops updating, `hn_hiring` and `scripts/probe-yc-ats.js` both silently lose coverage. There's no fallback; you'd switch to `yc-oss/api` or roll your own from YC's public Algolia index.
-- **Probe-tool output is a snapshot, not a feed.** `scripts/yc-ats-discovered.txt` reflects the state at the moment it was run. Re-run monthly or whenever the YC feed refreshes.
+- **Probe-tool output is a snapshot, not a feed.** The discovered/verified txt files reflect the state at the moment they were run. Re-run the probe monthly or whenever the YC feed refreshes.
 
 ---
 
@@ -434,7 +536,7 @@ cd scraper && node src/run-one.js meta
 
 ### Immediately actionable (tonight)
 
-1. **Integrate the YC ATS probe output.** The most recent run of `scripts/probe-yc-ats.js` discovered several hundred new YC US-hiring companies across Greenhouse, Lever, and Ashby (numbers in `scripts/yc-ats-discovered.log`). Open `scripts/yc-ats-discovered.txt`, review the lines, and paste the ones you recognize into `src/config.js::COMPANIES`. **Expect some false positives** from the domain-stem slug variant (single-word hostnames like "14" may hit an unrelated Greenhouse board). Eyeball each before adding. This is the single biggest yield jump available.
+1. **Re-collect to pick up the merges.** `COMPANIES` jumped from ~47 to 682 on 2026-04-24; current DB stats still reflect the pre-merge state. Run `rm -rf data/ && npm run init-db && npm run collect` (or just `npm run collect` on the existing DB) to bring it current.
 2. **Monitor the first few `hn_hiring` cron runs.** It's a new source and HN comment conventions drift. If yield drops to 0 one month, inspect with `node src/collectors/hn_hiring.js` in a REPL and compare first-line formats to the regex in `parseComment()`.
 
 ### Scraper coverage
@@ -465,5 +567,7 @@ cd scraper && node src/run-one.js meta
 - Don't write tests unless the user asks — they haven't.
 - Don't delete `scraper/src/debug-urls.js`. It's a shipped diagnostic, not dev scaffolding.
 - Don't try workatastartup.com again. No public API, endpoints 404 / gate on YC candidate session. `hn_hiring` + the ATS probe cover YC.
-- Don't auto-paste `scripts/yc-ats-discovered.txt` into `src/config.js` without review. The probe uses loose slug variants (including bare domain stems) that can false-match; every entry needs a human eyeball.
+- Don't re-investigate startup.jobs, wellfound.com, builtin.com, thehub.io, or theantijobboard.com — see "intentionally not implemented" table for each site's specific blocker.
+- Don't auto-paste raw `scripts/probe-yc-ats.js` output into `src/config.js` without running `verify-yc-ats.js` first. The raw probe uses loose slug variants (including bare domain stems) that false-match unrelated companies.
+- Don't auto-paste `probe-topstartups.js` output either. Verification is already built into that probe, but review before merging — collisions the probe can't distinguish (e.g. two unrelated companies with the same name) still slip through.
 - Don't re-sync main and scraper cron (`0 */2 *` and `30 */6 *`). The 30-min offset is intentional — prevents overlapping DB writes.

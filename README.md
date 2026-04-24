@@ -40,10 +40,17 @@ SRE / Platform, Security, Mobile.
 Job/
 ├── package.json
 ├── README.md
-├── frontend/            # Static UI served by Express
+├── web/                 # React UI (Vite + TanStack Query); built to web/dist/
+│   ├── package.json
+│   ├── vite.config.js
 │   ├── index.html
-│   ├── styles.css
-│   └── app.js
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx
+│       ├── api.js
+│       ├── styles.css
+│       ├── hooks/useJobs.js
+│       └── components/  # TopBar, Filters, JobsTable, Pager, NewJobsToast
 └── src/
     ├── index.js         # Entry: boots API + scheduler
     ├── config.js        # Companies list & runtime config

@@ -187,13 +187,39 @@ function passesLevel(title, mode) {
   return true; // 'permissive'
 }
 
+// Dedupe key has to survive cosmetic drift between sources for the same role:
+//   Google LLC (Workday) vs Google (ghlistings)
+//   San Francisco, CA, USA vs San Francisco, CA vs SF, CA
+//   Software Engineer (Remote) vs Software Engineer
+// We strip corporate suffixes from the company, parenthetical modifiers + common
+// qualifiers from the title, and country suffixes from the location before
+// slugifying. Errs on the aggressive side — catching real duplicates matters
+// more than preserving marginal distinctions. apply_url is used as a secondary
+// dedupe check in upsertJob to catch anything this misses.
+function normCompany(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\b(inc|llc|ltd|corp|co|pbc|gmbh|plc|bv|ag)\b\.?/g, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+function normTitle(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b(remote|hybrid|onsite|on-site|us|usa|united states|full[\s-]?time|ft|contract|w2|h1b)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+function normLocation(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\b(united states|usa|us|u\.s\.a\.|u\.s\.)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 function buildDedupeKey(company, title, location) {
-  const norm = (s) =>
-    String(s || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  return `${norm(company)}|${norm(title)}|${norm(location)}`;
+  return `${normCompany(company)}|${normTitle(title)}|${normLocation(location)}`;
 }
 
 // Main entry. Returns a DB-ready row or null if filtered out.

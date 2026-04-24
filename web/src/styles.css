@@ -1,0 +1,347 @@
+/* ─── Design tokens: light, Figma-ish palette ─────────────────────────────
+ * Soft off-white background, pure white cards, violet accent. Everything
+ * derives from these custom properties — swap the values to re-theme.
+ */
+:root {
+  --bg: #f4f5f8;
+  --panel: #ffffff;
+  --panel-hover: #fafbfd;
+  --border: #e6e8ee;
+  --border-strong: #d4d7e0;
+
+  --text: #1a1d26;
+  --text-muted: #6b7280;
+  --text-subtle: #9ca3af;
+
+  --accent: #7c3aed;
+  --accent-soft: #ede9fe;
+  --accent-fg: #5b21b6;
+
+  --pill-bg: #f1f2f6;
+  --pill-fg: #475569;
+
+  --entry-bg: #d1fae5;
+  --entry-fg: #065f46;
+  --mid-bg: #dbeafe;
+  --mid-fg: #1e40af;
+
+  --yes-bg: #d1fae5;
+  --yes-fg: #047857;
+  --no-bg: #fee2e2;
+  --no-fg: #b91c1c;
+  --unknown-bg: #fef3c7;
+  --unknown-fg: #92400e;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.10);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+}
+
+.main {
+  padding-top: 20px;
+}
+
+/* ─── Top bar ────────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 0 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.logo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+.stats {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.refresh-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: border-color 120ms ease, transform 120ms ease;
+  box-shadow: var(--shadow-sm);
+}
+.refresh-btn:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.refresh-btn:active { transform: translateY(0); }
+
+.spinning { display: inline-block; animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Filters ────────────────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.filters input,
+.filters select {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.filters input:hover,
+.filters select:hover { border-color: var(--border-strong); }
+.filters input:focus,
+.filters select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+.filters .search { flex: 1 1 280px; }
+.filters select { min-width: 160px; background-image: none; appearance: none; padding-right: 28px; cursor: pointer; }
+
+/* ─── Table card ─────────────────────────────────────────────────────────── */
+.table-card {
+  margin-top: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.jobs-table thead th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+  background: #fbfcfe;
+  border-bottom: 1px solid var(--border);
+}
+.jobs-table tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.jobs-table tbody tr:last-child td { border-bottom: 0; }
+.jobs-table tbody tr:hover { background: var(--panel-hover); }
+
+.company-name { font-weight: 600; line-height: 1.3; }
+.role-title { line-height: 1.35; }
+/* Role cell stacks the title + optional level pill. Applied to a wrapper
+ * div — not the td directly, because `display: flex` on a <td> overrides
+ * `vertical-align: middle` and pins content to the top of the cell. */
+.role-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+.nowrap { white-space: nowrap; }
+.sort-indicator { color: var(--text-subtle); font-size: 11px; margin-left: 4px; }
+
+/* ─── Pills and badges ───────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  width: fit-content;
+}
+.pill-entry { background: var(--entry-bg); color: var(--entry-fg); }
+.pill-mid   { background: var(--mid-bg);   color: var(--mid-fg); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.badge-YES     { background: var(--yes-bg);     color: var(--yes-fg); }
+.badge-NO      { background: var(--no-bg);      color: var(--no-fg); }
+.badge-UNKNOWN { background: var(--unknown-bg); color: var(--unknown-fg); }
+
+/* ─── Apply button ──────────────────────────────────────────────────────── */
+.apply-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: white !important;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12.5px;
+  transition: filter 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 1px 2px rgba(124, 58, 237, 0.25);
+}
+.apply-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.28);
+}
+
+/* ─── Pager ──────────────────────────────────────────────────────────────── */
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+.pager-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.pager-btn:hover:not(:disabled) { border-color: var(--border-strong); background: var(--panel-hover); }
+.pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pager-info { color: var(--text-muted); font-size: 13px; }
+
+/* ─── Loading / empty ────────────────────────────────────────────────────── */
+.table-empty {
+  margin-top: 18px;
+  padding: 28px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+}
+.skeleton {
+  background: linear-gradient(90deg, #eef0f4 25%, #f6f7fa 50%, #eef0f4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-md);
+}
+.skeleton-row { height: 44px; margin: 8px 0; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ─── New-jobs toast ─────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 11px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-lg);
+  animation: rise 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 10;
+}
+.toast:hover { border-color: var(--accent); color: var(--accent-fg); }
+.toast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+@keyframes rise {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .app { padding: 0 12px 32px; }
+  .topbar { padding: 14px 0 10px; }
+  .jobs-table { font-size: 12.5px; }
+  .jobs-table thead th,
+  .jobs-table tbody td { padding: 10px 12px; }
+}

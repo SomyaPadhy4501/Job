@@ -154,9 +154,11 @@ function createApp() {
     }
   });
 
-  // Serve the frontend.
-  const frontendDir = path.resolve(__dirname, '..', '..', 'frontend');
-  app.use(express.static(frontendDir));
+  // Serve the React UI built at web/dist/. run-all.sh builds it when web/src
+  // is newer than the bundle; for raw `npm start`, run `cd web && npm run build`
+  // first.
+  const webDist = path.resolve(__dirname, '..', '..', 'web', 'dist');
+  app.use(express.static(webDist));
 
   return app;
 }

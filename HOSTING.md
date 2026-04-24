@@ -72,7 +72,7 @@ None of those are on the roadmap.
 
 | Component          | Home              | Why                                              |
 |--------------------|-------------------|--------------------------------------------------|
-| Frontend (static)  | Vercel            | Zero-config for `frontend/`, free forever        |
+| Frontend (static)  | Vercel            | Zero-config for `web/dist/` (Vite build), free forever |
 | Read API           | Vercel functions  | Stateless GETs, idle 99% of the time             |
 | DB                 | Neon Postgres     | Managed, free 0.5 GB, scales to paid cleanly     |
 | Collectors (2 h)   | GitHub Actions    | Cron + compute + secrets, free 2000 min/mo       |
@@ -173,11 +173,13 @@ Express can also run on Vercel as a single handler if you don't want to split â€
 `api/index.js` exporting the Express app. Simpler migration, slightly worse
 cold-start per route.
 
-### 3. Deploy the static frontend to Vercel
+### 3. Deploy the React frontend to Vercel
 
-`frontend/` is already zero-dependency static files. Set Vercel's output
-directory to `frontend/` and it works. Point the frontend's fetch calls at the
-same domain (`/api/jobs` etc.) â€” same-origin, no CORS needed.
+The UI already lives at `web/` (Vite + React + TanStack Query). Set Vercel's
+project root to `web/`, build command to `npm run build`, and output
+directory to `dist`. The API fetch calls (`/jobs`, `/stats`, `/admin/*`)
+are already same-origin relative paths, so there's no CORS work once the
+Vercel functions at `/api/*` mount alongside the static bundle.
 
 ### 4. Move the 2 h collect cron to GitHub Actions
 

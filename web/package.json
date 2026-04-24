@@ -1,0 +1,21 @@
+{
+  "name": "job-aggregator-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "React UI for the job aggregator. Built with Vite; output at web/dist is served statically by the Express backend at src/api/server.js.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.51.23",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.1"
+  }
+}

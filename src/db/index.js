@@ -46,6 +46,7 @@ function initSchema(database) {
     CREATE INDEX IF NOT EXISTS idx_jobs_posted     ON jobs (date_posted);
     CREATE INDEX IF NOT EXISTS idx_jobs_role       ON jobs (role_type);
     CREATE INDEX IF NOT EXISTS idx_jobs_entry      ON jobs (is_entry_level);
+    CREATE INDEX IF NOT EXISTS idx_jobs_applyurl   ON jobs (apply_url);
 
     CREATE TABLE IF NOT EXISTS collection_runs (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,13 +76,41 @@ function migrate(database) {
     database.exec('ALTER TABLE jobs ADD COLUMN is_mid_level INTEGER NOT NULL DEFAULT 0');
     database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_mid ON jobs (is_mid_level)');
   }
+  // 2026-04-24: add apply_url index so upsertJob can do a secondary dedupe
+  // lookup by URL (catches near-duplicates where the dedupe_key differs only
+  // due to cosmetic drift — "Google LLC" vs "Google", "SF, CA, USA" vs "SF, CA").
+  database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_applyurl ON jobs (apply_url)');
+
+  // One-shot cleanup: remove existing apply_url duplicates (keep oldest row).
+  // No-op if the DB is already clean, so safe to run on every boot.
+  const dupes = database
+    .prepare('SELECT COUNT(*) AS c FROM (SELECT apply_url FROM jobs GROUP BY apply_url HAVING COUNT(*) > 1)')
+    .get().c;
+  if (dupes > 0) {
+    const removed = database
+      .prepare('DELETE FROM jobs WHERE id NOT IN (SELECT MIN(id) FROM jobs GROUP BY apply_url)')
+      .run().changes;
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] removed ${removed} apply_url duplicates across ${dupes} URLs`);
+  }
 }
 
 function upsertJob(job) {
   const database = getDb();
-  const existing = database
+  // Primary lookup: canonical dedupe_key. Catches the common case of re-seeing
+  // the same role over time.
+  let existing = database
     .prepare('SELECT id FROM jobs WHERE dedupe_key = ?')
     .get(job.dedupe_key);
+  // Secondary lookup: same apply_url already exists under a different
+  // dedupe_key. Happens when the same role is published by two sources with
+  // slightly different company/title/location formatting ("Google LLC" vs
+  // "Google", "SF, CA, USA" vs "San Francisco, California"). Merge them.
+  if (!existing && job.apply_url) {
+    existing = database
+      .prepare('SELECT id FROM jobs WHERE apply_url = ? LIMIT 1')
+      .get(job.apply_url);
+  }
 
   if (existing) {
     database

@@ -49,6 +49,28 @@ if [ ! -f data/jobs.db ]; then
   npm run init-db >/dev/null
 fi
 
+# ── Install web deps + build React UI if dist is missing or stale ───────────
+# Express serves web/dist statically. We only rebuild when dist is missing
+# or when any source file is newer than the dist bundle — so subsequent
+# launches stay instant.
+if [ ! -d web/node_modules ]; then
+  echo "==> Installing web UI dependencies..."
+  (cd web && npm install --no-audit --no-fund)
+fi
+WEB_NEEDS_BUILD=false
+if [ ! -f web/dist/index.html ]; then
+  WEB_NEEDS_BUILD=true
+else
+  # Newest source file mtime vs the built bundle's mtime.
+  if find web/src web/index.html web/package.json web/vite.config.js -newer web/dist/index.html 2>/dev/null | grep -q .; then
+    WEB_NEEDS_BUILD=true
+  fi
+fi
+if [ "$WEB_NEEDS_BUILD" = "true" ]; then
+  echo "==> Building web UI (web/dist)..."
+  (cd web && npm run build)
+fi
+
 # ── Install scraper deps + Chromium on first run (skippable) ────────────────
 RUN_SCRAPER="${RUN_SCRAPER:-true}"
 if [ "$RUN_SCRAPER" = "true" ]; then
