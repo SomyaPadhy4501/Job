@@ -1,64 +1,209 @@
 'use strict';
 
-const { runTarget } = require('./_base');
+const { CONFIG } = require('../config');
+const log = require('../logger');
 
-// metacareers.com is a Relay GraphQL SPA. The search page posts to /graphql
-// with an fb_dtsg CSRF token and a rotating `doc_id` for the
-// CareersJobSearchResultsDataQuery operation. Letting Playwright load the page
-// means the browser does the CSRF/doc_id handshake for us; we just intercept
-// the /graphql responses and keep the ones with job_results in them.
+const SEARCH_URLS = [
+  'https://www.metacareers.com/jobsearch',
+  'https://www.metacareers.com/jobsearch?q=Software',
+  'https://www.metacareers.com/jobsearch?q=Machine+Learning',
+  'https://www.metacareers.com/jobsearch?q=Data+Engineer',
+  'https://www.metacareers.com/jobsearch?q=Production+Engineer',
+  'https://www.metacareers.com/jobsearch?q=Research+Scientist',
+  'https://www.metacareers.com/jobsearch?teams[0]=Artificial%20Intelligence',
+  'https://www.metacareers.com/jobsearch?teams[0]=Infrastructure',
+  'https://www.metacareers.com/jobsearch?teams[0]=Software%20Engineering',
+  'https://www.metacareers.com/jobsearch?teams[0]=Research%20and%20Data',
+];
 
-const SEARCH_URL =
-  'https://www.metacareers.com/jobsearch?q=Software+Engineer&offices%5B0%5D=United+States';
+const MAX_DETAIL_ROWS = 80;
 
-function matches(url, method) {
-  return method === 'POST' && url.includes('metacareers.com/graphql');
+function cleanLines(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
 }
 
-// Meta's GraphQL responses are batched and deeply nested. Walk the tree and
-// pull out anything that has the shape of a job row.
-function walkForJobs(obj, out, depth = 0) {
-  if (!obj || depth > 10) return;
-  if (Array.isArray(obj)) { for (const x of obj) walkForJobs(x, out, depth + 1); return; }
-  if (typeof obj !== 'object') return;
-
-  // Meta job nodes typically carry id + title + locations + url on metacareers.
-  if ((obj.title || obj.job_title) && (obj.id || obj.__id) && (obj.locations || obj.primary_location || obj.cities)) {
-    out.push(obj);
-    return;
+function uniqueBy(items, keyFn) {
+  const out = [];
+  const seen = new Set();
+  for (const item of items) {
+    const key = keyFn(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
   }
-  for (const k of Object.keys(obj)) walkForJobs(obj[k], out, depth + 1);
+  return out;
 }
 
-function extract(data) {
-  const rows = [];
-  walkForJobs(data, rows);
-  return rows.map((j) => {
-    const id = j.id || j.__id || j.posting_id;
-    const locs = j.locations || j.cities || (j.primary_location ? [j.primary_location] : []);
-    const location = Array.isArray(locs)
-      ? locs.map((l) => l?.title || l?.name || l).filter(Boolean).join(', ')
-      : String(locs || '');
+function normalizeDetailUrl(url) {
+  return String(url || '').split('#')[0].replace(/\?.*$/, '');
+}
+
+function extractExternalId(url) {
+  const match = String(url || '').match(/\/profile\/job_details\/(\d+)/);
+  return match ? match[1] : '';
+}
+
+function looksRelevantTitle(title) {
+  const t = String(title || '').toLowerCase();
+  if (!/(engineer|scientist|developer|research)/.test(t)) return false;
+  if (/\b(senior|staff|principal|lead|leadership|manager|director|head|vp|architect)\b/.test(t)) return false;
+  return true;
+}
+
+function parseMetaDescription(text) {
+  const source = String(text || '');
+  const startMarkers = ['Apply now', 'Apply'];
+  const endMarkers = [
+    'About Meta',
+    'Equal Employment Opportunity',
+    'View jobs',
+  ];
+
+  let start = -1;
+  let startLen = 0;
+  for (const marker of startMarkers) {
+    start = source.indexOf(marker);
+    if (start >= 0) {
+      startLen = marker.length;
+      break;
+    }
+  }
+
+  if (start < 0) return '';
+  start += startLen;
+
+  let end = source.length;
+  for (const marker of endMarkers) {
+    const idx = source.indexOf(marker, start);
+    if (idx >= 0 && idx < end) end = idx;
+  }
+
+  return source
+    .slice(start, end)
+    .replace(/^\s+/, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function extractMaxYears(text) {
+  const matches = [...String(text || '').matchAll(/\b(\d{1,2})\+?\s+years?\b/gi)];
+  if (!matches.length) return null;
+  return Math.max(...matches.map((match) => Number(match[1])).filter(Number.isFinite));
+}
+
+async function collectSearchSeeds(page, url) {
+  await page.goto(url, {
+    waitUntil: 'domcontentloaded',
+    timeout: CONFIG.navTimeoutMs,
+  });
+  await page.waitForTimeout(7000);
+
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight)).catch(() => {});
+    await page.waitForTimeout(1000);
+  }
+
+  const rows = await page.evaluate(() => {
+    return Array.from(document.links)
+      .filter((link) => /\/profile\/job_details\/\d+/.test(link.href))
+      .map((link) => {
+        const text = (link.innerText || '').trim();
+        const lines = text
+          .split('\n')
+          .map((line) => line.replace(/\s+/g, ' ').trim())
+          .filter(Boolean)
+          .filter((line) => line !== '⋅');
+        return {
+          href: link.href,
+          title: lines[0] || '',
+          location: lines[1] || '',
+        };
+      })
+      .filter((row) => row.href && row.title);
+  });
+
+  return uniqueBy(
+    rows
+      .map((row) => ({
+        href: normalizeDetailUrl(row.href),
+        title: row.title,
+        location: row.location,
+      }))
+      .filter((row) => row.href && looksRelevantTitle(row.title)),
+    (row) => row.href
+  );
+}
+
+async function scrapeJobDetail(context, seed) {
+  const page = await context.newPage();
+  try {
+    await page.goto(seed.href, {
+      waitUntil: 'domcontentloaded',
+      timeout: CONFIG.navTimeoutMs,
+    });
+    await page.waitForTimeout(2500);
+
+    const detail = await page.evaluate(() => {
+      return {
+        title: document.title || '',
+        text: document.body.innerText || '',
+      };
+    });
+
+    const title =
+      seed.title ||
+      cleanLines(detail.text).find((line) => line && line !== 'Jobs') ||
+      String(detail.title || '').replace(/\s+—\s+Meta Careers$/, '').trim();
+    const description = parseMetaDescription(detail.text);
+    const years = extractMaxYears(description);
+
+    if (years != null && years > 3) return null;
+
     return {
-      external_id: String(id),
+      external_id: extractExternalId(seed.href),
       company_name: 'Meta',
-      job_title: j.title || j.job_title,
-      location,
-      apply_url: `https://www.metacareers.com/jobs/${id}/`,
-      description: j.description || j.short_description || '',
-      date_posted: j.created_time || j.date_posted || null,
+      job_title: title,
+      location: seed.location,
+      apply_url: seed.href,
+      description,
+      date_posted: null,
+      entry_level_override: years != null && years <= 1 ? 1 : undefined,
+      mid_level_override: years != null && years >= 2 && years <= 3 ? 1 : undefined,
     };
-  }).filter((r) => r.external_id && r.job_title);
+  } finally {
+    await page.close().catch(() => {});
+  }
 }
 
 async function run(context) {
-  return runTarget(context, {
-    name: 'meta',
-    url: SEARCH_URL,
-    responseMatcher: matches,
-    extract,
-    scrollCount: 10,
-  });
+  const page = await context.newPage();
+  try {
+    const seeds = [];
+    for (const url of SEARCH_URLS) {
+      const urlSeeds = await collectSearchSeeds(page, url);
+      log.info('target.meta.search', { url, seeds: urlSeeds.length });
+      seeds.push(...urlSeeds);
+    }
+
+    const uniqueSeeds = uniqueBy(seeds, (row) => row.href).slice(0, MAX_DETAIL_ROWS);
+    const jobs = [];
+
+    for (const seed of uniqueSeeds) {
+      try {
+        const job = await scrapeJobDetail(context, seed);
+        if (job) jobs.push(job);
+      } catch (err) {
+        log.warn('target.meta.detail-fail', { url: seed.href, error: err.message });
+      }
+    }
+
+    return jobs.filter((job) => job.external_id && job.job_title && job.apply_url);
+  } finally {
+    await page.close().catch(() => {});
+  }
 }
 
 module.exports = { run, source: 'meta' };

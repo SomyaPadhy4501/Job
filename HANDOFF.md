@@ -37,9 +37,11 @@ Env overrides: `PORT`, `RUN_SCRAPER=false` (main only), `COLLECT_CRON`,
 `SCRAPER_CRON`, `ENTRY_LEVEL_MODE`, `FILTER_US`, `FILTER_SOFTWARE`,
 `COLLECT_TOKEN`.
 
-Other scripts if you need them standalone:
-`./start.sh` (main only), `scraper/start.sh` (scraper only),
-`npm run collect` (one-shot collect), `npm run api` (API only).
+Other ways to run individual pieces:
+- `RUN_SCRAPER=false ./run-all.sh` — main service only (no Playwright)
+- `npm run collect` — one-shot collect and exit (no API, no scheduler)
+- `cd scraper && npm run scrape` — one-shot scrape and exit
+- `cd scraper && npm run scrape:one -- meta` — scrape a single target (debug)
 
 ---
 
@@ -93,7 +95,6 @@ them together at the process level only.
 | `src/collectors/http.js` | Shared fetch wrapper with timeout, retries, hostname-scoped TLS bypass |
 | `src/collectors/*.js` | One file per source (see next section) |
 | `frontend/index.html`, `styles.css`, `app.js` | Zero-dep static UI served by Express |
-| `start.sh` | Launcher (main only) |
 
 ### Scraper service (`/scraper/`)
 
@@ -107,8 +108,7 @@ them together at the process level only.
 | `src/targets/{microsoft,apple,meta,google}.js` | Per-site target (responseMatcher + extract) |
 | `src/debug-urls.js` | Diagnostic: lists every XHR URL seen during a page load, marks job-shaped JSON responses with `★ JOBS`. **This is how you fix a broken target.** |
 | `src/scheduler.js` | node-cron (6 h default) + single-flight |
-| `src/run-once.js`, `src/run-one.js` | Manual triggers |
-| `start.sh` | Launcher (scraper only) |
+| `src/run-once.js`, `src/run-one.js` | Manual triggers (`npm run scrape`, `npm run scrape:one`) |
 
 ### Top level
 
@@ -140,9 +140,9 @@ All collectors return jobs in this common shape:
 | `microsoft` | Single-tenant | `src/collectors/microsoft.js` | `apply.careers.microsoft.com/api/pcsx/search`. 887 jobs. **Found via scraper's debug-urls.js** — replace endpoint if PCSX disappears |
 | `netflix` | Single-tenant (Eightfold) | `src/collectors/netflix.js` | `explore.jobs.netflix.net/api/apply/v2/jobs`. L-level detection: L3=entry, L4=mid, L6+=reject |
 | `ghlistings` | Curated GitHub JSON | `src/collectors/ghlistings.js` | Generic — URL per config entry. Currently wired to `vanshb03/New-Grad-2027` + `SimplifyJobs/New-Grad-Positions`. Pre-labeled sponsorship via `SPONSOR_MAP` |
-| *(scraper)* `meta` | Playwright | `scraper/src/targets/meta.js` | GraphQL response interception. Captures only Featured Jobs (2-5 rows). Paginated results use rotating `fb_dtsg`/`doc_id` — not currently followed |
+| *(scraper)* `meta` | Playwright | `scraper/src/targets/meta.js` | DOM scraper on `metacareers.com/jobsearch` + detail pages under `/profile/job_details/*`. Last validated live run captured **26 raw rows** after query/team fan-out plus description-based seniority pruning. Not full pagination — breadth comes from multiple search views, then detail-page extraction. |
 | *(scraper)* `apple` | Playwright | `scraper/src/targets/apple.js` | Matches `jobs.apple.com/api/*`. Currently captures 0 rows — API fires no job-list XHRs during our session (SPA is cookie-gated) |
-| *(scraper)* `google` | Playwright | `scraper/src/targets/google.js` | Matches `/_/careersfrontend/` RPC. Currently 0 rows — payload is obfuscated protobuf-ish, our generic matcher doesn't recognise it |
+| *(scraper)* `google` | Playwright | `scraper/src/targets/google.js` | DOM scraper on Google Careers search pages + job detail pages. Last validated live run captured **21 raw rows** after query fan-out, detail extraction, and description-based seniority pruning. No RPC decoding needed anymore. |
 
 ### Sources that are *intentionally* not implemented
 
@@ -313,8 +313,9 @@ Response body for `GET /jobs`:
 - **Canadian cities like "Vancouver, BC, CA"** sometimes pass the US filter because `ca` matches California's state code. Low impact (handful of Workday rows); fix is to tighten `looksUS()` to look at position.
 - **Microsoft descriptions are empty.** The list endpoint (`/api/pcsx/search`) doesn't include them — we'd need a per-job `/api/pcsx/position_details` call which would be 10× traffic. Sponsorship for MS rows will always be UNKNOWN unless fixed.
 - **Netflix L5/L6 titles without the word "senior"** aren't rejected by the general senior-reject regex. The Netflix target has its own level filter (`L6+ reject`), but older collected rows may linger. Re-collect if needed.
-- **Apple + Google Playwright targets return 0 rows.** Real, logged, not fake. See `scraper/README.md::Target-by-target honest status`.
-- **Meta Playwright captures 2-5 rows** (the Featured section only). Pagination via scroll uses rotating tokens.
+- **Apple Playwright target still returns 0 rows.**
+- **Google scraper is now DOM-based** and returned 21 raw rows in the last live validation.
+- **Meta scraper is now DOM-based** and returned 26 raw rows in the last live validation. It still does not walk true pagination; coverage comes from multiple search views.
 
 ---
 
@@ -340,8 +341,8 @@ cd scraper && node src/run-one.js meta
 
 ## Where to pick up next (ranked by value)
 
-1. **Try to decode Google's `/_/careersfrontend/` RPC.** Biggest potential win. They use protobuf-ish payload. Start with `scraper/src/debug-urls.js` on the careers page, capture a response, find the actual list field name. Probably 2-4 hrs.
-2. **Add Meta pagination.** The scraper currently captures Featured Jobs only. Replaying `fb_dtsg` + `doc_id` on scrolls would unlock their full listings. Medium difficulty.
+1. **Add true Meta pagination.** The DOM scraper now gets substantially more rows, but still only from the first result page of several search views. If you can drive the pager safely, this is the biggest remaining scraper win.
+2. **Add true Google pagination depth or narrower query packs.** Current DOM pass fans out across role queries and two pages/query. Tuning that tradeoff could improve freshness vs coverage.
 3. **Add more Greenhouse slugs.** Current list is ~25. Many H-1B-friendly companies are on Greenhouse but not yet added (Rippling, HashiCorp variants, newer startups). Probe with a script, add a line per working slug. Easy, low impact per line.
 4. **Tighten US location filter.** Strip out `Vancouver, BC, CA` false positives.
 5. **"Posted in last N days" filter.** User hinted at this earlier. Easy — another URL param + WHERE clause + UI dropdown.

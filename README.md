@@ -68,7 +68,6 @@ Job/
     │   └── cache.js        # 30s TTL cache for /jobs
     └── scripts/
         ├── collect-once.js
-        ├── api-only.js
         └── init-db.js
 ```
 
@@ -177,12 +176,12 @@ the rest either have no JSON API, require auth, or serve bad TLS certs.
 |---|---|---|---|
 | 1 | **Amazon** | `amazon.jobs/en/search.json` — works, no auth | direct ✅ |
 | 2 | **Tata Consultancy Services** | Custom ATS (TCS iBegin) not publicly resolvable; DNS on `ibegin.tcs.com` doesn't respond | none ❌ |
-| 3 | **Microsoft** | `gcsservices.careers.microsoft.com` 404s (retired); `jobs.careers.microsoft.com` 301s to `apply.careers.microsoft.com` which 302s to a JS-rendered page with no public JSON. `microsoft.js` collector + hostname-scoped TLS bypass are shipped so re-enabling is one config line once they restore a JSON endpoint | ghlistings only (2) |
+| 3 | **Microsoft** | `gcsservices.careers.microsoft.com` 404s (retired); `jobs.careers.microsoft.com` 301s to `apply.careers.microsoft.com` which now exposes a usable `/api/pcsx/search` surface | direct + ghlistings ✅ |
 | 4 | **Infosys** | Career site on Oracle Taleo — no free public JSON search | none ❌ |
-| 5 | **Google** | `careers.google.com/api/v3/search/` returns 404; no usable public JSON exists | ghlistings only (6) |
+| 5 | **Google** | `careers.google.com/api/v3/search/` returns 404; no usable public JSON exists | ghlistings + Playwright DOM scrape ✅ |
 | 6 | **Apple** | `jobs.apple.com/api/role/search` returns 404; newer `api/v1/*` paths return 401 (cookie-gated) | ghlistings only (15) |
 | 7 | **Cognizant** | Workday tenant `cognizant.wd*` rejects anonymous CxS calls with 422/401 on every site+facet combination tried | none ❌ |
-| 8 | **Meta** | `metacareers.com` is GraphQL with signed `doc_id` tokens — hostile to aggregators | ghlistings only (3) |
+| 8 | **Meta** | `metacareers.com` is GraphQL with signed `doc_id` tokens — hostile to direct API collectors | ghlistings + Playwright DOM scrape ✅ |
 | 9 | **Tesla** | `www.tesla.com/cua-api/apps/careers/state` returns 403 (Cloudflare-protected, UA-filtered) | ghlistings (68) |
 | 10 | **Walmart** | `walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs` — works, no auth | direct ✅ |
 | — | **Netflix** | `explore.jobs.netflix.net/api/apply/v2/jobs` (Eightfold AI) — works, no auth | direct ✅ |
@@ -195,11 +194,9 @@ Intel (public Workday CxS endpoints).
 
 Why the gaps are real and not me giving up:
 
-1. **Google / Apple / Meta** actively prevent programmatic aggregation via TLS
-   gating, signed tokens, and deprecated endpoints. Working around those
-   needs paid scraping infra with residential proxies (brittle, expensive,
-   often violates ToS) or reverse-engineered auth tokens (break on every
-   redeploy).
+1. **Google / Apple / Meta** actively prevent clean direct-API aggregation via
+   TLS gating, signed tokens, and deprecated endpoints. Google and Meta are
+   now handled by the opt-in Playwright scraper; Apple remains blocked.
 2. **Microsoft** is mid-migration — their public JSON surface genuinely isn't
    there right now. The TLS-bypass machinery in `src/collectors/http.js` is
    already in place so when they restore an endpoint, I only need to update
@@ -218,7 +215,7 @@ are: (a) LinkedIn (paid, brittle, ToS-gray), (b) a paid aggregator like
 Adzuna, or (c) checking those careers pages manually for the few roles you
 care about.
 
-### What I investigated for Google / Apple / Meta / Microsoft and why it didn't ship
+### What I investigated for Google / Apple / Meta / Microsoft and what shipped
 
 I probed each site's actual frontend traffic to find the backend APIs their
 career pages call. Summary of what I found:
@@ -244,15 +241,15 @@ career pages call. Summary of what I found:
 
 **The honest summary:** Google/Apple/Meta/Microsoft deliberately gate their
 career APIs with JS-generated tokens, rotating GraphQL doc_ids, and cookie-
-gated auth. This isn't a technology gap — GraphQL and gRPC don't magically
-bypass auth. These are the exact defenses designed to prevent aggregation.
+gated auth. Microsoft now has a direct collector; Google and Meta now have
+an opt-in Playwright DOM scraper; Apple is still blocked.
 
-### Option: headless-browser scraping (not shipped by default)
+### Playwright browser scraping (shipped as opt-in)
 
-The only way to reach those four is to run a real browser (Playwright /
-Puppeteer), let it execute the frontend JS, harvest the auth tokens +
-GraphQL `doc_id`s at runtime, and then hit the gated APIs with those creds.
-This works but has hard costs:
+For the blocked direct-API sites, the fallback is a real browser
+(Playwright), which reads the rendered DOM and public detail pages instead of
+depending on the gated RPC/GraphQL surfaces. This works, but it has hard
+costs:
 
 * ~300 MB of Chromium + Playwright dependencies
 * 20-60 seconds per page (vs ms for our current collectors)
@@ -261,11 +258,8 @@ This works but has hard costs:
 * Breaks on every frontend deploy — Google and Meta ship UI changes weekly
 * Explicitly prohibited by each company's ToS; legal gray area under CFAA
 
-I didn't ship this by default because it's a structural change — it moves
-the project from "lightweight free tool" to "scraping infra with ongoing
-maintenance". If you want it anyway, ask explicitly and I'll add a
-`collectors/playwright/` directory with a Google/Meta/Apple scraper gated
-behind `PLAYWRIGHT_SCRAPE=true`.
+This is shipped as the separate `scraper/` microservice and can be disabled
+with `RUN_SCRAPER=false` if you want the main app only.
 
 Why the gap is real and not me giving up:
 

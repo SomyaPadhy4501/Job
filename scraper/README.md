@@ -24,24 +24,25 @@ else it already has.
 
 ## Setup
 
+The top-level `./run-all.sh` handles this automatically on first run
+(installs npm deps + downloads Chromium). If you want to do it manually:
+
 ```bash
 cd scraper
-npm install               # ~50 MB for playwright + node-cron
+npm install                       # ~50 MB for playwright + node-cron
 npx playwright install chromium   # ~250 MB (one-time)
-```
-
-Or just use the launcher which does both:
-
-```bash
-./start.sh
 ```
 
 ## Usage
 
+Normal operation is via the parent project's `./run-all.sh` — that script
+starts the scraper alongside the main API with a shared lifecycle. Run it
+standalone only for debugging:
+
 | Command | What it does |
 |---|---|
-| `./start.sh` | Run with a cron schedule (every 6 h by default) |
-| `npm run scrape` | One-shot: scrape all targets once, ingest, exit |
+| `node src/index.js` | Run with a cron schedule (every 6 h by default). Expects `INGEST_URL` to point at a running main API |
+| `npm run scrape` | One-shot: scrape all configured targets once, ingest, exit |
 | `npm run scrape:one -- <slug>` | Scrape only one target (debug). `<slug>` ∈ `google`, `meta`, `apple` |
 | `node src/debug-urls.js <url>` | Navigate to `<url>` and print every non-static response URL with a "★ JOBS" flag if it looks like a jobs payload. Use this when a target's endpoint changes |
 
@@ -66,16 +67,15 @@ All numbers are from our last live run.
 | Target | Method | Rows captured | Notes |
 |---|---|---|---|
 | **Microsoft** | *no longer in this service* | — | Promoted to a direct `/api/pcsx/search` collector in the main app — no browser needed. See `../src/collectors/microsoft.js`. |
-| **Meta** | GraphQL response interception on `/graphql` | **~2-5** | Captures the "Featured Jobs" section that renders in the initial page load. Further pagination uses rotating `fb_dtsg` + `doc_id` tokens on every scroll that aren't easy to replay — you get the featured picks, not their full catalogue. |
+| **Meta** | DOM scraping on `/jobsearch` plus detail pages at `/profile/job_details/*` | **26 raw rows** | Scrapes the rendered search results instead of replaying GraphQL. Coverage comes from multiple search/team views, then per-job detail extraction. Still does not walk true pagination. |
 | **Apple** | Response interception on `jobs.apple.com/api/*` | **0** | Apple's SPA is cookie-gated even for the initial page. The API responses that fire during our Playwright session don't contain job list data — they're auth/config calls. Getting jobs would require maintaining a logged-in session or reverse-engineering their new signed-request flow. |
-| **Google** | Response interception on `_/careersfrontend/*` RPC | **0** | Google's `boq-hiring.HiringCportalFrontendUi` bundle routes job search through an obfuscated `/_/` RPC endpoint that our generic matcher doesn't catch. The payload is encoded (protobuf-ish JSON). Supporting this properly needs a target-specific decoder. |
+| **Google** | DOM scraping on Careers search + job detail pages | **21 raw rows** | Avoids the old `/_/careersfrontend/*` RPC entirely. The target fans out across several Google Careers role queries, discovers detail URLs from the rendered results page, and enriches them from public detail pages. |
 
 In other words: **this service genuinely tries and honestly reports.** The
 only big-tech "wins" (Microsoft, Netflix, Uber, Amazon) are already handled
 in the main service because their APIs don't actually need a browser. The
-remaining three (Google, Meta, Apple) are where this scraper lives, and two
-of them currently yield zero rows — pending either more time to reverse-
-engineer their specific endpoints, or changes by those companies to open up.
+remaining three (Google, Meta, Apple) are where this scraper lives. Google
+and Meta now work via DOM scraping; Apple is still blocked.
 
 ## How to extend when a target's endpoint changes
 
