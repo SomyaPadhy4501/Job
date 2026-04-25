@@ -23,7 +23,8 @@ function getPool() {
       : { rejectUnauthorized: false },
     max: 5,              // serverless: keep pool small
     idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
+    // Neon free tier auto-suspends; cold-start can take 10s+ on first hit.
+    connectionTimeoutMillis: 30_000,
   });
   pool.on('error', (err) => {
     // eslint-disable-next-line no-console
