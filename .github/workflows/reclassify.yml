@@ -1,0 +1,43 @@
+name: reclassify-sponsorship
+
+# One-off backfill: re-run the sponsorship classifier against every row in
+# Neon and apply any changes. Manual-only — there's no schedule.
+# Default is dry-run; flip the `apply` input to `true` to actually write.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write changes to Neon (false = dry run, true = apply)'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  reclassify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Reclassify sponsorship
+        run: |
+          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+            npm run reclassify -- --apply
+          else
+            npm run reclassify
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
