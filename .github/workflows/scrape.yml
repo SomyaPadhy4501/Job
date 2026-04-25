@@ -2,7 +2,7 @@ name: scrape
 
 on:
   schedule:
-    - cron: '30 */6 * * *'  # Every 6h at :30 — offset from collect's :00 to avoid overlapping writes
+    - cron: '30 */2 * * *'  # Every 2h at :30 — offset from collect's :00 to avoid overlapping writes
   workflow_dispatch:         # Manual trigger for testing
 
 jobs:
