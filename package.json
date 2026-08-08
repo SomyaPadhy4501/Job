@@ -9,7 +9,8 @@
     "collect": "node src/scripts/collect-once.js",
     "init-db": "node src/scripts/init-db.js",
     "reclassify": "node src/scripts/reclassify-sponsorship.js",
-    "backfill-derived": "node src/scripts/backfill-derived.js"
+    "backfill-derived": "node src/scripts/backfill-derived.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18.17.0"
