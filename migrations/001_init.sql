@@ -32,7 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_jobs_role      ON jobs (role_type);
 CREATE INDEX IF NOT EXISTS idx_jobs_entry     ON jobs (is_entry_level);
 CREATE INDEX IF NOT EXISTS idx_jobs_applyurl  ON jobs (apply_url);
 CREATE INDEX IF NOT EXISTS idx_jobs_category  ON jobs (category);
-CREATE INDEX IF NOT EXISTS idx_jobs_restriction ON jobs (restriction);
+-- idx_jobs_restriction is created in 002, not here. On an existing database the
+-- CREATE TABLE above is a no-op, so `restriction` doesn't exist yet and indexing
+-- it from this file fails. 002 adds the column and the index together, which is
+-- correct for both a fresh database and an existing one.
 
 CREATE TABLE IF NOT EXISTS collection_runs (
   id              SERIAL PRIMARY KEY,
