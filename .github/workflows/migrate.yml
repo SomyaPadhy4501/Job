@@ -1,0 +1,71 @@
+name: migrate
+
+# Applies pending SQL migrations to Neon. Manual-only — there is no schedule,
+# and no trigger on push, because DDL should never run as a side effect of
+# merging.
+#
+# Every migration in migrations/ is written to be idempotent (ADD COLUMN IF NOT
+# EXISTS), so re-running this is safe and a no-op on an already-migrated
+# database.
+#
+# Runs BEFORE deploying code that reads the new columns: queryJobs selects an
+# explicit column list, so code deployed against an unmigrated schema 500s on
+# every /jobs request.
+#
+# `verify` mode applies nothing and just prints the current jobs schema — use it
+# to check the state of the database before and after.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'verify = print schema only. apply = run the migrations.'
+        required: true
+        default: 'verify'
+        type: choice
+        options:
+          - 'verify'
+          - 'apply'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Schema before
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c "\d jobs" || true
+
+      - name: Apply migrations
+        if: ${{ github.event.inputs.mode == 'apply' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
+          for f in migrations/*.sql; do
+            echo "=== applying $f ==="
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Schema after
+        if: ${{ github.event.inputs.mode == 'apply' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c "\d jobs"
+          echo "--- column presence check ---"
+          psql "$DATABASE_URL" -t -c "
+            SELECT column_name FROM information_schema.columns
+             WHERE table_name='jobs'
+               AND column_name IN ('restriction','yoe_min')
+             ORDER BY column_name;"
