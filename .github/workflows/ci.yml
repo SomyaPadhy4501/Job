@@ -47,3 +47,9 @@ jobs:
             count=$((count + 1))
           done < <(find src api scraper/src -name '*.js' -not -path '*/node_modules/*' -print0)
           echo "Syntax-checked $count files."
+
+      # `node --check` only parses — it cannot see inside a regex or a SQL
+      # template string, which is where the classifiers actually live. These
+      # tests are the only thing in CI that executes them.
+      - name: Run tests
+        run: npm test
