@@ -51,6 +51,38 @@ test('rejects Vancouver BC without the two-letter state token rescuing it', () =
   assert.strictEqual(looksUS('Vancouver, BC, CA'), false);
 });
 
+test('accepts US facility names that carry no state abbreviation', () => {
+  // Enterprise Workday boards name buildings, not cities. 88 USAA postings were
+  // dropped on "San Antonio Home Office" alone before these cities were added.
+  for (const loc of [
+    'San Antonio Home Office I',
+    'Tampa Campus',
+    'Plano Legacy',
+    'Phoenix Campus (Main)',
+    'SMYRNA PACES SUMMIT - 9125',
+    'JOLIET RDC - 5851',
+  ]) {
+    assert.strictEqual(looksUS(loc), true, loc);
+  }
+});
+
+test('rejects foreign locations that use an ISO alpha-3 country code', () => {
+  // "Barcelona, ESP" / "Kraków, POL" appear in Workday feeds and match no
+  // foreign-marker word.
+  for (const loc of ['Barcelona, ESP', 'Kraków, POL', 'Amman, JOR', 'Barcelona ESP', 'Dublin, IRL']) {
+    assert.strictEqual(looksUS(loc), false, loc);
+  }
+});
+
+test('an ISO-3 country code outranks a US city name that also exists abroad', () => {
+  // Cambridge and Birmingham are in the US city list AND in the UK. The ISO
+  // check must run before the city check or these pass as US.
+  assert.strictEqual(looksUS('Cambridge, GBR'), false);
+  assert.strictEqual(looksUS('Birmingham, GBR'), false);
+  // ...while the US ones still resolve.
+  assert.strictEqual(looksUS('Cambridge, MA'), true);
+});
+
 test('treats a missing location as unknown rather than foreign', () => {
   assert.strictEqual(looksUS(''), true);
   assert.strictEqual(looksUS(null), true);

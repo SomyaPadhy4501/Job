@@ -725,6 +725,27 @@ const COMPANIES = [
   // guessing; a wrong site path just 404s silently.
   { source: 'workday', slug: 'ebay',          tenant: 'ebay',       wd: '5',  site: 'apply',                 displayName: 'eBay' },
 
+  // Added 2026-08-08 from a coverage gap analysis against the USCIS FY2023
+  // H-1B Data Hub, filtered to the metros this board targets (TX, NJ, Atlanta,
+  // SF Bay, NY, Boston). Approval counts below are FY2023 for that metro.
+  //
+  // These are all large sponsors with no Greenhouse/Lever/Ashby board — of 43
+  // top missing sponsors probed, only 4 had one. Enterprise hiring lives on
+  // Workday, Eightfold, Phenom, iCIMS and Avature, which is the structural
+  // reason coverage skewed toward startups.
+  //
+  // tenant/wd/site were read off each careers site and then verified against
+  // the CxS endpoint. Do the same for any addition — a wrong site path 404s
+  // silently and the company just contributes nothing forever.
+  { source: 'workday', slug: 'paloaltonetworks', tenant: 'paloaltonetworks', wd: '5', site: 'panwexternalcareers', displayName: 'Palo Alto Networks' }, // SF Bay, 159
+  { source: 'workday', slug: 'autodesk',       tenant: 'autodesk',   wd: '1',  site: 'Ext',                   displayName: 'Autodesk' },        // SF Bay, 102
+  { source: 'workday', slug: 'hpe',            tenant: 'hpe',        wd: '5',  site: 'Jobsathpe',             displayName: 'HPE' },             // Texas, 162 (also hosts Juniper post-acquisition)
+  { source: 'workday', slug: 'statestreet',    tenant: 'statestreet', wd: '1', site: 'Global',                displayName: 'State Street' },    // Boston, 69
+  { source: 'workday', slug: 'homedepot',      tenant: 'homedepot',  wd: '5',  site: 'CareerDepot',           displayName: 'Home Depot' },      // Atlanta, 122
+  { source: 'workday', slug: 'usaa',           tenant: 'usaa',       wd: '1',  site: 'USAAJOBSWD',            displayName: 'USAA' },            // Texas, 72
+  { source: 'workday', slug: 'prudential',     tenant: 'pru',        wd: '5',  site: 'Careers',               displayName: 'Prudential' },      // NJ, 46
+  { source: 'workday', slug: 'manhattanassoc', tenant: 'manh',       wd: '5',  site: 'External',              displayName: 'Manhattan Associates' }, // Atlanta, 45
+
   // ── schema.org JobPosting via sitemap (see src/collectors/jsonld.js) ────────
   // For career sites with no public ATS API. Reads the sitemap the site
   // publishes for crawlers, then the JSON-LD JobPosting block on each detail
