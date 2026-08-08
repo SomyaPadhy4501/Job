@@ -53,6 +53,14 @@ function createApp() {
     const sourceRaw = (req.query.source || '').toString().trim();
     const source = sourceRaw || '';
 
+    // Restriction filter — fail CLOSED, unlike the sponsorship whitelist above.
+    // An unrecognised `sponsorship` value degrading to "no filter" only widens
+    // results, which is harmless. Doing the same here would SHOW clearance and
+    // citizens-only roles, which is precisely what this filter exists to
+    // prevent — so both the default and the fallback are 'hide'.
+    const restrictionRaw = (req.query.restriction || '').toString().toLowerCase();
+    const restriction = ['hide', 'all', 'only'].includes(restrictionRaw) ? restrictionRaw : 'hide';
+
     const limit = Math.min(
       CONFIG.maxPageSize,
       Math.max(1, Number(req.query.limit) || CONFIG.defaultPageSize)
@@ -60,7 +68,10 @@ function createApp() {
     const page = Math.max(1, Number(req.query.page) || 1);
     const offset = (page - 1) * limit;
 
-    const cacheKey = JSON.stringify({ search, title, sponsorship, company, role, level, source, limit, offset });
+    // `restriction` MUST be in the cache key — without it a hide= request and
+    // an all= request collide and serve each other's bodies for the 30s TTL,
+    // and the Vercel edge would pin the wrong one publicly.
+    const cacheKey = JSON.stringify({ search, title, sponsorship, company, role, level, source, restriction, limit, offset });
     const cached = jobsCache.get(cacheKey);
     if (cached) {
       res.setHeader('x-cache', 'HIT');
@@ -68,7 +79,7 @@ function createApp() {
     }
 
     const { total, rows } = await queryJobs({
-      search, title, sponsorship, company, role, level, source, limit, offset,
+      search, title, sponsorship, company, role, level, source, restriction, limit, offset,
     });
     const body = {
       data: rows,
@@ -78,7 +89,7 @@ function createApp() {
         total,
         totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      filters: { search, title, sponsorship, company, role, level, source },
+      filters: { search, title, sponsorship, company, role, level, source, restriction },
     };
 
     jobsCache.set(cacheKey, body);

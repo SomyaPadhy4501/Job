@@ -15,12 +15,17 @@ function normalizeLimit(n) {
   return ALLOWED_LIMITS.includes(v) ? v : DEFAULT_LIMIT;
 }
 
+// 'hide' is the default: roles requiring a security clearance or US-person
+// status are unreachable for a candidate who needs visa sponsorship.
+const DEFAULT_RESTRICTION = 'hide';
+
 export const INITIAL = {
   search: '',
   title: '',
   sponsorship: '',
   role: '',
   level: '',
+  restriction: DEFAULT_RESTRICTION,
   page: 1,
   limit: DEFAULT_LIMIT,
 };
@@ -34,6 +39,7 @@ function readFromUrl() {
     sponsorship: p.get('sponsorship') || '',
     role: p.get('role') || '',
     level: p.get('level') || '',
+    restriction: p.get('restriction') || DEFAULT_RESTRICTION,
     page: Math.max(1, Number(p.get('page')) || 1),
     limit: normalizeLimit(p.get('per')),
   };
@@ -47,6 +53,11 @@ function writeToUrl(filters) {
   if (filters.sponsorship) p.set('sponsorship', filters.sponsorship);
   if (filters.role) p.set('role', filters.role);
   if (filters.level) p.set('level', filters.level);
+  // Inverted guard: the usual `if (filters.x)` idiom would drop a meaningful
+  // non-empty default, silently resetting "Show all" back to "hide" on reload.
+  if (filters.restriction && filters.restriction !== DEFAULT_RESTRICTION) {
+    p.set('restriction', filters.restriction);
+  }
   if (filters.page > 1) p.set('page', filters.page);
   if (filters.limit !== DEFAULT_LIMIT) p.set('per', filters.limit);
   const qs = p.toString();

@@ -73,10 +73,52 @@ function PostedCell({ row }) {
   );
 }
 
+// yoe_min is the lowest years-of-experience figure stated in the posting;
+// -1 means the posting stated none. Showing the number alongside the level
+// makes the label auditable — "mid" with "3+ yrs" is a very different job from
+// "mid" with "2+ yrs", and a missing number signals the flag came from the
+// title heuristics rather than the text.
 function LevelPill({ row }) {
-  if (row.is_entry_level) return <span className="pill pill-entry">entry</span>;
-  if (row.is_mid_level) return <span className="pill pill-mid">mid · 1-2y</span>;
+  const yrs = typeof row.yoe_min === 'number' && row.yoe_min >= 0 ? row.yoe_min : null;
+  const suffix = yrs != null ? ` · ${yrs === 0 ? 'no exp' : `${yrs}+ yrs`}` : '';
+  if (row.is_entry_level) {
+    return <span className="pill pill-entry" title={yrs != null ? `Posting states ${yrs}+ years` : 'Level inferred from title'}>entry{suffix}</span>;
+  }
+  if (row.is_mid_level) {
+    return <span className="pill pill-mid" title={yrs != null ? `Posting states ${yrs}+ years` : 'Level inferred from title'}>mid{suffix}</span>;
+  }
+  if (yrs != null) {
+    return <span className="pill pill-senior" title={`Posting states ${yrs}+ years`}>{yrs}+ yrs</span>;
+  }
   return null;
+}
+
+const RESTRICTION_LABEL = {
+  CLEARANCE: 'clearance',
+  EXPORT_CONTROL: 'ITAR / US person',
+  CITIZENSHIP: 'US citizens only',
+  EXPORT_ADVISORY: 'export note',
+  CLEARANCE_PREFERRED: 'clearance a plus',
+};
+
+const RESTRICTION_TITLE = {
+  CLEARANCE: 'Requires a US security clearance — needs US citizenship, not obtainable on a visa.',
+  EXPORT_CONTROL: 'ITAR / export control: restricted to US persons (citizens or green-card holders).',
+  CITIZENSHIP: 'Posting explicitly requires US citizenship.',
+  EXPORT_ADVISORY: 'Mentions export-control law but imposes no citizenship requirement — still applicable.',
+  CLEARANCE_PREFERRED: 'Clearance listed as preferred, not required — still applicable.',
+};
+
+// Fixed base class + data attribute rather than an interpolated class name, so
+// a value without a specific CSS rule still renders styled instead of invisible.
+function RestrictionPill({ row }) {
+  const r = row.restriction;
+  if (!r) return null;
+  return (
+    <span className="pill pill-restriction" data-reason={r} title={RESTRICTION_TITLE[r] || 'Restricted role'}>
+      {RESTRICTION_LABEL[r] || 'restricted'}
+    </span>
+  );
 }
 
 export default function JobsTable({ rows, isLoading, error }) {
@@ -136,9 +178,12 @@ export default function JobsTable({ rows, isLoading, error }) {
               </td>
               <td>{r.location || '—'}</td>
               <td>
-                <span className={`badge badge-${r.sponsorship || 'UNKNOWN'}`}>
-                  {r.sponsorship || 'UNKNOWN'}
-                </span>
+                <div className="sponsor-cell">
+                  <span className={`badge badge-${r.sponsorship || 'UNKNOWN'}`}>
+                    {r.sponsorship || 'UNKNOWN'}
+                  </span>
+                  <RestrictionPill row={r} />
+                </div>
               </td>
               <td className="muted nowrap"><PostedCell row={r} /></td>
               <td>

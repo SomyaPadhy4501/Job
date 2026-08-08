@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   sponsorship    TEXT    NOT NULL DEFAULT 'UNKNOWN',
   role_type      TEXT    NOT NULL DEFAULT 'OTHER',
   category       TEXT    NOT NULL DEFAULT 'SMALL',
+  restriction    TEXT    NOT NULL DEFAULT '',
+  yoe_min        INTEGER NOT NULL DEFAULT -1,
   is_entry_level SMALLINT NOT NULL DEFAULT 0,
   is_mid_level   SMALLINT NOT NULL DEFAULT 0,
   first_seen_at  TEXT    NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
@@ -30,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_role      ON jobs (role_type);
 CREATE INDEX IF NOT EXISTS idx_jobs_entry     ON jobs (is_entry_level);
 CREATE INDEX IF NOT EXISTS idx_jobs_applyurl  ON jobs (apply_url);
 CREATE INDEX IF NOT EXISTS idx_jobs_category  ON jobs (category);
+CREATE INDEX IF NOT EXISTS idx_jobs_restriction ON jobs (restriction);
 
 CREATE TABLE IF NOT EXISTS collection_runs (
   id              SERIAL PRIMARY KEY,
