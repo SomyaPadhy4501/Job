@@ -65,6 +65,30 @@ async function fetchList(company) {
   return all;
 }
 
+// Workday collapses multi-site postings to the placeholder "2 Locations" /
+// "3 Locations" instead of naming any of them. That defeats the US filter in
+// normalizeJob — measured at 307/500 Capital One postings and 209/500 Nvidia
+// postings silently dropped, most of them US roles.
+//
+// `externalPath` still encodes the primary location ("/job/McLean-VA/..."),
+// so fall back to it. Hyphens become ", " for the trailing state code so the
+// result matches the "City, ST" shape normalizeLocation expects.
+const MULTI_LOCATION = /^\d+\s+locations?$/i;
+
+function locationFromPath(externalPath) {
+  const seg = String(externalPath || '').split('/')[2];
+  if (!seg) return '';
+  const m = seg.match(/^(.*)-([A-Z]{2})$/);
+  if (m) return `${m[1].replace(/-/g, ' ')}, ${m[2]}`;
+  return seg.replace(/-/g, ' ');
+}
+
+function resolveLocation(j) {
+  const text = (j.locationsText || '').trim();
+  if (text && !MULTI_LOCATION.test(text)) return text;
+  return locationFromPath(j.externalPath) || text;
+}
+
 async function fetchDetail(company, externalPath) {
   const data = await fetchJson(`${baseUrl(company)}/job${externalPath}`, { retries: 1 });
   return data?.jobPostingInfo?.jobDescription || '';
@@ -114,7 +138,7 @@ async function fetchCompany(company) {
       (Array.isArray(j.bulletFields) && j.bulletFields[0]) || j.externalPath,
     company_name: displayName || slug,
     job_title: j.title || '',
-    location: j.locationsText || '',
+    location: resolveLocation(j),
     // The CxS API returns `externalPath` like "/job/Leeds/Quality-Automation-Engineer_R00289257-1",
     // but the public URL needs the "/en-US/{site}" prefix — without it Workday
     // redirects through a resolver that eventually lands on

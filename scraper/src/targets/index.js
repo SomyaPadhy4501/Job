@@ -7,6 +7,7 @@ const google = require('./google');
 const deloitte = require('./deloitte');
 const phenom = require('./phenom');
 const builtin = require('./builtin');
+const wayfair = require('./wayfair');
 
 const REGISTRY = {
   [microsoft.source]: microsoft,
@@ -16,6 +17,7 @@ const REGISTRY = {
   [deloitte.source]: deloitte,
   [phenom.source]: phenom,
   [builtin.source]: builtin,
+  [wayfair.source]: wayfair,
 };
 
 function getTarget(slug) {
