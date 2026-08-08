@@ -233,6 +233,33 @@ a { color: inherit; }
 }
 .pill-entry { background: var(--entry-bg); color: var(--entry-fg); }
 .pill-mid   { background: var(--mid-bg);   color: var(--mid-fg); }
+/* Neither entry nor mid, but the posting stated a number — shown muted so the
+   years are visible without implying the role is in scope. */
+.pill-senior { background: var(--unknown-bg); color: var(--unknown-fg); }
+
+/* Work-authorization restrictions. The base rule carries the blocking styling,
+   so any future value renders legibly even without its own rule. The two
+   advisory values opt *out* to a muted look — they name a restriction but
+   don't impose one, and are never filtered out. */
+.pill-restriction {
+  background: var(--no-bg);
+  color: var(--no-fg);
+  cursor: help;
+}
+.pill-restriction[data-reason='EXPORT_ADVISORY'],
+.pill-restriction[data-reason='CLEARANCE_PREFERRED'] {
+  background: var(--unknown-bg);
+  color: var(--unknown-fg);
+}
+
+/* Sponsorship badge + restriction pill stack inside the one existing column,
+   keeping the table at 7 columns. */
+.sponsor-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
 
 .badge {
   display: inline-flex;

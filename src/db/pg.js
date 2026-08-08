@@ -79,8 +79,10 @@ async function upsertJob(job, client) {
              role_type      = $7,
              category       = $8,
              is_entry_level = $9,
-             is_mid_level   = $10
-       WHERE id = $11`,
+             is_mid_level   = $10,
+             restriction    = $11,
+             yoe_min        = $12
+       WHERE id = $13`,
       [
         now(),
         job.apply_url,
@@ -92,6 +94,11 @@ async function upsertJob(job, client) {
         job.category,
         job.is_entry_level,
         job.is_mid_level,
+        // `?? ''` is load-bearing: pg binds undefined -> NULL, and a
+        // NOT NULL DEFAULT does not rescue an explicitly-passed NULL — it
+        // raises a not-null violation that aborts the whole bulkUpsert.
+        job.restriction ?? '',
+        job.yoe_min ?? -1,
         existing.id,
       ],
     );
@@ -103,9 +110,9 @@ async function upsertJob(job, client) {
     `INSERT INTO jobs
        (dedupe_key, source, external_id, company_name, job_title, location,
         apply_url, description, date_posted, sponsorship, role_type, category,
-        is_entry_level, is_mid_level, first_seen_at, last_seen_at)
+        is_entry_level, is_mid_level, first_seen_at, last_seen_at, restriction, yoe_min)
      VALUES
-       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`,
+       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$16,$17)`,
     [
       job.dedupe_key,
       job.source,
@@ -121,7 +128,12 @@ async function upsertJob(job, client) {
       job.category,
       job.is_entry_level,
       job.is_mid_level,
+      // $15 is deliberately reused for both first_seen_at and last_seen_at.
+      // New columns are APPENDED after it so that reuse stays untouched —
+      // renumbering here would be a silent-corruption risk CI cannot catch.
       ts,
+      job.restriction ?? '',
+      job.yoe_min ?? -1,
     ],
   );
   return { inserted: 1, updated: 0 };
@@ -195,7 +207,7 @@ async function finishRun(id, stats) {
   );
 }
 
-async function queryJobs({ search, title, sponsorship, company, role, level, source, limit, offset }) {
+async function queryJobs({ search, title, sponsorship, company, role, level, source, restriction, limit, offset }) {
   const clauses = [];
   const params = [];
   let idx = 1;
@@ -227,6 +239,15 @@ async function queryJobs({ search, title, sponsorship, company, role, level, sou
   if (level === 'entry')  clauses.push('is_entry_level = 1');
   else if (level === 'mid') clauses.push('is_mid_level = 1');
   else if (level === 'early') clauses.push('(is_entry_level = 1 OR is_mid_level = 1)');
+  // restriction: 'hide' drops roles a sponsorship candidate is legally barred
+  // from. EXPORT_ADVISORY / CLEARANCE_PREFERRED stay visible — they name a
+  // restriction without imposing one. Literal enum, no bind param, so `idx`
+  // is undisturbed.
+  if (restriction === 'hide') {
+    clauses.push(`restriction NOT IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')`);
+  } else if (restriction === 'only') {
+    clauses.push(`restriction IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')`);
+  }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
@@ -242,7 +263,7 @@ async function queryJobs({ search, title, sponsorship, company, role, level, sou
   const offsetIdx = idx++;
   const { rows } = await getPool().query(
     `SELECT id, source, company_name, job_title, location, apply_url,
-            date_posted, sponsorship, role_type, category,
+            date_posted, sponsorship, role_type, category, restriction, yoe_min,
             is_entry_level, is_mid_level,
             first_seen_at, last_seen_at
        FROM jobs

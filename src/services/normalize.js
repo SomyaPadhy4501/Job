@@ -2,6 +2,8 @@
 
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
+const { classifyRestriction } = require('./clearance');
+const { extractExperience, levelFromYears } = require('./experience');
 
 function stripHtml(html) {
   if (!html) return '';
@@ -77,8 +79,20 @@ function looksUS(location) {
   if (!location) return true; // unknown → don't drop
   const l = location.toLowerCase();
 
-  // Explicit US → pass.
+  // Explicit US → pass. "North America" / "Americas" / "USCA" (US+Canada) are
+  // multi-country labels that always include the US, so they belong here — they
+  // used to fall through every branch below and get dropped.
   if (/\b(u\.?s\.?a?\.?|united states)\b/.test(l)) return true;
+  if (/\b(north america|americas|usca)\b/.test(l)) return true;
+
+  // A named US city outranks a foreign marker. This must run BEFORE
+  // FOREIGN_MARKERS: postings like "San Francisco or Remote (North America,
+  // Europe)" name a real US office but were rejected outright on the word
+  // "Europe". Safe to promote because US_CITY_MARKERS holds unambiguous city
+  // names only — the ambiguous two-letter state tokens ("ca" matching both
+  // California and Canada) stay below the foreign check, which is what the
+  // "Vancouver, BC, CA" case actually needed.
+  for (const c of US_CITY_MARKERS) if (l.includes(c)) return true;
 
   // Explicit non-US country/region/city → reject. This runs BEFORE the remote
   // check so "Remote, United Arab Emirates" doesn't slip through via the
@@ -89,11 +103,10 @@ function looksUS(location) {
   // Pure "remote" with no foreign marker → assume US for a US-centric board.
   if (/\bremote\b/.test(l)) return true;
 
-  // US state or city mentions.
+  // US state mentions.
   for (const name of US_STATE_NAMES) if (l.includes(name)) return true;
   const tokens = l.split(/[\s,;/|()\-]+/).filter(Boolean);
   for (const tok of tokens) if (US_STATES.has(tok)) return true;
-  for (const c of US_CITY_MARKERS) if (l.includes(c)) return true;
 
   return false;
 }
@@ -350,19 +363,40 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
       ? raw.sponsorship_override
       : classifySponsorship(`${job_title}\n${description}`, company_name);
 
-  // Same for entry-level: a curated new-grad source can force the flag.
-  const is_entry_level =
-    raw.entry_level_override != null
-      ? raw.entry_level_override ? 1 : 0
-      : looksExplicitEntry(job_title) ? 1 : 0;
+  // Years of experience stated in the description, e.g. "3+ years of
+  // professional android development experience". Titles alone leave most rows
+  // unlabelled — the majority read only "Software Engineer" — so a stated
+  // number is the better signal where one exists.
+  const years = extractExperience(`${job_title}\n${description}`);
+  const yoe_min = years ? years.min : -1; // -1 = not stated
+  const yearsLevel = levelFromYears(years);
+
+  // Level precedence:
+  //   1. Curated source override  (ghlistings/Uber tag the level explicitly)
+  //   2. Years stated in the description
+  //   3. Title heuristics
+  // The override stays on top: a new-grad feed that labels a posting is more
+  // authoritative than a number scraped out of its body text.
+  let is_entry_level;
+  if (raw.entry_level_override != null) is_entry_level = raw.entry_level_override ? 1 : 0;
+  else if (yearsLevel) is_entry_level = yearsLevel.is_entry_level;
+  else is_entry_level = looksExplicitEntry(job_title) ? 1 : 0;
 
   // Mid-level stamp: Uber supplies this via its authoritative level field.
-  // Otherwise fall back to title-based detection. Don't double-stamp if entry.
+  // Otherwise years, then title. Don't double-stamp if entry.
   let is_mid_level = 0;
   if (!is_entry_level) {
     if (raw.mid_level_override != null) is_mid_level = raw.mid_level_override ? 1 : 0;
+    else if (yearsLevel) is_mid_level = yearsLevel.is_mid_level;
     else if (looksMidLevel(job_title)) is_mid_level = 1;
   }
+
+  // Work-authorization restrictions (clearance / ITAR / citizenship). Kept in
+  // its own column rather than folded into `sponsorship`: "this employer won't
+  // sponsor" and "I am legally barred from this role" are different facts, and
+  // separating them keeps the filter reversible and the reason auditable.
+  // Classified against the full description, before the 20k truncation below.
+  const restriction = classifyRestriction(`${job_title}\n${description}`);
 
   return {
     dedupe_key: buildDedupeKey(company_name, job_title, location),
@@ -379,6 +413,8 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
     is_entry_level,
     is_mid_level,
     category: classifyCategory(company_name, raw.source),
+    restriction,
+    yoe_min,
   };
 }
 

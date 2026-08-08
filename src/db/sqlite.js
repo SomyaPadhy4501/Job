@@ -35,6 +35,8 @@ function initSchema(database) {
       sponsorship    TEXT    NOT NULL DEFAULT 'UNKNOWN',
       role_type      TEXT    NOT NULL DEFAULT 'OTHER',
       category       TEXT    NOT NULL DEFAULT 'SMALL',
+      restriction    TEXT    NOT NULL DEFAULT '',
+      yoe_min        INTEGER NOT NULL DEFAULT -1,
       is_entry_level INTEGER NOT NULL DEFAULT 0,
       is_mid_level   INTEGER NOT NULL DEFAULT 0,
       first_seen_at  TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -94,9 +96,20 @@ function migrate(database) {
     // eslint-disable-next-line no-console
     console.log(`[db.migrate] backfilled category on ${rows.length} rows`);
   }
+  if (!cols.includes('restriction')) {
+    database.exec("ALTER TABLE jobs ADD COLUMN restriction TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.includes('yoe_min')) {
+    // -1 means "the posting states no number", which is distinct from 0
+    // ("no experience required"). Both are meaningful, so don't collapse them.
+    database.exec('ALTER TABLE jobs ADD COLUMN yoe_min INTEGER NOT NULL DEFAULT -1');
+  }
   // Always ensure the category index exists — outside the ADD-COLUMN branch
   // so fresh DBs (where the column was created by initSchema) also get it.
   database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_category ON jobs (category)');
+  // Same placement rule for restriction. (idx_jobs_mid above is created inside
+  // its ADD-COLUMN branch and is therefore missing on fresh DBs — don't copy it.)
+  database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_restriction ON jobs (restriction)');
 
   // Reclassify category on every boot so a tightened/loosened startup list
   // propagates immediately. The classifier collapses to { 'STARTUP', '' }
@@ -167,22 +180,73 @@ function migrate(database) {
   // (USCIS H-1B lookup added 2026-04-24). This converges all existing rows
   // to the improved signal immediately without requiring a re-collect.
   // eslint-disable-next-line global-require
+  // Restriction (clearance / ITAR / citizenship) is recomputed in the same pass
+  // — it reads the same inputs, so a separate pass would double the scan.
+  // eslint-disable-next-line global-require
   const { classifySponsorship } = require('../services/classifier');
   const { stripHtml } = require('../services/normalize');
+  // eslint-disable-next-line global-require
+  const { classifyRestriction } = require('../services/clearance');
+  // Sources that pre-label sponsorship via `sponsorship_override` in
+  // normalizeJob (see src/collectors/ghlistings.js). Their rows carry an empty
+  // description, so re-running the rule-based classifier over them throws the
+  // curated answer away and falls back to the company-level USCIS lookup —
+  // which flipped all 16 curated NOs (KBR, Leidos, General Dynamics…) to
+  // YES/UNKNOWN on every boot. Never recompute sponsorship for these.
+  const CURATED_SPONSORSHIP_SOURCES = ['ghlistings'];
+  // eslint-disable-next-line global-require
+  const { extractExperience, levelFromYears } = require('../services/experience');
   const sponsorRows = database
-    .prepare('SELECT id, job_title, description, company_name FROM jobs')
+    .prepare(
+      `SELECT id, job_title, description, company_name, source, sponsorship,
+              restriction, yoe_min, is_entry_level, is_mid_level
+         FROM jobs`,
+    )
     .all();
   let sponsorUpdated = 0;
+  let restrictionUpdated = 0;
+  let yoeUpdated = 0;
   const updSpons = database.prepare('UPDATE jobs SET sponsorship = ? WHERE id = ?');
+  const updRestr = database.prepare('UPDATE jobs SET restriction = ? WHERE id = ?');
+  const updYoe = database.prepare(
+    'UPDATE jobs SET yoe_min = ?, is_entry_level = ?, is_mid_level = ? WHERE id = ?',
+  );
   const sponsorTx = database.transaction((list) => {
     for (const r of list) {
       const text = `${r.job_title || ''}\n${stripHtml(r.description || '')}`;
-      const next = classifySponsorship(text, r.company_name);
-      // Only update if changed — avoids unnecessary writes on every boot
-      const cur = database.prepare('SELECT sponsorship FROM jobs WHERE id = ?').get(r.id);
-      if (cur && next !== cur.sponsorship) {
-        updSpons.run(next, r.id);
-        sponsorUpdated++;
+      // Only update if changed — avoids unnecessary writes on every boot.
+      // The current values come from the outer SELECT; re-querying per row here
+      // was an N+1 (the category pass above is the pattern to follow).
+      if (!CURATED_SPONSORSHIP_SOURCES.includes(r.source)) {
+        const next = classifySponsorship(text, r.company_name);
+        if (next !== r.sponsorship) {
+          updSpons.run(next, r.id);
+          sponsorUpdated++;
+        }
+      }
+      const nextRestriction = classifyRestriction(text);
+      if (nextRestriction !== r.restriction) {
+        updRestr.run(nextRestriction, r.id);
+        restrictionUpdated++;
+      }
+
+      // Years of experience + the level flags derived from them. Rows whose
+      // level came from a curated source override can't be distinguished here
+      // (the override isn't persisted), so only overwrite the flags when the
+      // description actually states a number — otherwise leave them as the
+      // collector set them.
+      const years = extractExperience(text);
+      const nextYoe = years ? years.min : -1;
+      const lvl = levelFromYears(years);
+      const nextEntry = lvl ? lvl.is_entry_level : r.is_entry_level;
+      const nextMid = lvl ? lvl.is_mid_level : r.is_mid_level;
+      if (
+        nextYoe !== r.yoe_min ||
+        nextEntry !== r.is_entry_level ||
+        nextMid !== r.is_mid_level
+      ) {
+        updYoe.run(nextYoe, nextEntry, nextMid, r.id);
+        yoeUpdated++;
       }
     }
   });
@@ -190,6 +254,14 @@ function migrate(database) {
   if (sponsorUpdated > 0) {
     // eslint-disable-next-line no-console
     console.log(`[db.migrate] reclassified sponsorship on ${sponsorUpdated} rows`);
+  }
+  if (restrictionUpdated > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] reclassified restriction on ${restrictionUpdated} rows`);
+  }
+  if (yoeUpdated > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[db.migrate] recomputed experience level on ${yoeUpdated} rows`);
   }
   // 2026-04-24: add apply_url index so upsertJob can do a secondary dedupe
   // lookup by URL (catches near-duplicates where the dedupe_key differs only
@@ -303,7 +375,9 @@ function upsertJob(job) {
              role_type      = @role_type,
              category       = @category,
              is_entry_level = @is_entry_level,
-             is_mid_level   = @is_mid_level
+             is_mid_level   = @is_mid_level,
+             restriction    = @restriction,
+             yoe_min        = @yoe_min
          WHERE id = @id`
       )
       .run({ ...job, id: existing.id });
@@ -322,11 +396,11 @@ function upsertJob(job) {
       `INSERT INTO jobs
         (dedupe_key, source, external_id, company_name, job_title, location,
          apply_url, description, date_posted, sponsorship, role_type, category,
-         is_entry_level, is_mid_level)
+         is_entry_level, is_mid_level, restriction, yoe_min)
        VALUES
         (@dedupe_key, @source, @external_id, @company_name, @job_title, @location,
          @apply_url, @description, @date_posted, @sponsorship, @role_type, @category,
-         @is_entry_level, @is_mid_level)`
+         @is_entry_level, @is_mid_level, @restriction, @yoe_min)`
     )
     .run(job);
   return { inserted: 1, updated: 0 };
@@ -372,7 +446,7 @@ function finishRun(id, stats) {
     .run({ id, ...stats, errors: stats.errors ? JSON.stringify(stats.errors) : null });
 }
 
-function queryJobs({ search, title, sponsorship, company, role, level, source, limit, offset }) {
+function queryJobs({ search, title, sponsorship, company, role, level, source, restriction, limit, offset }) {
   const database = getDb();
   const clauses = [];
   const params = {};
@@ -411,6 +485,15 @@ function queryJobs({ search, title, sponsorship, company, role, level, source, l
   if (level === 'entry') clauses.push('is_entry_level = 1');
   else if (level === 'mid') clauses.push('is_mid_level = 1');
   else if (level === 'early') clauses.push('(is_entry_level = 1 OR is_mid_level = 1)');
+  // restriction: 'hide' → drop roles a sponsorship candidate is legally barred
+  //              from. EXPORT_ADVISORY / CLEARANCE_PREFERRED stay visible —
+  //              they name a restriction but don't impose one on the candidate.
+  //              'only' → just those roles. 'all' → no clause.
+  if (restriction === 'hide') {
+    clauses.push("restriction NOT IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')");
+  } else if (restriction === 'only') {
+    clauses.push("restriction IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')");
+  }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
   const total = database.prepare(`SELECT COUNT(*) AS c FROM jobs ${where}`).get(params).c;
@@ -424,7 +507,7 @@ function queryJobs({ search, title, sponsorship, company, role, level, source, l
   const rows = database
     .prepare(
       `SELECT id, source, company_name, job_title, location, apply_url,
-              date_posted, sponsorship, role_type, category,
+              date_posted, sponsorship, role_type, category, restriction, yoe_min,
               is_entry_level, is_mid_level,
               first_seen_at, last_seen_at
        FROM jobs

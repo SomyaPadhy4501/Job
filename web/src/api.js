@@ -18,6 +18,7 @@ export async function fetchJobs({
   sponsorship = '',
   role = '',
   level = '',
+  restriction = 'hide',
 } = {}) {
   const params = new URLSearchParams();
   params.set('page', page);
@@ -27,6 +28,7 @@ export async function fetchJobs({
   if (sponsorship) params.set('sponsorship', sponsorship);
   if (role) params.set('role', role);
   if (level) params.set('level', level);
+  if (restriction) params.set('restriction', restriction);
   const payload = await httpJson(`/jobs?${params.toString()}`);
   if (!payload || !Array.isArray(payload.data) || !payload.pagination) {
     throw new Error('Malformed /jobs response');

@@ -69,6 +69,14 @@ export default function Filters({ filters, onChange }) {
         <option value="mid">Mid-level (1-2 YOE)</option>
         <option value="early">Entry or mid</option>
       </select>
+      <select
+        value={filters.restriction}
+        onChange={(e) => onChange('restriction', e.target.value)}
+      >
+        <option value="hide">Hide clearance / citizens-only</option>
+        <option value="all">Show all roles</option>
+        <option value="only">Only restricted roles</option>
+      </select>
     </section>
   );
 }

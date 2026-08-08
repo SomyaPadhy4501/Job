@@ -718,6 +718,33 @@ const COMPANIES = [
   { source: 'workday', slug: 'samsung',    tenant: 'sec',        wd: '3',   site: 'Samsung_Careers',        displayName: 'Samsung Electronics' },
   { source: 'workday', slug: 'morganstanley', tenant: 'ms',      wd: '5',   site: 'External',               displayName: 'Morgan Stanley' },
   { source: 'workday', slug: 'gehealthcare',  tenant: 'gehc',    wd: '5',   site: 'GEHC_ExternalSite',      displayName: 'GE HealthCare' },
+  // Added 2026-08-08. eBay is a large H-1B sponsor (952 approvals over the last
+  // 2 FY per the USCIS Data Hub) that was missing entirely. tenant/wd/site are
+  // not guessable — this came from probing the CxS endpoint directly and
+  // confirming it returns jobs. Do the same for any new entry rather than
+  // guessing; a wrong site path just 404s silently.
+  { source: 'workday', slug: 'ebay',          tenant: 'ebay',       wd: '5',  site: 'apply',                 displayName: 'eBay' },
+
+  // ── schema.org JobPosting via sitemap (see src/collectors/jsonld.js) ────────
+  // For career sites with no public ATS API. Reads the sitemap the site
+  // publishes for crawlers, then the JSON-LD JobPosting block on each detail
+  // page. Check robots.txt before adding anyone here — Intuit disallows
+  // /search-jobs/ (its internal search API), which is why this route exists
+  // instead. 1,063 H-1B approvals over the last 2 FY per the USCIS Data Hub.
+  { source: 'jsonld', slug: 'intuit', displayName: 'Intuit',
+    sitemapUrl: 'https://jobs.intuit.com/sitemap.xml', jobPath: '/job/' },
+
+  // ── Adzuna aggregator (see src/collectors/adzuna.js) ───────────────────────
+  // Discovery-only fallback for employers with no reachable public board.
+  // No-ops unless ADZUNA_APP_ID / ADZUNA_APP_KEY are set, so these entries are
+  // inert until credentials exist. Adzuna returns only a description snippet,
+  // so these rows arrive with an empty description — sponsorship falls back to
+  // the USCIS company lookup and `restriction` stays '' until a detail-page
+  // enrichment pass fills the text in.
+  { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
+  { source: 'adzuna', slug: 'cisco',    displayName: 'Cisco',    company: 'Cisco' },
+  { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
+  { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
 
   // ─── Oracle HCM / Candidate Experience ───────────────────────────────────
   { source: 'oracle_hcm', slug: 'oracle', displayName: 'Oracle', apiHost: 'eeho.fa.us2.oraclecloud.com', siteNumber: 'CX_45001', uiBaseUrl: 'https://careers.oracle.com/en/sites/jobsearch' },

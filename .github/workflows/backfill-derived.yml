@@ -1,0 +1,46 @@
+name: backfill-derived
+
+# One-off backfill: compute `restriction` (clearance / ITAR / citizenship) for
+# every row in Neon. Manual-only — there's no schedule.
+# Default is dry-run; flip the `apply` input to `true` to actually write.
+#
+# PREREQUISITE: run migrations/002_add_restriction.sql and 003_add_yoe_min.sql against Neon first.
+# Without the column this fails immediately with an undefined-column error.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write changes to Neon (false = dry run, true = apply)'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  backfill-derived:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Backfill derived fields
+        run: |
+          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+            npm run backfill-derived -- --apply
+          else
+            npm run backfill-derived
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
