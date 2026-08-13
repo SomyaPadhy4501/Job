@@ -8,7 +8,14 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 15       # Full fan-out across 700+ companies takes ~7 min
+    # Was 15 when the fan-out was ~7 min across 700+ companies. The getro,
+    # smartrecruiters, eightfold and rippling sources add roughly 5 min: getro
+    # pages 16 VC networks until each crosses the retention window and then
+    # fetches a description per surviving row, and eightfold is deliberately
+    # throttled because its edge rate-limits by IP across all tenants at once.
+    # Measured separately at ~4 min (existing) + ~5 min (new). 30 leaves room
+    # for a slow upstream rather than losing the whole run to a mid-flight kill.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
