@@ -792,6 +792,56 @@ const COMPANIES = [
   // needed — the earlier 404s were because we were targeting the wrong path.
   { source: 'microsoft',    displayName: 'Microsoft' },
 
+  // ─── Eightfold AI tenants (see src/collectors/eightfold.js) ──────────────
+  // Netflix is also Eightfold but keeps its own `netflix` source entry above,
+  // because it needs the L-level title hook and sits on a vanity host.
+  //
+  // Discovered 2026-08-13 by sweeping `{slug}.eightfold.ai` and vanity career
+  // hosts. Most tenants are NOT reachable: Nutanix and Juniper 404, Micron,
+  // Dolby and Vodafone return 403 (the tenant disabled anonymous API access — a
+  // browser user-agent does not help). Don't re-probe those.
+  //
+  // Keep this list short on purpose. Eightfold rate-limits by IP across every
+  // tenant at once, so each addition raises the odds of 403ing Netflix too —
+  // see the rate-limit note at the top of src/collectors/eightfold.js.
+  //
+  // NetApp: 273 H-1B approvals over the last 2 FY per the USCIS Data Hub, and
+  // ~47 software candidates per run. Worth its request budget.
+  //
+  // Bayer was probed and rejected, not overlooked: 626 postings but only one
+  // software title in the whole catalogue (it's a pharma/agri employer), so it
+  // cost ~63 requests per run for ~1 row. Don't re-add it.
+  { source: 'eightfold', slug: 'netapp', displayName: 'NetApp',
+    apiBase: 'https://netapp.eightfold.ai/api/apply/v2/jobs', domain: 'netapp.com' },
+
+  // ─── SmartRecruiters (discovered 2026-08-13, see src/collectors/smartrecruiters.js) ───
+  // Found by scripts/probe-smartrecruiters.js, which walks the USCIS sponsor
+  // list in descending approval order — so every entry here is a confirmed
+  // H-1B sponsor, not a guess. Counts are US postings / H-1B approvals over the
+  // last 2 FY.
+  //
+  // Slugs are case-insensitive but otherwise exact, and there is no company
+  // search endpoint, so always add via the probe rather than by hand.
+  { source: 'smartrecruiters', slug: 'abbvie', displayName: 'AbbVie' },                    // 1057 US, 303 approvals
+  { source: 'smartrecruiters', slug: 'intuitive', displayName: 'Intuitive' },              // 384 US, 339 approvals
+  { source: 'smartrecruiters', slug: 'servicenow', displayName: 'ServiceNow' },            // 294 US, 849 approvals
+  { source: 'smartrecruiters', slug: 'BoschGroup', displayName: 'Bosch Group' },           // 288 US, 188 approvals
+  { source: 'smartrecruiters', slug: 'harvarduniversity', displayName: 'Harvard University' }, // 252 US, 291 approvals
+  { source: 'smartrecruiters', slug: 'aristanetworks', displayName: 'Arista Networks' },   // 112 US, 182 approvals
+  { source: 'smartrecruiters', slug: 'westerndigital', displayName: 'Western Digital' },   // 71 US, 286 approvals
+  { source: 'smartrecruiters', slug: 'microchip', displayName: 'Microchip' },              // 7 US, 143 approvals
+  //
+  // Deliberately NOT added, though the probe found a live board for each — all
+  // had 1-3 US postings, i.e. a vestigial or secondary board that isn't where
+  // the company actually hires. Re-probe before adding any of them:
+  //   uber, wayfair          — already covered by their own collectors
+  //   visa (883 approvals)   — resolves HANDOFF's "no confirmed endpoint" note:
+  //                            Visa's SmartRecruiters board exists but is
+  //                            effectively empty, so it stays uncovered
+  //   atos-syntel, natsoftcorporation, nisum, irissoftware, teladochealth
+  //   robertbosch            — a near-empty duplicate of BoschGroup above,
+  //                            which is the real board (288 US postings)
+
   // ─── Community-curated GitHub new-grad lists ─────────────────────────────
   // These give us broad FAANG + enterprise coverage (Google, Apple, Meta,
   // Microsoft, Goldman Sachs, JP Morgan, SpaceX, Boeing, Lockheed, …) that
@@ -816,6 +866,40 @@ const COMPANIES = [
   // headers, and keeps only comments whose company matches a US-based YC
   // company currently marked `isHiring` in akshaybhalotia/yc_company_scraper.
   { source: 'hn_hiring', displayName: 'HN Who is hiring (YC US)' },
+
+  // ─── Getro VC portfolio boards (verified 2026-08-13) ─────────────────────
+  // Discovered by scripts/probe-getro.js. See src/collectors/getro.js.
+  //
+  // This is the widest startup-coverage route we have: 63k US rows across these
+  // 16 networks, versus ~700 individually-configured Greenhouse/Lever/Ashby
+  // companies. It reaches the startups the YC and topstartups probes miss —
+  // too small, too new, or simply never on a list we scraped — and every row
+  // carries a direct ATS apply URL, a real posting date, and Getro's own
+  // seniority label.
+  //
+  // The row counts below are total US postings on each board, NOT what we
+  // ingest. The collector pages newest-first and stops at RETENTION_DAYS, so
+  // per-run volume is a function of how fast each network posts, not its size.
+  //
+  // `networkId` is not guessable — always get it from the probe script. A wrong
+  // id fails loudly (Elasticsearch index_not_found_exception), not silently.
+  // Portfolios overlap heavily; duplicates collapse on dedupe_key.
+  { source: 'getro', slug: 'general-catalyst', networkId: 222, boardHost: 'jobs.generalcatalyst.com', displayName: 'General Catalyst' }, // 12015 US rows
+  { source: 'getro', slug: 'accel', networkId: 8672, boardHost: 'jobs.accel.com', displayName: 'Accel' }, // 10944 US rows
+  { source: 'getro', slug: 'thrive-capital', networkId: 2105, boardHost: 'jobs.thrivecap.com', displayName: 'Thrive Capital' }, // 8445 US rows
+  { source: 'getro', slug: 'khosla-ventures', networkId: 257, boardHost: 'jobs.khoslaventures.com', displayName: 'Khosla Ventures' }, // 7268 US rows
+  { source: 'getro', slug: '8vc', networkId: 1005, boardHost: 'jobs.8vc.com', displayName: '8VC' }, // 6921 US rows
+  { source: 'getro', slug: 'insight-partners-2', networkId: 246, boardHost: 'jobs.insightpartners.com', displayName: 'Insight Partners' }, // 6097 US rows
+  { source: 'getro', slug: 'summit-partners', networkId: 36623, boardHost: 'jobs.summitpartners.com', displayName: 'Summit Partners' }, // 2730 US rows
+  { source: 'getro', slug: 'menlo-ventures', networkId: 767, boardHost: 'jobs.menlovc.com', displayName: 'Menlo Ventures' }, // 2613 US rows
+  { source: 'getro', slug: 'lead-edge-capital', networkId: 1076, boardHost: 'jobs.leadedge.com', displayName: 'Lead Edge Capital' }, // 1543 US rows
+  { source: 'getro', slug: 'sapphire-ventures', networkId: 199, boardHost: 'jobs.sapphireventures.com', displayName: 'Sapphire Ventures' }, // 1490 US rows
+  { source: 'getro', slug: 'craft-ventures', networkId: 340, boardHost: 'jobs.craftventures.com', displayName: 'Craft Ventures' }, // 1196 US rows
+  { source: 'getro', slug: 'signalfire', networkId: 135, boardHost: 'jobs.signalfire.com', displayName: 'SignalFire' }, // 794 US rows
+  { source: 'getro', slug: 'uncork-capital', networkId: 247, boardHost: 'jobs.uncorkcapital.com', displayName: 'Uncork Capital' }, // 511 US rows
+  { source: 'getro', slug: 'true-ventures', networkId: 646, boardHost: 'jobs.trueventures.com', displayName: 'True Ventures' }, // 495 US rows
+  { source: 'getro', slug: 'scale-venture-partners', networkId: 776, boardHost: 'jobs.scalevp.com', displayName: 'Scale Venture Partners' }, // 428 US rows
+  { source: 'getro', slug: 'freestyle', networkId: 108, boardHost: 'jobs.freestyle.vc', displayName: 'Freestyle Capital' }, // 218 US rows
 ];
 
 const CONFIG = {
