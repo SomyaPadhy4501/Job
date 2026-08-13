@@ -60,13 +60,55 @@ const US_STATE_NAMES = [
   'virginia','washington','west virginia','wisconsin','wyoming',
   'district of columbia',
 ];
+// Enterprise employers name facilities rather than cities — "San Antonio Home
+// Office I", "Tampa Campus", "Plano Legacy", "SMYRNA PACES SUMMIT - 9125".
+// Those carry no state abbreviation, so without the city name here they were
+// dropped as non-US: 88 USAA postings alone died on "San Antonio Home Office".
+// Weighted toward the metros this board targets (TX, NJ, Atlanta, SF Bay, NY,
+// Boston) but covers the large US metros generally.
 const US_CITY_MARKERS = [
-  'new york','san francisco','sf ','nyc','los angeles','boston','seattle',
-  'austin','chicago','atlanta','denver','miami','houston','dallas','portland',
-  'san diego','san jose','palo alto','mountain view','sunnyvale','bellevue',
-  'cambridge','brooklyn','minneapolis','washington, dc','washington dc',
-  'redmond','bay area',
+  // Northeast
+  'new york','nyc','brooklyn','queens','manhattan','jersey city','newark',
+  'hoboken','princeton','edison','boston','cambridge','somerville','waltham',
+  'burlington','needham','quincy','philadelphia','pittsburgh','baltimore',
+  'washington, dc','washington dc','arlington','alexandria','reston','mclean',
+  'stamford','hartford','providence',
+  // Southeast
+  'atlanta','alpharetta','smyrna','marietta','duluth','charlotte','raleigh',
+  'durham','miami','orlando','tampa','jacksonville','nashville','richmond',
+  'columbia','birmingham',
+  // Texas + South Central
+  'austin','dallas','houston','san antonio','plano','irving','fort worth',
+  'frisco','richardson','round rock','el paso','oklahoma city',
+  // Midwest
+  'chicago','minneapolis','st. paul','detroit','columbus','cleveland',
+  'cincinnati','indianapolis','kansas city','st. louis','milwaukee','omaha',
+  'joliet','madison','ann arbor',
+  // West
+  'san francisco','sf ','bay area','san jose','palo alto','mountain view',
+  'sunnyvale','santa clara','menlo park','redwood city','cupertino','fremont',
+  'oakland','berkeley','san mateo','los angeles','san diego','irvine',
+  'seattle','bellevue','redmond','portland','denver','boulder','phoenix',
+  'tempe','scottsdale','salt lake city','las vegas','albuquerque','boise',
 ];
+
+// Foreign locations frequently use an ISO 3166 alpha-3 country code as the last
+// token — "Barcelona, ESP", "Kraków, POL", "Amman, JOR". None of these appear in
+// FOREIGN_MARKERS, so they would slip through any loosening of the default.
+// Matched only as the FINAL token, because several codes collide with ordinary
+// English words ("can", "are", "chn" is safe but "can" is not).
+const FOREIGN_ISO3 = new Set([
+  'esp','pol','jor','irl','gbr','deu','fra','ind','can','mex','bra','jpn','chn',
+  'sgp','aus','nld','swe','che','isr','phl','rou','cze','prt','hun','tur','zaf',
+  'kor','twn','hkg','mys','idn','vnm','tha','nzl','arg','chl','col','per','egy',
+  'nga','are','sau','dnk','nor','fin','aut','bel','grc','ita','ukr','srb','hrv',
+  'bgr','ltu','lva','est','svk','svn','mar','ken','pak','bgd','lka','npl','crc',
+]);
+function endsWithForeignIso3(l) {
+  const tokens = l.trim().split(/[\s,]+/).filter(Boolean);
+  const last = tokens[tokens.length - 1];
+  return !!last && last.length === 3 && FOREIGN_ISO3.has(last);
+}
 
 // Any of these markers in a location string marks the row as non-US — they
 // override the "bare remote → US" heuristic and the US_STATES `ca` fallback
@@ -84,6 +126,13 @@ function looksUS(location) {
   // used to fall through every branch below and get dropped.
   if (/\b(u\.?s\.?a?\.?|united states)\b/.test(l)) return true;
   if (/\b(north america|americas|usca)\b/.test(l)) return true;
+
+  // An ISO alpha-3 country code as the final token settles it, and must be
+  // checked BEFORE the city list: several US city names also exist abroad, so
+  // "Cambridge, GBR" and "Birmingham, GBR" would otherwise match a US city and
+  // pass. Only the last token is considered — some codes collide with ordinary
+  // words.
+  if (endsWithForeignIso3(l)) return false;
 
   // A named US city outranks a foreign marker. This must run BEFORE
   // FOREIGN_MARKERS: postings like "San Francisco or Remote (North America,
@@ -358,10 +407,18 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
   // A source can supply a pre-labeled sponsorship (e.g. the New-Grad-2027 repo
   // tags every posting). Trust it over the rule-based classifier when present.
+  // `sponsor_company_fallbacks` lets a source supply additional company keys for
+  // the USCIS lookup when it can't be trusted to name the employer correctly —
+  // see the note on classifySponsorship. Only affects the lookup; company_name
+  // as stored and displayed is untouched.
   const sponsorship =
     raw.sponsorship_override && ['YES', 'NO', 'UNKNOWN'].includes(raw.sponsorship_override)
       ? raw.sponsorship_override
-      : classifySponsorship(`${job_title}\n${description}`, company_name);
+      : classifySponsorship(
+          `${job_title}\n${description}`,
+          company_name,
+          raw.sponsor_company_fallbacks || []
+        );
 
   // Years of experience stated in the description, e.g. "3+ years of
   // professional android development experience". Titles alone leave most rows

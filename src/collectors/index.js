@@ -17,6 +17,10 @@ const ghlistings = require('./ghlistings');
 const hnHiring = require('./hn_hiring');
 const jsonld = require('./jsonld');
 const adzuna = require('./adzuna');
+const getro = require('./getro');
+const eightfold = require('./eightfold');
+const smartrecruiters = require('./smartrecruiters');
+const rippling = require('./rippling');
 
 // Registry keyed by source. Adding a new source = drop a module here.
 const REGISTRY = {
@@ -37,6 +41,10 @@ const REGISTRY = {
   [hnHiring.source]: hnHiring,
   [jsonld.source]: jsonld,
   [adzuna.source]: adzuna,
+  [getro.source]: getro,
+  [eightfold.source]: eightfold,
+  [smartrecruiters.source]: smartrecruiters,
+  [rippling.source]: rippling,
 };
 
 function getCollector(source) {
