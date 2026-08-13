@@ -61,7 +61,15 @@ function normSlug(s) {
     .join('-');
 }
 
-function classifySponsorship(text, companyName) {
+// `fallbackCompanyNames` exists for sources that report the wrong employer.
+// Getro is the motivating case: its portfolio records keep a startup's
+// pre-acquisition name while the posting itself now lives on the acquirer's ATS,
+// so 46 Adobe roles arrive labelled "Frame.io", 32 IBM roles as "Instana", 16
+// Salesforce roles as "Airkit". The USCIS lookup misses every one of them and
+// they land UNKNOWN despite the real employer having thousands of approvals.
+// The collector derives a second candidate from the apply_url host and passes it
+// here. First key that resolves wins.
+function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   if (!text || typeof text !== 'string') return 'UNKNOWN';
   const t = text.toLowerCase();
 
@@ -75,9 +83,10 @@ function classifySponsorship(text, companyName) {
   }
   // 3. USCIS lookup — company_name drives the signal; description alone misses
   //    ~516 rows that have no description text (Workday, Microsoft, Goldman, etc.)
-  if (companyName) {
-    const slug = normSlug(companyName);
-    const record = getH1bCache()[slug];
+  const cache = getH1bCache();
+  for (const candidate of [companyName, ...fallbackCompanyNames]) {
+    if (!candidate) continue;
+    const record = cache[normSlug(candidate)];
     if (record && record.approvals_last_2fy >= USCIS_THRESHOLD) {
       return 'YES';
     }

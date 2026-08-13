@@ -407,10 +407,18 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
   // A source can supply a pre-labeled sponsorship (e.g. the New-Grad-2027 repo
   // tags every posting). Trust it over the rule-based classifier when present.
+  // `sponsor_company_fallbacks` lets a source supply additional company keys for
+  // the USCIS lookup when it can't be trusted to name the employer correctly —
+  // see the note on classifySponsorship. Only affects the lookup; company_name
+  // as stored and displayed is untouched.
   const sponsorship =
     raw.sponsorship_override && ['YES', 'NO', 'UNKNOWN'].includes(raw.sponsorship_override)
       ? raw.sponsorship_override
-      : classifySponsorship(`${job_title}\n${description}`, company_name);
+      : classifySponsorship(
+          `${job_title}\n${description}`,
+          company_name,
+          raw.sponsor_company_fallbacks || []
+        );
 
   // Years of experience stated in the description, e.g. "3+ years of
   // professional android development experience". Titles alone leave most rows
