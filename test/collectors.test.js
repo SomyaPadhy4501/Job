@@ -316,3 +316,67 @@ test('config entries for the new sources carry their required fields', () => {
     assert.ok(c.slug, 'smartrecruiters entry missing slug');
   }
 });
+
+// ─── Rippling ─────────────────────────────────────────────────────────────────
+
+const rippling = require('../src/collectors/rippling');
+
+const RIPPLING_JOB = {
+  uuid: '37773206-51d2-43f1-b78c-5ac5eac8abbd',
+  name: 'Software Engineer',
+  url: 'https://ats.rippling.com/opendoor/jobs/37773206-51d2-43f1-b78c-5ac5eac8abbd',
+  department: { id: 'Engineering', label: 'Engineering' },
+  workLocation: { label: 'San Francisco, CA', id: 'San Francisco, CA' },
+};
+
+const RIPPLING_DETAIL = {
+  companyName: 'Opendoor',
+  createdOn: '2026-06-23T13:34:02.081000-07:00',
+  workLocations: ['San Francisco, CA'],
+  description: {
+    company: '<p>About Opendoor</p>',
+    role: '<p>You will build things. Must hold an active security clearance.</p>',
+  },
+};
+
+test('rippling: date_posted is null even though createdOn exists', () => {
+  // createdOn is a creation date with no updated counterpart, and these boards
+  // keep roles open for months. Using it dropped 21 of Opendoor's 24 open
+  // software roles at the retention check — the tenant collapsed to 1 row while
+  // every one of those jobs was still listed.
+  const row = rippling.mapJob(RIPPLING_JOB, { slug: 'opendoor', detail: RIPPLING_DETAIL });
+  assert.strictEqual(row.date_posted, null);
+
+  const n = normalizeJob(row, {
+    filterUSOnly: true,
+    filterSoftwareOnly: true,
+    entryLevelMode: 'permissive',
+    retentionDays: 30,
+  });
+  assert.ok(n, 'a still-listed role must survive retention');
+  assert.strictEqual(n.date_posted, null);
+});
+
+test('rippling: description joins every rich-text block, not just the role', () => {
+  // `description` is an object of named blocks. `role` carries the requirements,
+  // including clearance language, so taking only one block loses the restriction.
+  const row = rippling.mapJob(RIPPLING_JOB, { slug: 'opendoor', detail: RIPPLING_DETAIL });
+  assert.ok(row.description.includes('About Opendoor'));
+  assert.ok(row.description.includes('build things'));
+
+  const n = normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true });
+  assert.strictEqual(n.restriction, 'CLEARANCE');
+});
+
+test('rippling: buildDescription tolerates a plain string or nothing', () => {
+  assert.strictEqual(rippling.buildDescription('already text'), 'already text');
+  assert.strictEqual(rippling.buildDescription(null), '');
+  assert.strictEqual(rippling.buildDescription({}), '');
+});
+
+test('rippling: falls back to the list workLocation and a derived apply_url', () => {
+  const row = rippling.mapJob(RIPPLING_JOB, { slug: 'opendoor', displayName: 'Opendoor', detail: null });
+  assert.strictEqual(row.location, 'San Francisco, CA');
+  assert.strictEqual(row.company_name, 'Opendoor');
+  assert.match(row.apply_url, /ats\.rippling\.com\/opendoor\/jobs\//);
+});

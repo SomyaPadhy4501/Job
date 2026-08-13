@@ -197,7 +197,10 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'octantbio', displayName: 'Octant Bio' },
   { source: 'greenhouse', slug: 'offerup', displayName: 'OfferUp' },
   { source: 'greenhouse', slug: 'onxmaps', displayName: 'onX' },
-  { source: 'greenhouse', slug: 'opendoor', displayName: 'Opendoor' },
+  // Opendoor moved off Greenhouse to Rippling — the slug now 404s. Kept as a
+  // comment rather than deleted so the migration is legible if their board
+  // moves again. See the `rippling` entries below.
+  // { source: 'greenhouse', slug: 'opendoor', displayName: 'Opendoor' },
   { source: 'greenhouse', slug: 'ophelia', displayName: 'Ophelia' },
   { source: 'greenhouse', slug: 'outschool', displayName: 'Outschool' },
   { source: 'greenhouse', slug: 'pagerduty', displayName: 'PagerDuty' },
@@ -866,6 +869,26 @@ const COMPANIES = [
   // headers, and keeps only comments whose company matches a US-based YC
   // company currently marked `isHiring` in akshaybhalotia/yc_company_scraper.
   { source: 'hn_hiring', displayName: 'HN Who is hiring (YC US)' },
+
+  // ─── Rippling ATS (verified 2026-08-13, see src/collectors/rippling.js) ──
+  // Found by scripts/probe-rippling.js. Rippling is where companies migrate
+  // *to*: Opendoor's Greenhouse board 404s now, and its 74 postings were
+  // invisible except for the few Getro happened to mirror.
+  //
+  // Only three of twenty probe hits are here, because slug collisions are the
+  // norm on this ATS and every one was verified against the board's own
+  // companyName before being added. Rejected as different companies entirely:
+  // `wsp` is Waldorf School of the Peninsula (not the 194-approval engineering
+  // firm), `ace` is American College of Education, `sas` is Strategic
+  // Association Solutions (not SAS Institute), `paramount` is a debt-recovery
+  // firm, `archer` is Archer Review. Adding any of those would have put an
+  // unrelated employer's jobs on the board under a big sponsor's name.
+  // Always check displayName against the USCIS key before merging a probe line.
+  //
+  // ThoughtSpot was probed and rejected: 56 postings, none of them engineering —
+  // its Rippling board carries only sales, marketing and CS roles. Don't re-add.
+  { source: 'rippling', slug: 'opendoor',     displayName: 'Opendoor' },     // 74 postings, 35 approvals (as opendoor-labs)
+  { source: 'rippling', slug: 'rsa-security', displayName: 'RSA Security' }, // 41 postings, 49 approvals
 
   // ─── Getro VC portfolio boards (verified 2026-08-13) ─────────────────────
   // Discovered by scripts/probe-getro.js. See src/collectors/getro.js.
