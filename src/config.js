@@ -764,7 +764,16 @@ const COMPANIES = [
   // inert until credentials exist. Adzuna returns only a description snippet,
   // so these rows arrive with an empty description — sponsorship falls back to
   // the USCIS company lookup and `restriction` stays '' until a detail-page
-  // enrichment pass fills the text in.
+  // enrichment pass fills the text in. It also means the 0-2 year ceiling can't
+  // read these rows; only the title filters apply.
+  //
+  // Tesla stays here rather than in the Playwright scraper. Re-probed
+  // 2026-10-21: Akamai answers "Access Denied" to plain HTTP (even robots.txt),
+  // to headless Chromium in both modes, and to headed Playwright Chromium (the
+  // sensor page loads, then the reload is denied). A normal browser gets the
+  // whole catalog from /cua-api/apps/careers/state, so automation detection is
+  // the only wall, and getting past it means the stealth arms race this project
+  // doesn't do. The detail's applyUrl host, tesla.avature.net, doesn't resolve.
   { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
   { source: 'adzuna', slug: 'cisco',    displayName: 'Cisco',    company: 'Cisco' },
   { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
@@ -827,6 +836,9 @@ const COMPANIES = [
   // search endpoint, so always add via the probe rather than by hand.
   { source: 'smartrecruiters', slug: 'abbvie', displayName: 'AbbVie' },                    // 1057 US, 303 approvals
   { source: 'smartrecruiters', slug: 'intuitive', displayName: 'Intuitive' },              // 384 US, 339 approvals
+  // ServiceNow: careers.servicenow.com is a front end over this same board (its
+  // job ids are SmartRecruiters ids), so this entry is the whole catalogue — 430
+  // US postings on 2026-10-21, of which ~13 survive the title filters.
   { source: 'smartrecruiters', slug: 'servicenow', displayName: 'ServiceNow' },            // 294 US, 849 approvals
   { source: 'smartrecruiters', slug: 'BoschGroup', displayName: 'Bosch Group' },           // 288 US, 188 approvals
   { source: 'smartrecruiters', slug: 'harvarduniversity', displayName: 'Harvard University' }, // 252 US, 291 approvals
