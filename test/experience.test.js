@@ -8,7 +8,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { extractExperience, levelFromYears } = require('../src/services/experience');
+const {
+  extractExperience,
+  levelFromYears,
+  exceedsMaxYoe,
+  MAX_YOE,
+} = require('../src/services/experience');
+const { normalizeJob, looksSeniorReject } = require('../src/services/normalize');
 
 const min = (text) => {
   const y = extractExperience(text);
@@ -74,11 +80,65 @@ test('maps years to level flags', () => {
   assert.deepStrictEqual(levelFromYears({ min: 0 }), { is_entry_level: 1, is_mid_level: 0 });
   assert.deepStrictEqual(levelFromYears({ min: 1 }), { is_entry_level: 1, is_mid_level: 0 });
   assert.deepStrictEqual(levelFromYears({ min: 2 }), { is_entry_level: 0, is_mid_level: 1 });
-  assert.deepStrictEqual(levelFromYears({ min: 3 }), { is_entry_level: 0, is_mid_level: 1 });
+  // 3+ is over the ceiling — no level flag, and normalizeJob drops the row.
+  assert.deepStrictEqual(levelFromYears({ min: 3 }), { is_entry_level: 0, is_mid_level: 0 });
   assert.deepStrictEqual(levelFromYears({ min: 4 }), { is_entry_level: 0, is_mid_level: 0 });
 });
 
 test('returns null for unknown years so callers fall back to title heuristics', () => {
   assert.strictEqual(levelFromYears(null), null);
   assert.strictEqual(levelFromYears({}), null);
+});
+
+// ─── 0-2 year ceiling ─────────────────────────────────────────────────────────
+
+test('the ceiling is 2 years and unknown years never exceed it', () => {
+  assert.strictEqual(MAX_YOE, 2);
+  assert.strictEqual(exceedsMaxYoe({ min: 2 }), false);
+  assert.strictEqual(exceedsMaxYoe({ min: 3 }), true);
+  assert.strictEqual(exceedsMaxYoe(null), false);
+  assert.strictEqual(exceedsMaxYoe({}), false);
+});
+
+const OPTS = { filterUSOnly: true, filterSoftwareOnly: true, entryLevelMode: 'permissive' };
+const row = (description, extra = {}) => ({
+  source: 'greenhouse',
+  company_name: 'Example',
+  job_title: 'Software Engineer',
+  location: 'Austin, TX',
+  apply_url: 'https://example.com/jobs/1',
+  description,
+  ...extra,
+});
+
+test('normalizeJob drops postings that ask for more than 2 years', () => {
+  assert.strictEqual(normalizeJob(row('3+ years of experience building backend services'), OPTS), null);
+  assert.strictEqual(normalizeJob(row('3-5 years of professional experience'), OPTS), null);
+  // A curated "entry" label doesn't outrank the posting's own text.
+  assert.strictEqual(
+    normalizeJob(row('5+ years of experience required', { entry_level_override: 1 }), OPTS),
+    null,
+  );
+});
+
+test('normalizeJob keeps postings within 0-2 years, and ones that state no number', () => {
+  const two = normalizeJob(row('2+ years of experience with python'), OPTS);
+  assert.strictEqual(two.yoe_min, 2);
+  assert.strictEqual(two.is_mid_level, 1);
+
+  // The lowest stated bar decides, so a range that starts inside the ceiling stays.
+  assert.strictEqual(normalizeJob(row('1-3 years of experience in java'), OPTS).yoe_min, 1);
+
+  const unstated = normalizeJob(row('Join our team building payments infrastructure.'), OPTS);
+  assert.strictEqual(unstated.yoe_min, -1);
+});
+
+test('numeric level 3+ titles are rejected like III, without catching 3D or 5G', () => {
+  // Many rows carry no description, so the title is the only level signal.
+  for (const t of ['Software Engineer 3', 'SDE3', 'Data Scientist 4', 'Software Developer 5 - Cloud']) {
+    assert.strictEqual(looksSeniorReject(t), true, t);
+  }
+  for (const t of ['Software Engineer 2', 'Software Engineer II', 'Graphics Engineer 3D Vision', 'Software Engineer 5G']) {
+    assert.strictEqual(looksSeniorReject(t), false, t);
+  }
 });

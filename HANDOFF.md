@@ -82,7 +82,7 @@ Other ways to run individual pieces:
 ## User's priorities (ranked; don't re-litigate)
 
 1. **US-based, full-time** (interns and co-ops are rejected globally in `normalize.js`; don't suggest re-enabling them)
-2. **Entry-level OR mid-level (1-2 YOE)**. `II` is mid, `III`+ is senior. Senior/staff/principal/lead/manager/architect are rejected.
+2. **Entry-level OR mid-level (1-2 YOE)**. `II` is mid, `III`+ (and numeric `3`+, "SDE3") is senior. Senior/staff/principal/lead/manager/architect are rejected. **Hard ceiling since 2026-10-21: 0–2 years.** A posting whose lowest stated requirement is above 2 years is dropped in `normalizeJob` and swept from the DB at the end of every collect (`MAX_YOE` in `src/services/experience.js`). Postings that state no number are kept.
 3. **Role types:** SWE/SDE, MLE, AI/Research, Data Scientist, Data Engineer, DevOps/SRE/Platform, Security, Mobile
 4. **Visa sponsorship tracking.** Classifier is rule-based (`src/services/classifier.js`). Some sources pre-label sponsorship — their labels win over the classifier via `sponsorship_override`.
 5. **Newest first.** Date sort with ISO normalization (`normalize.js::parseDateToIso`).
@@ -358,7 +358,7 @@ For each raw job, in order:
    - Note: **`II` is allowed through** (mid-level)
 8. Classify sponsorship — but `raw.sponsorship_override` wins if present (`YES`/`NO`/`UNKNOWN`)
 9. Flag `is_entry_level` (from override if present, else title regex)
-10. Flag `is_mid_level` (from override, else regex on `II`, `Mid-level`, `1-2 years`, etc.) — never double-stamped with entry
+10. Flag `is_mid_level` (from override, else regex on `II`, `Mid-level`, `1-2 years`, etc.) — never double-stamped with entry. Before steps 8–10, the years stated in the description are extracted and the row is **rejected** if the lowest is above 2 (`MAX_YOE`); 0–1 years stamps entry, 2 stamps mid
 11. Compute `dedupe_key = lower(company)|lower(title)|lower(location)` (slugified)
 
 ---

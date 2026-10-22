@@ -3,7 +3,7 @@
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
 const { classifyRestriction } = require('./clearance');
-const { extractExperience, levelFromYears } = require('./experience');
+const { extractExperience, levelFromYears, exceedsMaxYoe } = require('./experience');
 
 function stripHtml(html) {
   if (!html) return '';
@@ -299,6 +299,10 @@ const SENIOR_REJECT = [
   /\bchief\b/, // "Programs Chief Engineer", "Chief of Staff", etc.
   /\s(iii|iv|v|vi)\b/i, // space + III/IV/…  (II is intentionally NOT rejected)
   /\s-\s*(iii|iv|v|vi)\b/i,
+  // Numeric level 3+ — "Software Engineer 3", "SDE3". Same rung as III, and
+  // matters most on rows with no description for the years ceiling to read.
+  // `\b` after the digit keeps "3D" and "5G" out.
+  /\b(engineer|developer|scientist|sde|swe)\s*[3-6]\b/i,
 ];
 
 const ENTRY_POSITIVE = [
@@ -405,6 +409,16 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   if (filterUSOnly && !looksUS(location)) return null;
   if (!passesLevel(job_title, entryLevelMode || 'permissive')) return null;
 
+  // Years of experience stated in the description, e.g. "3+ years of
+  // professional android development experience". Titles alone leave most rows
+  // unlabelled — the majority read only "Software Engineer" — so a stated
+  // number is the better signal where one exists.
+  const years = extractExperience(`${job_title}\n${description}`);
+
+  // Hard ceiling: 0-2 years only (MAX_YOE). Applies to every source, curated
+  // overrides included — a level label doesn't outrank the posting's own text.
+  if (exceedsMaxYoe(years)) return null;
+
   // A source can supply a pre-labeled sponsorship (e.g. the New-Grad-2027 repo
   // tags every posting). Trust it over the rule-based classifier when present.
   // `sponsor_company_fallbacks` lets a source supply additional company keys for
@@ -420,11 +434,6 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
           raw.sponsor_company_fallbacks || []
         );
 
-  // Years of experience stated in the description, e.g. "3+ years of
-  // professional android development experience". Titles alone leave most rows
-  // unlabelled — the majority read only "Software Engineer" — so a stated
-  // number is the better signal where one exists.
-  const years = extractExperience(`${job_title}\n${description}`);
   const yoe_min = years ? years.min : -1; // -1 = not stated
   const yearsLevel = levelFromYears(years);
 

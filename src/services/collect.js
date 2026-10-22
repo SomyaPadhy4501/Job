@@ -4,7 +4,10 @@ const { COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
-const { bulkUpsert, startRun, finishRun, pruneStaleJobs } = require('../db');
+const { MAX_YOE } = require('./experience');
+const {
+  bulkUpsert, startRun, finishRun, pruneStaleJobs, pruneOverExperienced,
+} = require('../db');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -34,7 +37,9 @@ async function fetchCompanySafe(company) {
 }
 
 async function collectAll({ companies = COMPANIES } = {}) {
-  const runId = startRun();
+  // Awaited because the Postgres backend is async: unawaited, runId was a
+  // Promise (logged as `"runId":{}`) and finishRun never matched a row.
+  const runId = await startRun();
   const started = Date.now();
   log.info('collection.start', { runId, companies: companies.length });
 
@@ -89,11 +94,17 @@ async function collectAll({ companies = COMPANIES } = {}) {
   // Retention sweep: delete rows older than the retention window. Hits both
   // dated rows that slipped past normalize (e.g. curated lists that re-publish
   // stale items) and null-dated rows whose last_seen_at has aged out (source
-  // stopped listing them — role filled or pulled).
-  const pruned = pruneStaleJobs(CONFIG.retentionDays);
+  // stopped listing them — role filled or pulled). Awaited for the same reason
+  // as startRun: collect-once exits as soon as this function returns, which cut
+  // an unawaited Postgres DELETE short.
+  const pruned = await pruneStaleJobs(CONFIG.retentionDays);
   if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
 
-  finishRun(runId, {
+  // Experience-ceiling sweep: rows stored before the 0-2 year ceiling existed.
+  const overYoe = await pruneOverExperienced(MAX_YOE);
+  if (overYoe > 0) log.info('collection.pruned-yoe', { runId, pruned: overYoe, maxYoe: MAX_YOE });
+
+  await finishRun(runId, {
     companies_ok: companiesOk,
     companies_fail: companiesFail,
     jobs_inserted: inserted,

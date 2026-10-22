@@ -427,6 +427,15 @@ function pruneStaleJobs(days) {
   return r.changes;
 }
 
+// Delete rows whose stated experience requirement is above the board's
+// ceiling (MAX_YOE in src/services/experience.js). normalizeJob already rejects
+// these on the way in; this removes rows stored before the ceiling existed, and
+// any whose yoe_min the boot backfill has since recomputed upward. yoe_min = -1
+// (no number stated) is never touched.
+function pruneOverExperienced(maxYoe) {
+  return getDb().prepare('DELETE FROM jobs WHERE yoe_min > ?').run(maxYoe).changes;
+}
+
 function startRun() {
   return getDb().prepare('INSERT INTO collection_runs DEFAULT VALUES').run().lastInsertRowid;
 }
@@ -579,4 +588,5 @@ module.exports = {
   getJobById,
   statsSummary,
   pruneStaleJobs,
+  pruneOverExperienced,
 };

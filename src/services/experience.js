@@ -59,6 +59,12 @@ const YEARS_OF_SHAPE =
 
 const MAX_REASONABLE_YEARS = 25; // guards against "25 years, we've been pioneering"
 
+// The board's experience ceiling: only roles asking for 0-2 years. A posting
+// whose lowest stated requirement is above this is dropped by normalizeJob and
+// swept from the DB at the end of each collect run. Postings that state no
+// number are kept — the title filters in normalize.js still apply to them.
+const MAX_YOE = 2;
+
 function isNarrative(before) {
   return NARRATIVE_BEFORE.test(before.slice(-28));
 }
@@ -115,15 +121,21 @@ function extractExperience(text) {
 
 // Map extracted years to the board's two level flags.
 //   0-1 years  → entry   (new grad / early career)
-//   2-3 years  → mid     (matches the existing "mid · 1-2y" bucket's intent)
-//   4+ years   → neither (too senior for this board's audience)
+//   2 years    → mid     (the "mid · 1-2 YOE" bucket)
+//   3+ years   → neither (over MAX_YOE — normalizeJob drops these)
 // Returns { is_entry_level, is_mid_level } or null when years are unknown, so
 // callers can fall back to the title heuristics.
 function levelFromYears(years) {
   if (!years || typeof years.min !== 'number') return null;
   if (years.min <= 1) return { is_entry_level: 1, is_mid_level: 0 };
-  if (years.min <= 3) return { is_entry_level: 0, is_mid_level: 1 };
+  if (years.min <= MAX_YOE) return { is_entry_level: 0, is_mid_level: 1 };
   return { is_entry_level: 0, is_mid_level: 0 };
 }
 
-module.exports = { extractExperience, levelFromYears };
+// True when the posting states a minimum above the board's ceiling. Unknown
+// years never exceed it.
+function exceedsMaxYoe(years) {
+  return !!years && typeof years.min === 'number' && years.min > MAX_YOE;
+}
+
+module.exports = { extractExperience, levelFromYears, exceedsMaxYoe, MAX_YOE };

@@ -177,6 +177,12 @@ async function pruneStaleJobs(days) {
   return rowCount;
 }
 
+// See the note on pruneOverExperienced in sqlite.js.
+async function pruneOverExperienced(maxYoe) {
+  const { rowCount } = await getPool().query('DELETE FROM jobs WHERE yoe_min > $1', [maxYoe]);
+  return rowCount;
+}
+
 async function startRun() {
   const { rows } = await getPool().query(
     `INSERT INTO collection_runs (started_at) VALUES ($1) RETURNING id`,
@@ -326,4 +332,5 @@ module.exports = {
   getJobById,
   statsSummary,
   pruneStaleJobs,
+  pruneOverExperienced,
 };

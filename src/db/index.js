@@ -7,7 +7,10 @@
  *
  * Both backends export the identical async API:
  *   getDb, upsertJob, bulkUpsert, startRun, finishRun,
- *   queryJobs, getJobById, statsSummary, pruneStaleJobs
+ *   queryJobs, getJobById, statsSummary, pruneStaleJobs, pruneOverExperienced
+ *
+ * SQLite's functions are synchronous and Postgres's return promises, so callers
+ * must `await` every one of them — awaiting a plain value is harmless.
  */
 module.exports = process.env.DATABASE_URL
   ? require('./pg')
