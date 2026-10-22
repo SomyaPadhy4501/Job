@@ -1,0 +1,42 @@
+name: jsearch
+
+# Google for Jobs via JSearch (src/collectors/jsearch.js) — currently Tesla,
+# whose own careers site blocks automated browsers.
+#
+# Once a day, not every 2 h: JSearch's free plan is 200 requests/month, a hard
+# limit, and one run costs at most 4 (one per query). That is ~124/month, so
+# manual "Run workflow" clicks come out of the remaining ~76 — don't loop them.
+# The 2-hourly collect never touches this source (`cadence: 'daily'`).
+
+on:
+  schedule:
+    - cron: '45 14 * * *'   # daily; :45 stays clear of collect (:00) and scrape (:30)
+  workflow_dispatch:
+
+jobs:
+  jsearch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect JSearch sources
+        run: npm run collect -- --source jsearch
+        env:
+          DATABASE_URL:     ${{ secrets.DATABASE_URL }}
+          FILTER_US:        'true'
+          FILTER_SOFTWARE:  'true'
+          ENTRY_LEVEL_MODE: 'permissive'
+          RETENTION_DAYS:   '30'
+          # RapidAPI key with the free JSearch Basic plan. Without it the
+          # collector logs a skip and the run succeeds with no rows.
+          JSEARCH_API_KEY:  ${{ secrets.JSEARCH_API_KEY }}

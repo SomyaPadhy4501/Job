@@ -767,17 +767,26 @@ const COMPANIES = [
   // enrichment pass fills the text in. It also means the 0-2 year ceiling can't
   // read these rows; only the title filters apply.
   //
-  // Tesla stays here rather than in the Playwright scraper. Re-probed
-  // 2026-10-21: Akamai answers "Access Denied" to plain HTTP (even robots.txt),
-  // to headless Chromium in both modes, and to headed Playwright Chromium (the
-  // sensor page loads, then the reload is denied). A normal browser gets the
-  // whole catalog from /cua-api/apps/careers/state, so automation detection is
-  // the only wall, and getting past it means the stealth arms race this project
-  // doesn't do. The detail's applyUrl host, tesla.avature.net, doesn't resolve.
+  // Tesla is here and in the JSearch block below, not in the Playwright
+  // scraper. Re-probed 2026-10-21: Akamai answers "Access Denied" to plain HTTP
+  // (even robots.txt), to headless Chromium in both modes, and to headed
+  // Playwright Chromium (the sensor page loads, then the reload is denied). A
+  // normal browser gets the whole catalog from /cua-api/apps/careers/state, so
+  // automation detection is the only wall, and getting past it means the
+  // stealth arms race this project doesn't do. The detail's applyUrl host,
+  // tesla.avature.net, doesn't resolve.
   { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
   { source: 'adzuna', slug: 'cisco',    displayName: 'Cisco',    company: 'Cisco' },
   { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
   { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
+
+  // ── JSearch / Google for Jobs (see src/collectors/jsearch.js) ─────────────
+  // Full descriptions, unlike Adzuna, and only rows whose apply link is on
+  // `applyHost` are kept. `cadence: 'daily'` keeps these out of the 2-hourly
+  // collect: the free plan is 200 requests/month, so they run once a day from
+  // .github/workflows/jsearch.yml. Inert until JSEARCH_API_KEY is set.
+  { source: 'jsearch', slug: 'tesla', displayName: 'Tesla', employer: 'Tesla',
+    applyHost: 'tesla.com', cadence: 'daily' },
 
   // ─── Oracle HCM / Candidate Experience ───────────────────────────────────
   { source: 'oracle_hcm', slug: 'oracle', displayName: 'Oracle', apiHost: 'eeho.fa.us2.oraclecloud.com', siteNumber: 'CX_45001', uiBaseUrl: 'https://careers.oracle.com/en/sites/jobsearch' },
@@ -937,6 +946,12 @@ const COMPANIES = [
   { source: 'getro', slug: 'freestyle', networkId: 108, boardHost: 'jobs.freestyle.vc', displayName: 'Freestyle Capital' }, // 218 US rows
 ];
 
+// What the 2-hourly collect (scheduler, /admin/collect, collect.yml) runs:
+// everything except `cadence: 'daily'` entries. Those sit on metered free plans
+// and run only from their own daily workflow, via
+// `npm run collect -- --source <name>`.
+const SCHEDULED_COMPANIES = COMPANIES.filter((c) => c.cadence !== 'daily');
+
 const CONFIG = {
   port: Number(process.env.PORT || 3000),
   dbPath: process.env.DB_PATH || './data/jobs.db',
@@ -968,4 +983,4 @@ const CONFIG = {
   cacheTtlMs: 30_000,
 };
 
-module.exports = { COMPANIES, CONFIG };
+module.exports = { COMPANIES, SCHEDULED_COMPANIES, CONFIG };

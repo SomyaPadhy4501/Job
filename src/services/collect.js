@@ -1,6 +1,6 @@
 'use strict';
 
-const { COMPANIES, CONFIG } = require('../config');
+const { SCHEDULED_COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
@@ -36,7 +36,9 @@ async function fetchCompanySafe(company) {
   }
 }
 
-async function collectAll({ companies = COMPANIES } = {}) {
+// The default leaves out `cadence: 'daily'` entries (metered free plans — see
+// SCHEDULED_COMPANIES in config.js). Pass `companies` to run those.
+async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
   // Awaited because the Postgres backend is async: unawaited, runId was a
   // Promise (logged as `"runId":{}`) and finishRun never matched a row.
   const runId = await startRun();
