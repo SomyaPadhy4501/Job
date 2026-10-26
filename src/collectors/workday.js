@@ -95,13 +95,24 @@ async function fetchDetail(company, externalPath) {
 }
 
 // "Posted 3 Days Ago" → approximate ISO date, else null.
+//
+// The CxS list says "Posted Today", "Posted Yesterday", "Posted N Days Ago" or
+// "Posted 30+ Days Ago" (Nvidia, Adobe, PayPal, 2026-10-26). Only the third
+// used to parse: today's postings came back undated and sorted below every
+// dated row, and 30+-day-old ones dodged the retention check entirely. "N+"
+// means at least N, so it's dated a day past N to land outside an N-day window.
 function parsePostedOn(s) {
   if (!s) return null;
-  const m = /(\d+)\s+(day|days|hour|hours|month|months)\s+ago/i.exec(s);
-  if (!m) return null;
-  const n = Number(m[1]);
-  const unit = m[2].toLowerCase();
   const d = new Date();
+  if (/\btoday\b/i.test(s)) return d.toISOString();
+  if (/\byesterday\b/i.test(s)) {
+    d.setDate(d.getDate() - 1);
+    return d.toISOString();
+  }
+  const m = /(\d+)(\+?)\s+(day|days|hour|hours|month|months)\s+ago/i.exec(s);
+  if (!m) return null;
+  const n = Number(m[1]) + (m[2] ? 1 : 0);
+  const unit = m[3].toLowerCase();
   if (unit.startsWith('hour')) d.setHours(d.getHours() - n);
   else if (unit.startsWith('day')) d.setDate(d.getDate() - n);
   else if (unit.startsWith('month')) d.setMonth(d.getMonth() - n);
@@ -149,4 +160,4 @@ async function fetchCompany(company) {
   }));
 }
 
-module.exports = { fetchCompany, source: 'workday' };
+module.exports = { fetchCompany, parsePostedOn, source: 'workday' };

@@ -158,13 +158,11 @@ const EF_POSITION = {
   canonicalPositionUrl: 'https://netapp.eightfold.ai/careers/job/41240606',
   job_description: '',
   t_create: 1721692800, // 2024-07-23 — genuinely old posting
-  // Recent maintenance touch, relative to now. A fixed timestamp (2026-08-17)
-  // aged out of the 30-day retention window and failed this test on unchanged
-  // code two months after it was written.
+  // Recent edit, relative to now so the case doesn't drift with the calendar.
   t_update: Math.floor(Date.now() / 1000) - 2 * 24 * 60 * 60,
 };
 
-test('eightfold: prefers t_update over t_create so long-lived postings survive retention', () => {
+test('eightfold: dates by t_create, so an old posting with a recent edit ages out', () => {
   const row = eightfold.mapPosition(EF_POSITION, {
     source: 'eightfold',
     slug: 'netapp',
@@ -172,10 +170,9 @@ test('eightfold: prefers t_update over t_create so long-lived postings survive r
     title: EF_POSITION.name,
     description: 'Build cloud platform services.',
   });
-  // Preferring t_create here put every Netflix/NetApp row outside the 30-day
-  // retention window, and the tenants collected to exactly zero rows while
-  // still reporting success.
-  assert.strictEqual(row.date_posted, EF_POSITION.t_update);
+  // t_update moves on any edit. Preferring it kept months-old Netflix and
+  // NetApp postings on the board as if they were new.
+  assert.strictEqual(row.date_posted, EF_POSITION.t_create);
 
   const n = normalizeJob(row, {
     filterUSOnly: true,
@@ -183,15 +180,15 @@ test('eightfold: prefers t_update over t_create so long-lived postings survive r
     entryLevelMode: 'permissive',
     retentionDays: 30,
   });
-  assert.ok(n, 'a maintained posting must survive the retention window');
+  assert.strictEqual(n, null, 'a 2024 posting must not pass the 30-day window');
 });
 
-test('eightfold: t_create is still used when t_update is absent', () => {
+test('eightfold: t_update is still used when t_create is absent', () => {
   const row = eightfold.mapPosition(
-    { ...EF_POSITION, t_update: undefined },
+    { ...EF_POSITION, t_create: undefined },
     { source: 'eightfold', slug: 'netapp', displayName: 'NetApp', title: EF_POSITION.name }
   );
-  assert.strictEqual(row.date_posted, EF_POSITION.t_create);
+  assert.strictEqual(row.date_posted, EF_POSITION.t_update);
 });
 
 test('eightfold: netflix L-level hook flows into the level overrides', async () => {
@@ -327,6 +324,38 @@ test('greenhouse: falls back to updated_at only when first_published is missing'
   assert.strictEqual(greenhouse.mapJob({ id: 1 }, { slug: 'x' }).date_posted, null);
 });
 
+// ─── Workday ──────────────────────────────────────────────────────────────────
+
+const workday = require('../src/collectors/workday');
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysAgo = (iso) => Math.round((Date.now() - new Date(iso).getTime()) / DAY_MS);
+
+test('workday: every postedOn phrasing gets a date', () => {
+  // The four forms Nvidia, Adobe and PayPal return (2026-10-26). Only "N Days
+  // Ago" used to parse; today's postings came back null and sorted last.
+  assert.strictEqual(daysAgo(workday.parsePostedOn('Posted Today')), 0);
+  assert.strictEqual(daysAgo(workday.parsePostedOn('Posted Yesterday')), 1);
+  assert.strictEqual(daysAgo(workday.parsePostedOn('Posted 3 Days Ago')), 3);
+  assert.strictEqual(workday.parsePostedOn(''), null);
+  assert.strictEqual(workday.parsePostedOn('Posted recently'), null);
+});
+
+test('workday: "30+ Days Ago" falls outside a 30-day window', () => {
+  // A null date skipped the retention check, so these stayed on the board.
+  const date_posted = workday.parsePostedOn('Posted 30+ Days Ago');
+  assert.strictEqual(daysAgo(date_posted), 31);
+  const n = normalizeJob(
+    {
+      source: 'workday', external_id: 'JR2005011', company_name: 'Nvidia',
+      job_title: 'Software Engineer', location: 'Santa Clara, CA',
+      apply_url: 'https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/x',
+      description: '', date_posted,
+    },
+    { filterUSOnly: true, filterSoftwareOnly: true, retentionDays: 30 }
+  );
+  assert.strictEqual(n, null);
+});
+
 // ─── Cross-collector invariants ───────────────────────────────────────────────
 
 test('every new collector is registered and exposes the collector contract', () => {
@@ -377,13 +406,10 @@ const RIPPLING_DETAIL = {
   },
 };
 
-test('rippling: date_posted is null even though createdOn exists', () => {
-  // createdOn is a creation date with no updated counterpart, and these boards
-  // keep roles open for months. Using it dropped 21 of Opendoor's 24 open
-  // software roles at the retention check — the tenant collapsed to 1 row while
-  // every one of those jobs was still listed.
+test('rippling: dates by createdOn, so a months-old role ages out', () => {
+  // Null used to keep Opendoor's long-open roles on the board as if new.
   const row = rippling.mapJob(RIPPLING_JOB, { slug: 'opendoor', detail: RIPPLING_DETAIL });
-  assert.strictEqual(row.date_posted, null);
+  assert.strictEqual(row.date_posted, RIPPLING_DETAIL.createdOn);
 
   const n = normalizeJob(row, {
     filterUSOnly: true,
@@ -391,8 +417,10 @@ test('rippling: date_posted is null even though createdOn exists', () => {
     entryLevelMode: 'permissive',
     retentionDays: 30,
   });
-  assert.ok(n, 'a still-listed role must survive retention');
-  assert.strictEqual(n.date_posted, null);
+  assert.strictEqual(n, null, 'a role created 2026-06-23 must not pass the 30-day window');
+
+  // Without a detail record there's no date to read.
+  assert.strictEqual(rippling.mapJob(RIPPLING_JOB, { slug: 'opendoor' }).date_posted, null);
 });
 
 test('rippling: description joins every rich-text block, not just the role', () => {

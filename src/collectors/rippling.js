@@ -112,22 +112,11 @@ function mapJob(j, { slug, displayName, detail }) {
     location: buildLocation(j, detail),
     apply_url: j.url || detail?.url || `https://ats.rippling.com/${slug}/jobs/${j.uuid}`,
     description: buildDescription(detail?.description),
-    // Deliberately null, even though `createdOn` is available and accurate.
-    //
-    // createdOn is a creation timestamp and Rippling exposes no updated/modified
-    // counterpart, so it can't answer "is this still open?" — and these
-    // employers keep postings live for months. Feeding it to date_posted put 21
-    // of Opendoor's 24 open software roles outside the 30-day retention window:
-    // the whole tenant collapsed to 1 row while every one of those jobs was
-    // still listed and still applyable.
-    //
-    // A Rippling board only contains currently-open roles, so presence in the
-    // feed IS the freshness signal. Null dates are exempt from the retention
-    // check and pruned via last_seen_at once they leave the feed, which is the
-    // same treatment Workday and Adzuna rows already get for the same reason.
-    // The cost is that these rows sort without a posting date; the alternative
-    // was discarding 88% of them.
-    date_posted: null,
+    // The posting date. This used to be null on purpose, keeping 21 of
+    // Opendoor's 24 software roles that were open but older than the retention
+    // window. The board shows recent postings only, so those age out like any
+    // other source's, and undated rows no longer sort below everything else.
+    date_posted: detail?.createdOn || null,
   };
 }
 

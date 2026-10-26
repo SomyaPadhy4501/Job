@@ -136,10 +136,14 @@ async function fetchEightfold({
     if (start + PAGE_SIZE >= (data.count || 0)) break;
   }
 
-  // Title pre-filter before spending a request per description. Same two gates
-  // normalize applies, just moved ahead of the expensive part.
+  // Title pre-filter before spending a request per description. Same gates
+  // normalize applies, just moved ahead of the expensive part — retention
+  // included, since most of a tenant's catalogue is months old.
+  const cutoffSec = (Date.now() - (CONFIG.retentionDays || 30) * 24 * 60 * 60 * 1000) / 1000;
   const candidates = [];
   for (const p of byId.values()) {
+    if (p.t_create && p.t_create < cutoffSec) continue;
+
     const title = p.name || p.posting_name || '';
     if (!title) continue;
 
@@ -157,8 +161,8 @@ async function fetchEightfold({
   // their description should be the oldest ones, not an arbitrary slice.
   candidates.sort(
     (a, b) =>
-      (b.position.t_update || b.position.t_create || 0) -
-      (a.position.t_update || a.position.t_create || 0)
+      (b.position.t_create || b.position.t_update || 0) -
+      (a.position.t_create || a.position.t_update || 0)
   );
 
   const toEnrich = candidates.slice(0, detailCap);
@@ -190,15 +194,14 @@ function mapPosition(p, { source, slug, displayName, title, lvl, description }) 
     location,
     description: description || p.job_description || '',
     apply_url: p.canonicalPositionUrl || '',
-    // t_update first, NOT t_create — this ordering is load-bearing. Eightfold
-    // employers keep postings open for months (Netflix's catalogue includes
-    // live 2024 and 2025 rows), so t_create puts nearly every row outside the
-    // 30-day retention window in normalize and the whole tenant collects to
-    // zero. t_update tracks "this posting is still being maintained", which is
-    // the question retention is actually asking. Closed postings are pruned by
-    // last_seen_at in pruneStaleJobs instead.
+    // t_create, the posting date. t_update moves on any edit: on 2026-10-26
+    // Netflix's "AI Engineer 6" was created 826 days earlier but updated 161
+    // days ago, and NetApp's two newest-looking engineering roles were 109 and
+    // 117 days old. The board shows recent postings only, so a role open for
+    // months ages out like anywhere else; one that closes inside the window is
+    // removed by pruneUnseenJobs.
     // Unix seconds — parseDateToIso handles the scaling.
-    date_posted: p.t_update || p.t_create || null,
+    date_posted: p.t_create || p.t_update || null,
     entry_level_override: lvl?.entry,
     mid_level_override: lvl?.mid,
   };
