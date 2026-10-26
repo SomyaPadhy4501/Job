@@ -292,6 +292,41 @@ test('smartrecruiters: experienceLevel maps only at the ends of the range', () =
   }
 });
 
+// ─── Greenhouse ───────────────────────────────────────────────────────────────
+
+const greenhouse = require('../src/collectors/greenhouse');
+
+// Trimmed from boards-api.greenhouse.io/v1/boards/andurilindustries/jobs on
+// 2026-10-26. The whole board shared that morning's updated_at; the posting
+// itself went up 14 months earlier.
+const GH_JOB = {
+  id: 4802146007,
+  title: '2026 Early Career Software Engineer',
+  absolute_url: 'https://boards.greenhouse.io/andurilindustries/jobs/4802146007?gh_jid=4802146007',
+  location: { name: 'Costa Mesa, California, United States' },
+  updated_at: '2026-10-26T12:17:25-04:00',
+  first_published: '2025-08-11T13:40:49-04:00',
+  content: '&lt;p&gt;Build software for autonomous systems.&lt;/p&gt;',
+};
+
+test('greenhouse: dates a posting by first_published, not updated_at', () => {
+  const row = greenhouse.mapJob(GH_JOB, { slug: 'andurilindustries', displayName: 'Anduril Industries' });
+  assert.strictEqual(row.date_posted, '2025-08-11T13:40:49-04:00');
+  assert.strictEqual(row.company_name, 'Anduril Industries');
+  // Read by updated_at this row looked a few hours old. By its real date it is
+  // far outside retention and must not reach the board.
+  const n = normalizeJob(row, {
+    filterUSOnly: true, filterSoftwareOnly: true, entryLevelMode: 'permissive', retentionDays: 30,
+  });
+  assert.strictEqual(n, null);
+});
+
+test('greenhouse: falls back to updated_at only when first_published is missing', () => {
+  const { first_published, ...noFirst } = GH_JOB;
+  assert.strictEqual(greenhouse.mapJob(noFirst, { slug: 'x' }).date_posted, '2026-10-26T12:17:25-04:00');
+  assert.strictEqual(greenhouse.mapJob({ id: 1 }, { slug: 'x' }).date_posted, null);
+});
+
 // ─── Cross-collector invariants ───────────────────────────────────────────────
 
 test('every new collector is registered and exposes the collector contract', () => {
