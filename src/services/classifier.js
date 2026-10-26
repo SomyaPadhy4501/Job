@@ -2,17 +2,78 @@
 
 // Rule-based sponsorship classifier.
 // Precedence (first match wins):
-//   1. Explicit NO in description → NO.  Always strongest.
-//   2. Explicit YES in description → YES.
-//   3. Company in USCIS H-1B Employer Data Hub (≥ 3 approvals last 2 FY) → YES.
-//   4. Otherwise → UNKNOWN.
+//   1. Explicit refusal in description          → NO.  Always strongest.
+//   2. Explicit offer in description            → YES.
+//   3. "Must be authorized to work" on its own  → NO.
+//   4. Sponsorship mentioned without a negation → YES.
+//   5. Company in USCIS H-1B Employer Data Hub (≥ 3 approvals last 2 FY) → YES.
+//   6. Otherwise → UNKNOWN.
+//
+// Patterns run per sentence against normalizeForMatch() text, so stray markup
+// ("sponsorship is <strong>not</strong> available") and typographic apostrophes
+// ("we’re not able to sponsor") can't split a phrase. Every phrasing below is
+// from the live corpus (2026-10-26) unless noted.
 //
 // No LLM / no API — pure regex + static JSON lookup.
 
 const path = require('path');
 const fs = require('fs');
+const { normalizeForMatch } = require('./clearance');
 
+// 1. Refusals. The old list caught only "no sponsorship", "unable/cannot
+// sponsor" and "do(es) not offer/provide sponsorship", so the common phrasings
+// below fell through to tier 4 and came back YES on the words "visa
+// sponsorship" — the most costly error for a candidate who needs a visa.
+// Gaps stop at commas so "does not offer relocation, but we sponsor visas"
+// isn't read as a refusal.
+const NO_PATTERNS = [
+  /\bno (?:[\w-]+ ){0,2}sponsorship\b/,                      // "no visa sponsorship"
+  /\b(?:unable|not able|n't able) to\b[^.,]{0,50}\bsponsor/, // "unable to provide employment visa sponsorship"
+  /\b(?:cannot|can't|do not|don't|does not|doesn't|will not|won't|is not|isn't|are not|aren't)(?: currently| presently)? (?:sponsor|sponsoring\b|(?:offer|provid|support)\w*\b[^.,]{0,40}\bsponsor)/,
+  /\b(?:not eligible|ineligible) for\b[^.,]{0,40}\bsponsorship\b/, // "not eligible for employment-based sponsorship"
+  /\bsponsorship\b[^.,]{0,40}?\b(?:not (?:be )?(?:available|offered|provided|possible|supported)|unavailable)\b/,
+  /\bsponsorship\s*(?:available|offered|provided)?\s*:\s*(?:no|none|not available)\b/, // "visa sponsorship: no"
+  /\b(?:not|never|must not|do not|don't|does not|cannot|will not)(?: now or in the future| currently)? require\b[^.]{0,40}\bsponsorship\b/,
+  // "authorized to work ... without the need for visa sponsorship". Anchored on
+  // "to work" so Amazon's export-control boilerplate ("... export laws without
+  // sponsorship for an export license") stays out, and "with or without
+  // sponsorship" — which states no restriction at all — is excluded.
+  /\b(?:authorized|eligible|permitted|able) to work\b[^.]{0,100}?(?<!with or )\bwithout\b[^.]{0,60}?\bsponsor(?!ship for an? export)/,
+  /\b(?:permanent|unrestricted) (?:us )?work authorization\b/,
+  /\bauthorized to work for any employer\b/,
+];
+
+// Hedges, not refusals: "we aren't able to successfully sponsor visas for
+// every role and every candidate" follows "we do sponsor visas" in 21 live
+// postings; "we can't guarantee sponsorship for every role" is the same idea.
+// Firecrawl scopes its refusal to one group — "we also support h-1b transfers
+// ... we're not able to sponsor new h-1b visas for candidates outside the us".
+// A sentence like these never counts as a refusal.
+const HEDGE = new RegExp([
+  /\b(?:every|all) (?:roles?|candidates?|positions?|cases?)\b/.source,
+  /\bguarantee/.source,
+  /\bfor (?:candidates?|applicants?|people|individuals?) (?:who are |currently )?(?:based |located |living |residing )?(?:outside|abroad)\b/.source,
+].join('|'));
+
+// 2. Offers. These outrank tier 3, so "must be authorized to work in the US. We
+// sponsor H-1B, O-1 ..." reads as YES instead of NO.
 const YES_PATTERNS = [
+  /\bwe (?:do |can |will |gladly |happily |proudly |also |currently )?sponsor\b[^.]{0,60}\b(?:visas?|h-?1-?b|o-?1|green cards?|immigration|employment|international|work permits?)/,
+  /(?<!not |n't |never )\b(?:happy|glad|able|willing|open) to sponsor\b/,
+  /\b(?:offer|provid|support)\w*\b[^.,]{0,30}\bvisa sponsorship\b/,
+  /\bvisa sponsorship (?:is )?(?:available|offered|provided)\b/,
+];
+
+// 3. Ambiguous on its own (an OPT holder is authorized to work) but usually
+// written by employers who don't sponsor, so it ranks below an explicit offer.
+// "with or without sponsorship" says the opposite and is excluded.
+const AUTHORIZED_ONLY = [
+  /\bmust be (?:legally |currently )?authorized to work\b/,
+];
+const WITH_OR_WITHOUT = /\bwith or without\b[^.]{0,30}\bsponsorship\b/;
+
+// 4. Bare mentions — the original YES list, unchanged.
+const MENTION_PATTERNS = [
   /visa sponsorship/,
   /h-?1b sponsorship/,
   /h-?1b visa sponsorship/,
@@ -20,15 +81,9 @@ const YES_PATTERNS = [
   /sponsor(?: a)? visa/,
 ];
 
-const NO_PATTERNS = [
-  /must be authorized to work/,
-  /must be legally authorized to work/,
-  /no sponsorship/,
-  /unable to sponsor/,
-  /cannot sponsor/,
-  /do(?:es)? not (?:offer|provide) (?:visa )?sponsorship/,
-  /not (?:offering|providing) (?:visa )?sponsorship/,
-];
+function anySentence(sentences, patterns, unless) {
+  return sentences.some((s) => !(unless && unless.test(s)) && patterns.some((p) => p.test(s)));
+}
 
 // Threshold for USCIS YES signal: ≥ 3 approved H-1B petitions in last 2 FY.
 const USCIS_THRESHOLD = 3;
@@ -71,17 +126,21 @@ function normSlug(s) {
 // here. First key that resolves wins.
 function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   if (!text || typeof text !== 'string') return 'UNKNOWN';
-  const t = text.toLowerCase();
+  // Apostrophes first: normalizeForMatch blanks unknown entities, which would
+  // turn a double-encoded Greenhouse "can&#39;t sponsor" into "can t sponsor".
+  const sentences = normalizeForMatch(text.replace(/&#0*39;|&#x27;|&apos;|&[lr]squo;/gi, "'"))
+    .replace(/[‘’]/g, "'")
+    .split(/[.!?;•]+/);
 
   // 1. Explicit NO beats everything
-  for (const p of NO_PATTERNS) {
-    if (p.test(t)) return 'NO';
-  }
+  if (anySentence(sentences, NO_PATTERNS, HEDGE)) return 'NO';
   // 2. Explicit YES
-  for (const p of YES_PATTERNS) {
-    if (p.test(t)) return 'YES';
-  }
-  // 3. USCIS lookup — company_name drives the signal; description alone misses
+  if (anySentence(sentences, YES_PATTERNS)) return 'YES';
+  // 3. Work authorization required, sponsorship not offered
+  if (anySentence(sentences, AUTHORIZED_ONLY, WITH_OR_WITHOUT)) return 'NO';
+  // 4. Sponsorship mentioned
+  if (anySentence(sentences, MENTION_PATTERNS)) return 'YES';
+  // 5. USCIS lookup — company_name drives the signal; description alone misses
   //    ~516 rows that have no description text (Workday, Microsoft, Goldman, etc.)
   const cache = getH1bCache();
   for (const candidate of [companyName, ...fallbackCompanyNames]) {
@@ -91,7 +150,7 @@ function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
       return 'YES';
     }
   }
-  // 4. Fall through
+  // 6. Fall through
   return 'UNKNOWN';
 }
 
