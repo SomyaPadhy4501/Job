@@ -105,8 +105,9 @@ async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
 
   // Delisting sweep: rows a source refreshed in this run no longer returns.
   // Runs after bulkUpsert, so everything this run saw already has a fresh
-  // last_seen_at. Sources that failed or came back empty are left alone.
-  const fresh = refreshedSources(results);
+  // last_seen_at. Sources that failed or came back empty are left alone;
+  // retired sources are swept like a source that stopped listing everything.
+  const fresh = [...refreshedSources(results), ...CONFIG.retiredSources];
   const unseen = await pruneUnseenJobs(fresh, CONFIG.staleAfterDays);
   if (unseen > 0) {
     log.info('collection.pruned-unseen', {

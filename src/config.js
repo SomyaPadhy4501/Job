@@ -795,9 +795,6 @@ const COMPANIES = [
   // ─── PCSX (Phenom Cloud) — same API shape as Microsoft ──────────────────
   { source: 'pcsx', slug: 'qualcomm', displayName: 'Qualcomm', apiBase: 'https://careers.qualcomm.com/api/pcsx/search', domain: 'qualcomm.com', applyUrlBase: 'https://careers.qualcomm.com/careers' },
 
-  // ─── Capgemini (standalone job-stream API) ──────────────────────────────
-  { source: 'capgemini', slug: 'capgemini', displayName: 'Capgemini' },
-
   // ─── Wipro (SAP SuccessFactors-backed in-house API) ─────────────────────
   { source: 'wipro', slug: 'wipro', displayName: 'Wipro' },
 
@@ -982,6 +979,12 @@ const CONFIG = {
   // outage doesn't read as every job closing. Days rather than runs: collect
   // runs every 2 h, the JSearch source once a day.
   staleAfterDays: Number(process.env.STALE_AFTER_DAYS || 3),
+
+  // Sources removed from COMPANIES. Nothing collects them any more, so their
+  // rows are delisted like any job its source stopped returning: gone once
+  // they're staleAfterDays past their last sighting.
+  //   capgemini – removed 2026-10-26.
+  retiredSources: ['capgemini'],
 
   requestTimeoutMs: 20_000,
   fetchConcurrency: 4, // parallel companies per run

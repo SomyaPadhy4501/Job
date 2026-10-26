@@ -6,7 +6,6 @@ const ashby = require('./ashby');
 const workday = require('./workday');
 const oracleHcm = require('./oracle_hcm');
 const pcsx = require('./pcsx');
-const capgemini = require('./capgemini');
 const wipro = require('./wipro');
 const goldmanSachs = require('./goldman_sachs');
 const amazon = require('./amazon');
@@ -31,7 +30,6 @@ const REGISTRY = {
   [workday.source]: workday,
   [oracleHcm.source]: oracleHcm,
   [pcsx.source]: pcsx,
-  [capgemini.source]: capgemini,
   [wipro.source]: wipro,
   [goldmanSachs.source]: goldmanSachs,
   [amazon.source]: amazon,
