@@ -975,6 +975,14 @@ const CONFIG = {
   // and again at the end of each collect run (post-upsert sweep).
   retentionDays: Number(process.env.RETENTION_DAYS || 30),
 
+  // Delisting: a job its source stopped returning has been filled or pulled,
+  // even while its posted date is still inside the retention window. Rows not
+  // seen for this many days are deleted — but only for sources that were
+  // actually refreshed (refreshedSources in src/services/freshness.js), so an
+  // outage doesn't read as every job closing. Days rather than runs: collect
+  // runs every 2 h, the JSearch source once a day.
+  staleAfterDays: Number(process.env.STALE_AFTER_DAYS || 3),
+
   requestTimeoutMs: 20_000,
   fetchConcurrency: 4, // parallel companies per run
 

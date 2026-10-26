@@ -7,7 +7,8 @@
  *
  * Both backends export the identical async API:
  *   getDb, upsertJob, bulkUpsert, startRun, finishRun,
- *   queryJobs, getJobById, statsSummary, pruneStaleJobs, pruneOverExperienced
+ *   queryJobs, getJobById, statsSummary, pruneStaleJobs, pruneUnseenJobs,
+ *   pruneOverExperienced
  *
  * SQLite's functions are synchronous and Postgres's return promises, so callers
  * must `await` every one of them — awaiting a plain value is harmless.

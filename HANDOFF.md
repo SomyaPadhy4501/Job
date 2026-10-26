@@ -465,6 +465,7 @@ Every env var the code actually reads, grouped by process.
 - `FILTER_SOFTWARE` — drop `role_type === 'OTHER'` (default: `true`)
 - `ENTRY_LEVEL_MODE` — `off` | `permissive` | `strict` (default: `permissive`)
 - `RETENTION_DAYS` — drop jobs older than N days (default: `30`; see "Retention" below)
+- `STALE_AFTER_DAYS` — drop jobs a refreshed source hasn't returned for N days, i.e. delisted ones (default: `3`; see `refreshedSources` in `src/services/freshness.js` for which sources count as refreshed)
 - `COLLECT_TOKEN` — bearer for `/admin/collect` and `/admin/ingest` (default: none = open)
 - `DEBUG` — verbose logger (default: quiet)
 - `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` — Adzuna credentials; the `adzuna` entries no-op without both

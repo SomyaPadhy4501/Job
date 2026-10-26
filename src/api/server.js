@@ -3,7 +3,9 @@
 const path = require('path');
 const express = require('express');
 const { CONFIG } = require('../config');
-const { queryJobs, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
+const {
+  queryJobs, getJobById, statsSummary, upsertJob, bulkUpsert, pruneUnseenJobs,
+} = require('../db');
 const { jobsCache } = require('./cache');
 const { collectAll } = require('../services/collect');
 const { normalizeJob } = require('../services/normalize');
@@ -146,9 +148,14 @@ function createApp() {
       const result = await bulkUpsert(toUpsert);
       inserted = result.inserted;
       updated = result.updated;
+      // Each scrape target posts its whole listing in one batch, and only after
+      // a run that found rows (runOneTarget in scraper/src/run.js), so a
+      // non-empty batch is the source's current listing. An empty one proves
+      // nothing and prunes nothing.
+      const pruned = jobs.length ? await pruneUnseenJobs([source], CONFIG.staleAfterDays) : 0;
       jobsCache.clear();
-      log.info('ingest.ok', { source, received: jobs.length, inserted, updated, rejected });
-      res.json({ ok: true, source, received: jobs.length, inserted, updated, rejected });
+      log.info('ingest.ok', { source, received: jobs.length, inserted, updated, rejected, pruned });
+      res.json({ ok: true, source, received: jobs.length, inserted, updated, rejected, pruned });
     } catch (err) {
       log.error('ingest.error', { source, error: err.message });
       res.status(500).json({ ok: false, error: err.message });

@@ -302,6 +302,7 @@ clean.
 | `FILTER_SOFTWARE`| Vercel env + Actions env           | `true`                                            |
 | `ENTRY_LEVEL_MODE`| Vercel env + Actions env          | `permissive` (see `src/config.js`)                |
 | `RETENTION_DAYS` | Vercel env + Actions env           | `30` (drops rows older than N days at collect end)|
+| `STALE_AFTER_DAYS`| Vercel env + Actions env          | `3` (drops rows a refreshed source stopped listing)|
 
 **Do not** commit any of these. Vercel has an env-var UI; GitHub Actions has
 repo Settings → Secrets and variables → Actions.

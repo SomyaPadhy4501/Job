@@ -427,6 +427,25 @@ function pruneStaleJobs(days) {
   return r.changes;
 }
 
+// Delete rows a source stopped returning. Unlike pruneStaleJobs this keys on
+// last_seen_at: a delisted job (filled, pulled) can be a week old — well inside
+// the retention window — and its apply link is already dead. `sources` must
+// name only sources refreshed in the same run (refreshedSources in
+// src/services/freshness.js), or an outage would read as every one of their
+// jobs closing. last_seen_at is written by datetime('now') here, so the cutoff
+// is computed in SQLite's own format rather than compared against an ISO string.
+function pruneUnseenJobs(sources, days) {
+  if (!days || days <= 0 || !sources.length) return 0;
+  const placeholders = sources.map(() => '?').join(', ');
+  return getDb()
+    .prepare(
+      `DELETE FROM jobs
+       WHERE source IN (${placeholders})
+         AND last_seen_at < datetime('now', ?)`
+    )
+    .run(...sources, `-${days} days`).changes;
+}
+
 // Delete rows whose stated experience requirement is above the board's
 // ceiling (MAX_YOE in src/services/experience.js). normalizeJob already rejects
 // these on the way in; this removes rows stored before the ceiling existed, and
@@ -588,5 +607,6 @@ module.exports = {
   getJobById,
   statsSummary,
   pruneStaleJobs,
+  pruneUnseenJobs,
   pruneOverExperienced,
 };

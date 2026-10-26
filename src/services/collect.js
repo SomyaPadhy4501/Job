@@ -5,8 +5,9 @@ const { getCollector } = require('../collectors');
 const { normalizeJob } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
 const { MAX_YOE } = require('./experience');
+const { refreshedSources } = require('./freshness');
 const {
-  bulkUpsert, startRun, finishRun, pruneStaleJobs, pruneOverExperienced,
+  bulkUpsert, startRun, finishRun, pruneStaleJobs, pruneUnseenJobs, pruneOverExperienced,
 } = require('../db');
 const log = require('../logger');
 
@@ -101,6 +102,17 @@ async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
   // an unawaited Postgres DELETE short.
   const pruned = await pruneStaleJobs(CONFIG.retentionDays);
   if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
+
+  // Delisting sweep: rows a source refreshed in this run no longer returns.
+  // Runs after bulkUpsert, so everything this run saw already has a fresh
+  // last_seen_at. Sources that failed or came back empty are left alone.
+  const fresh = refreshedSources(results);
+  const unseen = await pruneUnseenJobs(fresh, CONFIG.staleAfterDays);
+  if (unseen > 0) {
+    log.info('collection.pruned-unseen', {
+      runId, pruned: unseen, days: CONFIG.staleAfterDays, sources: fresh.length,
+    });
+  }
 
   // Experience-ceiling sweep: rows stored before the 0-2 year ceiling existed.
   const overYoe = await pruneOverExperienced(MAX_YOE);

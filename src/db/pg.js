@@ -177,6 +177,18 @@ async function pruneStaleJobs(days) {
   return rowCount;
 }
 
+// See the note on pruneUnseenJobs in sqlite.js. last_seen_at is an ISO string
+// written by now() here, so it compares correctly as text.
+async function pruneUnseenJobs(sources, days) {
+  if (!days || days <= 0 || !sources.length) return 0;
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { rowCount } = await getPool().query(
+    'DELETE FROM jobs WHERE source = ANY($1) AND last_seen_at < $2',
+    [sources, cutoff],
+  );
+  return rowCount;
+}
+
 // See the note on pruneOverExperienced in sqlite.js.
 async function pruneOverExperienced(maxYoe) {
   const { rowCount } = await getPool().query('DELETE FROM jobs WHERE yoe_min > $1', [maxYoe]);
@@ -332,5 +344,6 @@ module.exports = {
   getJobById,
   statsSummary,
   pruneStaleJobs,
+  pruneUnseenJobs,
   pruneOverExperienced,
 };
