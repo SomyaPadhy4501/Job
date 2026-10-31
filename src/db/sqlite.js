@@ -188,6 +188,8 @@ function migrate(database) {
   const { stripHtml } = require('../services/normalize');
   // eslint-disable-next-line global-require
   const { deriveRestriction } = require('../services/clearance');
+  // eslint-disable-next-line global-require
+  const { employerFromApplyUrl } = require('../collectors/getro');
   // Sources that pre-label sponsorship via `sponsorship_override` in
   // normalizeJob (see src/collectors/ghlistings.js). Their rows carry an empty
   // description, so re-running the rule-based classifier over them throws the
@@ -199,7 +201,7 @@ function migrate(database) {
   const { extractExperience, levelFromYears } = require('../services/experience');
   const sponsorRows = database
     .prepare(
-      `SELECT id, job_title, description, company_name, source, sponsorship,
+      `SELECT id, job_title, description, company_name, source, apply_url, sponsorship,
               restriction, yoe_min, is_entry_level, is_mid_level
          FROM jobs`,
     )
@@ -221,7 +223,9 @@ function migrate(database) {
       const curated = CURATED_SPONSORSHIP_SOURCES.includes(r.source);
       let sponsorship = r.sponsorship;
       if (!curated) {
-        sponsorship = classifySponsorship(text, r.company_name);
+        // Getro's employer fallback, as in the collector (employerFromApplyUrl).
+        const fallbacks = r.source === 'getro' ? [employerFromApplyUrl(r.apply_url)].filter(Boolean) : [];
+        sponsorship = classifySponsorship(text, r.company_name, fallbacks);
         if (sponsorship !== r.sponsorship) {
           updSpons.run(sponsorship, r.id);
           sponsorUpdated++;

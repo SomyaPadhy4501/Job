@@ -25,6 +25,7 @@
 
 const { deriveRestriction, DISQUALIFYING } = require('../services/clearance');
 const { classifySponsorship } = require('../services/classifier');
+const { employerFromApplyUrl } = require('../collectors/getro');
 const { extractExperience, levelFromYears } = require('../services/experience');
 const { stripHtml } = require('../services/normalize');
 
@@ -51,9 +52,13 @@ function derive(row) {
   const years = extractExperience(text);
   const lvl = levelFromYears(years);
   const curated = CURATED_SPONSORSHIP_SOURCES.includes(row.source);
+  // Getro rows need the apply-URL employer as a second USCIS key, exactly as
+  // the collector supplies it (see employerFromApplyUrl) — without it the dry
+  // run proposed downgrading 279 Getro rows from YES to UNKNOWN.
+  const fallbacks = row.source === 'getro' ? [employerFromApplyUrl(row.apply_url)].filter(Boolean) : [];
   const sponsorship = curated
     ? row.sponsorship
-    : classifySponsorship(text, row.company_name);
+    : classifySponsorship(text, row.company_name, fallbacks);
   return {
     sponsorship,
     restriction: deriveRestriction({
@@ -117,7 +122,7 @@ async function runPg() {
     for (let offset = 0; ; offset += BATCH) {
       // eslint-disable-next-line no-await-in-loop
       const { rows } = await pool.query(
-        `SELECT id, job_title, description, company_name, source, sponsorship, restriction, yoe_min,
+        `SELECT id, job_title, description, company_name, source, apply_url, sponsorship, restriction, yoe_min,
                 is_entry_level, is_mid_level
            FROM jobs ORDER BY id LIMIT $1 OFFSET $2`,
         [BATCH, offset],
@@ -208,7 +213,7 @@ function runSqlite() {
   let scanned = 0;
 
   const select = db.prepare(
-    `SELECT id, job_title, description, company_name, source, sponsorship, restriction, yoe_min,
+    `SELECT id, job_title, description, company_name, source, apply_url, sponsorship, restriction, yoe_min,
             is_entry_level, is_mid_level
        FROM jobs ORDER BY id LIMIT ? OFFSET ?`,
   );
