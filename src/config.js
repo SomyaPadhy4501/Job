@@ -962,6 +962,84 @@ const COMPANIES = [
   { source: 'workday', slug: 'davita-dkc_external', tenant: 'davita', wd: '1', site: 'DKC_External', displayName: 'Davita' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
   { source: 'workday', slug: 'pitneybowes-pbcareers', tenant: 'pitneybowes', wd: '1', site: 'PBCareers', displayName: 'Pitney Bowes' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
 
+  // ─── H-1B sponsors, next tier (20-49 approvals; discover-sponsors.js 20 50, 2026-10-31) ───
+  // 2,553 uncovered sponsors probed; 287 boards survived filtering and these
+  // produced at least one kept row when collected. Same naming rule as above:
+  // displayName is the USCIS petitioner name the sponsorship lookup keys on.
+  { source: 'workday', slug: 'disney-disneycareer', tenant: 'disney', wd: '5', site: 'disneycareer', displayName: 'Disney Streaming' },  // 11 kept on 2026-10-31, 26 H-1B approvals
+  { source: 'workday', slug: 'iheartmedia-external_ihm', tenant: 'iheartmedia', wd: '5', site: 'External_iHM', displayName: 'Iheartmedia Management Services' },  // 8 kept on 2026-10-31, 24 H-1B approvals
+  { source: 'workday', slug: 'aveva-aveva_careers', tenant: 'aveva', wd: '3', site: 'AVEVA_careers', displayName: 'Aveva' },  // 7 kept on 2026-10-31, 38 H-1B approvals
+  { source: 'workday', slug: 'kcura-external_career_site', tenant: 'kcura', wd: '1', site: 'External_Career_Site', displayName: 'Relativity Oda' },  // 7 kept on 2026-10-31, 35 H-1B approvals
+  { source: 'workday', slug: 'thomsonreuters-external_career_site', tenant: 'thomsonreuters', wd: '5', site: 'External_Career_Site', displayName: 'Thomson Reuters' },  // 7 kept on 2026-10-31, 32 H-1B approvals
+  { source: 'workday', slug: 'lseg-careers', tenant: 'lseg', wd: '3', site: 'Careers', displayName: 'Refinitiv' },  // 5 kept on 2026-10-31, 46 H-1B approvals
+  { source: 'workday', slug: 'kyndryl-kyndrylprofessionalcareers', tenant: 'kyndryl', wd: '5', site: 'KyndrylProfessionalCareers', displayName: 'Kyndryl' },  // 5 kept on 2026-10-31, 40 H-1B approvals
+  { source: 'workday', slug: 'aig-aig', tenant: 'aig', wd: '1', site: 'aig', displayName: 'Aig' },  // 5 kept on 2026-10-31, 39 H-1B approvals
+  { source: 'workday', slug: 'roche-rog-a2o-gene', tenant: 'roche', wd: '3', site: 'ROG-A2O-GENE', displayName: 'Roche Molecular' },  // 4 kept on 2026-10-31, 45 H-1B approvals
+  { source: 'workday', slug: 'aveva-etap_careers', tenant: 'aveva', wd: '3', site: 'ETAP_Careers', displayName: 'Aveva' },  // 4 kept on 2026-10-31, 38 H-1B approvals
+  { source: 'workday', slug: 'resmed-resmed_external_careers', tenant: 'resmed', wd: '3', site: 'ResMed_External_Careers', displayName: 'Resmed Digital Health' },  // 4 kept on 2026-10-31, 27 H-1B approvals
+  { source: 'workday', slug: 'lighting-jobs-and-careers', tenant: 'lighting', wd: '3', site: 'jobs-and-careers', displayName: 'Signify North' },  // 4 kept on 2026-10-31, 27 H-1B approvals
+  { source: 'workday', slug: 'carlyle-carlyle', tenant: 'carlyle', wd: '1', site: 'Carlyle', displayName: 'Carlyle Group Employee' },  // 4 kept on 2026-10-31, 26 H-1B approvals
+  { source: 'workday', slug: 'sifive-sifivecareers', tenant: 'sifive', wd: '1', site: 'sifivecareers', displayName: 'Sifive' },  // 4 kept on 2026-10-31, 21 H-1B approvals
+  { source: 'workday', slug: 'flywire-flywirecareers', tenant: 'flywire', wd: '108', site: 'flywirecareers', displayName: 'Flywire' },  // 4 kept on 2026-10-31, 20 H-1B approvals
+  { source: 'workday', slug: 'cree-ext', tenant: 'cree', wd: '108', site: 'EXT', displayName: 'Wolfspeed' },  // 4 kept on 2026-10-31, 20 H-1B approvals
+  { source: 'workday', slug: 'formfactor-ffi-careers', tenant: 'formfactor', wd: '1', site: 'FFI-Careers', displayName: 'Formfactor' },  // 3 kept on 2026-10-31, 38 H-1B approvals
+  { source: 'workday', slug: 'relx-elsevierjobs', tenant: 'relx', wd: '3', site: 'ElsevierJobs', displayName: 'Elsevier' },  // 3 kept on 2026-10-31, 26 H-1B approvals
+  { source: 'workday', slug: 'cubic-cubic_usa_careers', tenant: 'cubic', wd: '1', site: 'cubic_USA_careers', displayName: 'Cubic' },  // 2 kept on 2026-10-31, 44 H-1B approvals
+  { source: 'workday', slug: 'kyndryl-kyndrylearlycareers', tenant: 'kyndryl', wd: '5', site: 'KyndrylEarlyCareers', displayName: 'Kyndryl' },  // 2 kept on 2026-10-31, 40 H-1B approvals
+  { source: 'workday', slug: 'healthresearch-hri_careers', tenant: 'healthresearch', wd: '1', site: 'HRI_Careers', displayName: 'Health Research Roswell Park' },  // 2 kept on 2026-10-31, 39 H-1B approvals
+  { source: 'workday', slug: 'brandeis-jobs', tenant: 'brandeis', wd: '5', site: 'Jobs', displayName: 'Brandeis University' },  // 2 kept on 2026-10-31, 37 H-1B approvals
+  { source: 'workday', slug: 'crowe-external_careers', tenant: 'crowe', wd: '12', site: 'External_Careers', displayName: 'Crowe' },  // 2 kept on 2026-10-31, 37 H-1B approvals
+  { source: 'workday', slug: 'td-td_bank_careers', tenant: 'td', wd: '3', site: 'TD_Bank_Careers', displayName: 'Td Bank National Association' },  // 2 kept on 2026-10-31, 37 H-1B approvals
+  { source: 'workday', slug: 'goodwinprocter-external_careers', tenant: 'goodwinprocter', wd: '5', site: 'External_Careers', displayName: 'Goodwin Procter' },  // 2 kept on 2026-10-31, 35 H-1B approvals
+  { source: 'workday', slug: 'dimensional-dfa_careers', tenant: 'dimensional', wd: '5', site: 'DFA_Careers', displayName: 'Dimensional Fund Advisors' },  // 2 kept on 2026-10-31, 33 H-1B approvals
+  { source: 'workday', slug: 'arrowstreetcapital-arrowstreet', tenant: 'arrowstreetcapital', wd: '5', site: 'Arrowstreet', displayName: 'Arrowstreet Capital Limited Partnership' },  // 2 kept on 2026-10-31, 30 H-1B approvals
+  { source: 'workday', slug: 'stevens-external', tenant: 'stevens', wd: '5', site: 'External', displayName: 'Stevens Institute' },  // 2 kept on 2026-10-31, 29 H-1B approvals
+  { source: 'workday', slug: 'bentleysystems-bentley', tenant: 'bentleysystems', wd: '5', site: 'bentley', displayName: 'Bentley Systems Incorporated' },  // 2 kept on 2026-10-31, 28 H-1B approvals
+  { source: 'workable', slug: 'mindex', displayName: 'Mindex' },  // 2 kept on 2026-10-31, 26 H-1B approvals
+  { source: 'workday', slug: 'unum-external', tenant: 'unum', wd: '1', site: 'External', displayName: 'Unum' },  // 2 kept on 2026-10-31, 25 H-1B approvals
+  { source: 'workday', slug: 'baxter-baxter', tenant: 'baxter', wd: '1', site: 'baxter', displayName: 'Baxter Healthcare' },  // 2 kept on 2026-10-31, 24 H-1B approvals
+  { source: 'workday', slug: 'clearwateranalytics-clearwater_analytics_careers', tenant: 'clearwateranalytics', wd: '1', site: 'Clearwater_Analytics_Careers', displayName: 'Clearwater Analytics' },  // 2 kept on 2026-10-31, 22 H-1B approvals
+  { source: 'workday', slug: 'gnw-gnw', tenant: 'gnw', wd: '1', site: 'GNW', displayName: 'Genworth North' },  // 2 kept on 2026-10-31, 22 H-1B approvals
+  { source: 'workday', slug: 'merceruniversity-external', tenant: 'merceruniversity', wd: '1', site: 'external', displayName: 'Mercer University' },  // 2 kept on 2026-10-31, 21 H-1B approvals
+  { source: 'workday', slug: 'alteryx-alteryxcareers', tenant: 'alteryx', wd: '108', site: 'AlteryxCareers', displayName: 'Alteryx' },  // 2 kept on 2026-10-31, 20 H-1B approvals
+  { source: 'workday', slug: 'rackspace-external', tenant: 'rackspace', wd: '1', site: 'External', displayName: 'Rackspace' },  // 1 kept on 2026-10-31, 49 H-1B approvals
+  { source: 'workday', slug: 'insulet-insuletcareers', tenant: 'insulet', wd: '5', site: 'insuletcareers', displayName: 'Insulet' },  // 1 kept on 2026-10-31, 46 H-1B approvals
+  { source: 'workday', slug: 'comscore-external', tenant: 'comscore', wd: '5', site: 'External', displayName: 'Comscore' },  // 1 kept on 2026-10-31, 45 H-1B approvals
+  { source: 'workday', slug: 'keybank-external_career_site', tenant: 'keybank', wd: '5', site: 'External_Career_Site', displayName: 'Keybank National Association' },  // 1 kept on 2026-10-31, 45 H-1B approvals
+  { source: 'workday', slug: 'momentive-mc', tenant: 'momentive', wd: '1', site: 'MC', displayName: 'Momentive' },  // 1 kept on 2026-10-31, 44 H-1B approvals
+  { source: 'workday', slug: 'ciena-careers', tenant: 'ciena', wd: '5', site: 'Careers', displayName: 'Ciena' },  // 1 kept on 2026-10-31, 43 H-1B approvals
+  { source: 'workday', slug: 'itron-itron', tenant: 'itron', wd: '5', site: 'Itron', displayName: 'Itron' },  // 1 kept on 2026-10-31, 42 H-1B approvals
+  { source: 'workday', slug: 'belk-careers', tenant: 'belk', wd: '1', site: 'Careers', displayName: 'Belk' },  // 1 kept on 2026-10-31, 41 H-1B approvals
+  { source: 'workday', slug: 'belk-careers-corporate', tenant: 'belk', wd: '1', site: 'Careers-Corporate', displayName: 'Belk' },  // 1 kept on 2026-10-31, 41 H-1B approvals
+  { source: 'greenhouse', slug: 'schonfeld', displayName: 'Schonfeld Strategic Advisors' },  // 1 kept on 2026-10-31, 41 H-1B approvals
+  { source: 'workday', slug: 'huron-huroncareers', tenant: 'huron', wd: '1', site: 'huroncareers', displayName: 'Huron Consulting Services' },  // 1 kept on 2026-10-31, 40 H-1B approvals
+  { source: 'workday', slug: 'netscout-careers', tenant: 'netscout', wd: '108', site: 'Careers', displayName: 'Netscout' },  // 1 kept on 2026-10-31, 40 H-1B approvals
+  { source: 'workday', slug: 'firstnational-fnbocareers', tenant: 'firstnational', wd: '12', site: 'fnbocareers', displayName: 'First National Bank Omaha' },  // 1 kept on 2026-10-31, 39 H-1B approvals
+  { source: 'workday', slug: 'rochester-ur_staff', tenant: 'rochester', wd: '5', site: 'UR_Staff', displayName: 'Rochester Institute' },  // 1 kept on 2026-10-31, 37 H-1B approvals
+  { source: 'workday', slug: 'super-search', tenant: 'super', wd: '103', site: 'search', displayName: 'Super Micro Computer' },  // 1 kept on 2026-10-31, 37 H-1B approvals
+  { source: 'workday', slug: 'ironmountain-iron-mountain-jobs', tenant: 'ironmountain', wd: '5', site: 'iron-mountain-jobs', displayName: 'Iron Mountain Information Management' },  // 1 kept on 2026-10-31, 35 H-1B approvals
+  { source: 'workday', slug: 'caresource-caresource', tenant: 'caresource', wd: '1', site: 'CareSource', displayName: 'Caresource Management Services' },  // 1 kept on 2026-10-31, 33 H-1B approvals
+  { source: 'greenhouse', slug: 'enova', displayName: 'Enova Financial' },  // 1 kept on 2026-10-31, 32 H-1B approvals
+  { source: 'workday', slug: 'simonsfoundation-simonsfoundationcareers', tenant: 'simonsfoundation', wd: '1', site: 'simonsfoundationcareers', displayName: 'Simons Foundation' },  // 1 kept on 2026-10-31, 31 H-1B approvals
+  { source: 'workday', slug: 'tysonfoods-tsn', tenant: 'tysonfoods', wd: '5', site: 'TSN', displayName: 'Tyson Foods' },  // 1 kept on 2026-10-31, 31 H-1B approvals
+  { source: 'workday', slug: 'arrowstreetcapital-campus_careers', tenant: 'arrowstreetcapital', wd: '5', site: 'Campus_Careers', displayName: 'Arrowstreet Capital Limited Partnership' },  // 1 kept on 2026-10-31, 30 H-1B approvals
+  { source: 'ashby', slug: 'Vultr', displayName: 'Constant Contact' },  // 1 kept on 2026-10-31, 30 H-1B approvals
+  { source: 'workday', slug: 'bmc-bmc', tenant: 'bmc', wd: '1', site: 'BMC', displayName: 'Bmc' },  // 1 kept on 2026-10-31, 29 H-1B approvals
+  { source: 'workday', slug: 'dataminr-dataminr', tenant: 'dataminr', wd: '12', site: 'Dataminr', displayName: 'Dataminr' },  // 1 kept on 2026-10-31, 29 H-1B approvals
+  { source: 'workday', slug: 'bakertilly-btcareers', tenant: 'bakertilly', wd: '5', site: 'BTCareers', displayName: 'Moss Adams' },  // 1 kept on 2026-10-31, 29 H-1B approvals
+  { source: 'workday', slug: 'chevron-university', tenant: 'chevron', wd: '5', site: 'University', displayName: 'Chevron' },  // 1 kept on 2026-10-31, 28 H-1B approvals
+  { source: 'workday', slug: 'unisys-external', tenant: 'unisys', wd: '5', site: 'External', displayName: 'Unisys' },  // 1 kept on 2026-10-31, 28 H-1B approvals
+  { source: 'greenhouse', slug: 'gomotive', displayName: 'Keep Truckin' },  // 1 kept on 2026-10-31, 27 H-1B approvals
+  { source: 'workday', slug: 'ambarella-ambarella', tenant: 'ambarella', wd: '108', site: 'Ambarella', displayName: 'Ambarella' },  // 1 kept on 2026-10-31, 26 H-1B approvals
+  { source: 'workday', slug: 'medimpact-medimpact', tenant: 'medimpact', wd: '5', site: 'MedImpact', displayName: 'Medimpact Healthcare' },  // 1 kept on 2026-10-31, 26 H-1B approvals
+  { source: 'workday', slug: 'electrolux-electroluxcareersite', tenant: 'electrolux', wd: '3', site: 'ElectroluxCareerSite', displayName: 'Electrolux Home Products' },  // 1 kept on 2026-10-31, 25 H-1B approvals
+  { source: 'workday', slug: 'nextgen-nextgen_careers', tenant: 'nextgen', wd: '5', site: 'NextGen_Careers', displayName: 'Next Gen' },  // 1 kept on 2026-10-31, 25 H-1B approvals
+  { source: 'workday', slug: 'newrez-nrz', tenant: 'newrez', wd: '1', site: 'NRZ', displayName: 'Newrez' },  // 1 kept on 2026-10-31, 24 H-1B approvals
+  { source: 'greenhouse', slug: 'duolingo', displayName: 'Duolingo' },  // 1 kept on 2026-10-31, 22 H-1B approvals
+  { source: 'workday', slug: 'pacificlife-pacificlifecareers', tenant: 'pacificlife', wd: '1', site: 'PacificLifeCareers', displayName: 'Pacific Life Insurance' },  // 1 kept on 2026-10-31, 22 H-1B approvals
+  { source: 'workday', slug: 'trendmicro-external', tenant: 'trendmicro', wd: '3', site: 'External', displayName: 'Trend Micro' },  // 1 kept on 2026-10-31, 22 H-1B approvals
+  { source: 'workday', slug: 'monolithicpower-mps_careers', tenant: 'monolithicpower', wd: '12', site: 'MPS_Careers', displayName: 'Monolithic Power' },  // 1 kept on 2026-10-31, 20 H-1B approvals
+
   // ─── YC companies newly hiring (scripts/probe-yc-ats.js + verify-yc-ats.js, 2026-10-31) ───
   // Of 32 verified boards only these had a current entry/mid US software opening.
   { source: 'greenhouse', slug: 'morph', displayName: 'Morph' }, // YC Summer 2023
