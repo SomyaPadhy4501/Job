@@ -166,6 +166,10 @@ test('shop-floor and manufacturing titles are not software roles (Tesla audit)',
   ]) assert.strictEqual(classifyRole(t), 'OTHER', t);
   assert.strictEqual(classifyRole('Production Engineer'), 'SRE');
   assert.strictEqual(classifyRole('Production Engineer, Infrastructure'), 'SRE');
+  // Caught by the production dry run — new-grad and tooling PE roles stay in.
+  assert.strictEqual(classifyRole('Production Engineer (University Grad)'), 'SRE');
+  assert.strictEqual(classifyRole('Production Engineer, Support Tooling (Tooling and Frameworks)'), 'SRE');
+  assert.strictEqual(classifyRole('Production Engineer, Lithium'), 'OTHER');
   assert.strictEqual(passesLevel('Production Engineering Supervisor, Megapack (Night Shift)', 'permissive'), false);
   assert.strictEqual(looksUS('Barcelona, Ct'), false);
   assert.strictEqual(classifyRole('Software Engineer, Factory Software'), 'SWE');

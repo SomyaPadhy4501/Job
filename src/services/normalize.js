@@ -258,7 +258,8 @@ const HAS_SOFTWARE_CUE =
 // Technician, Infrastructure Engineering", "Technical Sourcer, Software
 // Engineering" all classified as SWE/SRE from Tesla's board (2026-10-31).
 const SHOP_FLOOR_ROLE = /\b(?:cnc|metrology|machinist|technician|sourcer|operator)\b/i;
-const PROD_ENG_SOFTWARE = /\b(?:software|infrastructure|platform|cloud|systems|reliability|network|data|ml)\b/i;
+const MANUFACTURING_PROCESS =
+  /\b(?:cathode|anode|lithium|cells?|battery|batteries|megapack|powerwall|stamping|die|paint|body in white|biw|general assembly|assembly|wire harness|casting|molding|moulding|weld(?:ing)?|machining|refinery|night shift|pilot line)\b/i;
 
 // Non-CS engineering disciplines as the prefix to "engineer/developer".
 // Catches "Electrical Engineer", "Propulsion Engineer", "Industrial Engineer",
@@ -324,10 +325,11 @@ function classifyRole(title) {
   // of the title would otherwise match a CS pattern.
   if (NON_CS_DISCIPLINE.test(t)) return 'OTHER';
   if (SHOP_FLOOR_ROLE.test(t)) return 'OTHER';
-  // "Production Engineer" alone is an SRE title (Meta's usage). Tesla's
-  // "Production Engineer, Cathode" / "…, Lithium" are factory process roles:
-  // a qualifier with no software cue means manufacturing.
-  if (/^production engineer(?:ing)?\b/i.test(t) && /[,(–—]|\s-\s/.test(t) && !PROD_ENG_SOFTWARE.test(t)) return 'OTHER';
+  // "Production Engineer" is an SRE title (Meta's usage, incl. "Production
+  // Engineer (University Grad)"). Tesla's "Production Engineer, Cathode" /
+  // "…, Lithium" are factory process roles — rejected only when the title
+  // names a manufacturing process, so infra variants stay in.
+  if (/^production engineer(?:ing)?\b/i.test(t) && MANUFACTURING_PROCESS.test(t)) return 'OTHER';
   if (RESEARCH_DISCIPLINE_SUFFIX.test(t)) return 'OTHER';
   if (STARTS_NON_CS_DISCIPLINE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
   if (HARDWARE_CUE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
