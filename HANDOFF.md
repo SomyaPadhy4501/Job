@@ -35,7 +35,7 @@ removes existing `apply_url` duplicates (kept oldest row, ran cleanly on
 - Source `goldman_sachs` — Goldman Sachs's `api-higher.gs.com/gateway/api/v1/graphql` endpoint. Anonymous GraphQL; pulls all ~1.4k global roles and filters to US client-side (no reliable server-side location filter schema).
 - Scraper target `deloitte` (`scraper/src/targets/deloitte.js`) — SSR DOM scrape of `apply.deloitte.com/en_US/careers/SearchJobs/?locationTextInput=United+States`. Paginates `?jobOffset=N` in 10-row steps, capped at 30 pages (~300 rows/run). No JSON API exists for Deloitte, so this is the only option. Lives in the scraper microservice because DOM selectors break on layout change — keeping it out of the main collector process insulates the rest.
 - Scraper target `phenom` (`scraper/src/targets/phenom.js`) — generic Phenom People DOM scraper, shared across Cisco + Cognizant. Uses anchor-pattern selectors (`/global/en/job/{id}` for Cisco, `/global-en/jobs/{id}` for Cognizant) and falls back on visible DOM location text. Coverage is bounded: Phenom's infinite-scroll usually stalls around 10 visible results unless we click a specific "Show more" button that each tenant styles differently. Ships with the accepted limit; revisit if first-page coverage is insufficient.
-- Retention: the DB now only holds jobs whose `date_posted` (or, if null, `last_seen_at`) is within `CONFIG.retentionDays` (default 30). Enforced at normalize time (old dated rows rejected) and again at the end of each collect run via `pruneStaleJobs()` in [src/db/index.js](src/db/index.js). Tunable via the `RETENTION_DAYS` env var.
+- Retention (updated 2026-10-31): the board **shows** jobs posted or first seen within `CONFIG.visibleDays` (default 7, `VISIBLE_DAYS`) and **deletes** them after `CONFIG.retentionDays` (default 14, `RETENTION_DAYS`) — owner's call. The gap stops a still-open undated posting being deleted and re-inserted as "new" every week. Duplicate links are collapsed at collect time (`canonicalUrl` + `dedupeBatch`) and cleaned from the DB by `src/scripts/dedupe-urls.js` (run in the backfill-derived workflow). Was: the DB only holds jobs whose `date_posted` (or, if null, `last_seen_at`) is within `CONFIG.retentionDays` (default 30). Enforced at normalize time (old dated rows rejected) and again at the end of each collect run via `pruneStaleJobs()` in [src/db/index.js](src/db/index.js). Tunable via the `RETENTION_DAYS` env var.
 - First-seen date stamp: when a row arrives without a `date_posted` (Microsoft PCSX, Goldman GraphQL, Wipro, most Workday tenants, …), `upsertJob` stamps the current timestamp on first insert. Subsequent refetches hit the UPDATE branch where `date_posted = COALESCE(@date_posted, date_posted)` — so the stamped date is never overwritten. Combined with the retention sweep, this gives every row a meaningful "age" and null-dated retention fallback becomes a safety net rather than the common path. A one-shot backfill in `migrate()` copies `first_seen_at` into `date_posted` for any pre-existing null rows on next boot.
 - `scripts/probe-yc-ats.js` — discovers YC companies that publish on Greenhouse/Lever/Ashby. Writes config-ready blocks to stdout; redirect into a file for the verifier.
 - `scripts/verify-yc-ats.js` — verifies probe output before merge (Greenhouse exact-name match via `/boards/{slug}` metadata; Lever/Ashby via slug-variant provenance). 12 collisions caught on the first run (e.g. `greenhouse:beam` → "Bridge to Enter Advanced Mathematics" nonprofit, not YC Beam). 357 entries verified and merged into `src/config.js` on 2026-04-24.
@@ -291,6 +291,26 @@ i.e. dated rows first, newest first, "no-date" rows sink to the bottom.
 
 ## UI notes (`web/`)
 
+**Defaults (owner's call, 2026-10-31):** sponsorship = YES ("Sponsors visas
+(confirmed)"; `ANY` in the URL turns it off), restriction = hide, view =
+grouped by company. The grouped view reads `GET /companies` (one row per
+company with role count and newest date; a single-role company carries its
+`job` inline) and expands a company with `GET /jobs?company=<name>`. Both
+routes share `parseFilters()` in server.js and `buildWhere()` in each DB
+backend, so the two views can't disagree about which rows a filter admits.
+`?view=list` gives the old flat table.
+
+**Excluded employers:** Netflix, xAI and Capgemini are hidden from every
+source via `EXCLUDED_EMPLOYERS` in `src/services/clearance.js`
+(`restriction = EXCLUDED_EMPLOYER`). Their collector entries were removed from
+`COMPANIES`. Add to that list rather than deleting rows.
+
+**Browser extension daily run:** `extension/` opens the saved boards once a
+day (default 10:00 local; if the machine was off, on the first Chrome start
+after that), in an unfocused window that closes itself ~45 s after the last
+board loads. Logic in `extension/schedule.js` (tested). It only opens the
+user's own list — max 25 boards, one visit each — and never clicks or pages.
+
 React + Vite SPA. TanStack Query owns all server state (rows, pagination
 total, filter-scoped results); local component state owns the filter
 form. The whole thing builds to static files at `web/dist/` served by
@@ -467,7 +487,8 @@ Every env var the code actually reads, grouped by process.
 - `FILTER_US` — drop non-US rows in `normalize.js` (default: `true`)
 - `FILTER_SOFTWARE` — drop `role_type === 'OTHER'` (default: `true`)
 - `ENTRY_LEVEL_MODE` — `off` | `permissive` | `strict` (default: `permissive`)
-- `RETENTION_DAYS` — drop jobs older than N days (default: `30`; see "Retention" below)
+- `RETENTION_DAYS` — delete jobs older than N days (default: `14`)
+- `VISIBLE_DAYS` — only show jobs from the last N days (default: `7`)
 - `COLLECT_TOKEN` — bearer for `/admin/collect` and `/admin/ingest` (default: none = open)
 - `DEBUG` — verbose logger (default: quiet)
 
