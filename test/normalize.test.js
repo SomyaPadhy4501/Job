@@ -120,3 +120,18 @@ test('an excluded employer is dropped whichever source lists it', () => {
   assert.strictEqual(normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true }), null);
   assert.ok(normalizeJob({ ...row, company_name: 'Shield AI' }, { filterUSOnly: true, filterSoftwareOnly: true }));
 });
+
+test('a config entry\'s H-1B filing names reach the sponsorship lookup', () => {
+  // Adzuna rows have no description, so "Cisco" only resolves through the name
+  // Cisco files under.
+  const { addSponsorNames } = require('../src/services/normalize');
+  const row = {
+    source: 'adzuna', company_name: 'Cisco', job_title: 'Software Engineer',
+    location: 'San Jose, CA', apply_url: 'https://www.adzuna.com/details/1', description: '',
+  };
+  const opts = { filterUSOnly: true, filterSoftwareOnly: true };
+  assert.strictEqual(normalizeJob(row, opts).sponsorship, 'UNKNOWN');
+  const [named] = addSponsorNames([row], ['Cisco Systems']);
+  assert.strictEqual(normalizeJob(named, opts).sponsorship, 'YES');
+  assert.deepStrictEqual(addSponsorNames([row], undefined), [row]);
+});

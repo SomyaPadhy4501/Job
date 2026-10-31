@@ -702,6 +702,10 @@ const COMPANIES = [
   { source: 'workday', slug: 'usaa',           tenant: 'usaa',       wd: '1',  site: 'USAAJOBSWD',            displayName: 'USAA' },            // Texas, 72
   { source: 'workday', slug: 'prudential',     tenant: 'pru',        wd: '5',  site: 'Careers',               displayName: 'Prudential' },      // NJ, 46
   { source: 'workday', slug: 'manhattanassoc', tenant: 'manh',       wd: '5',  site: 'External',              displayName: 'Manhattan Associates' }, // Atlanta, 45
+  // Added 2026-10-31, verified against the CxS endpoint (500 rows, 3 kept).
+  // Files H-1Bs as Verizon Data Services, 493 approvals over the last 2 FY.
+  { source: 'workday', slug: 'verizon',        tenant: 'verizon',    wd: '12', site: 'verizon-careers',       displayName: 'Verizon',
+    uscisNames: ['Verizon Data Services'] },
 
   // ── schema.org JobPosting via sitemap (see src/collectors/jsonld.js) ────────
   // For career sites with no public ATS API. Reads the sitemap the site
@@ -721,6 +725,19 @@ const COMPANIES = [
   // enrichment pass fills the text in. It also means the 0-2 year ceiling can't
   // read these rows; only the title filters apply.
   //
+  // Every entry is `cadence: 'daily'` and costs 3 requests a run (one page per
+  // default query); the free key allows ~80 a day averaged over a month, and a
+  // test holds the total under DAILY_REQUEST_BUDGET in src/collectors/adzuna.js.
+  // `company` is matched as a substring of Adzuna's employer name, and
+  // `uscisNames` is the employer's H-1B filing name where the display name
+  // isn't one — without it these description-less rows can't be labelled.
+  //
+  // The 15 added 2026-10-31 are the largest H-1B sponsors (last 2 FY) with no
+  // source on the board, leaving out IT staffing/outsourcing firms and
+  // universities. Adzuna's API needs a key, so their coverage is unverified:
+  // run `node scripts/probe-adzuna.js` once the key exists and drop any entry
+  // that comes back with no matches.
+  //
   // Tesla is here and in the JSearch block below, not in the Playwright
   // scraper. Re-probed 2026-10-21: Akamai answers "Access Denied" to plain HTTP
   // (even robots.txt), to headless Chromium in both modes, and to headed
@@ -729,16 +746,32 @@ const COMPANIES = [
   // automation detection is the only wall, and getting past it means the
   // stealth arms race this project doesn't do. The detail's applyUrl host,
   // tesla.avature.net, doesn't resolve.
-  { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
-  { source: 'adzuna', slug: 'cisco',    displayName: 'Cisco',    company: 'Cisco' },
-  { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
-  { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
+  { source: 'adzuna', slug: 'tesla',      displayName: 'Tesla',      company: 'Tesla',      cadence: 'daily' },
+  { source: 'adzuna', slug: 'cisco',      displayName: 'Cisco',      company: 'Cisco',      cadence: 'daily', uscisNames: ['Cisco Systems'] },
+  { source: 'adzuna', slug: 'qualcomm',   displayName: 'Qualcomm',   company: 'Qualcomm',   cadence: 'daily' },
+  { source: 'adzuna', slug: 'ibm',        displayName: 'IBM',        company: 'IBM',        cadence: 'daily', uscisNames: ['IBM Corporation'] },
+  { source: 'adzuna', slug: 'broadcom',   displayName: 'Broadcom',   company: 'Broadcom',   cadence: 'daily', uscisNames: ['VMware', 'Broadcom Corporation'] },
+  { source: 'adzuna', slug: 'bloomberg',  displayName: 'Bloomberg',  company: 'Bloomberg',  cadence: 'daily', uscisNames: ['Bloomberg LP'] },
+  { source: 'adzuna', slug: 'barclays',   displayName: 'Barclays',   company: 'Barclays',   cadence: 'daily', uscisNames: ['Barclays Services'] },
+  { source: 'adzuna', slug: 'charter',    displayName: 'Charter Communications', company: 'Charter Communications', cadence: 'daily' },
+  { source: 'adzuna', slug: 'amd',        displayName: 'AMD',        company: 'AMD',        cadence: 'daily', uscisNames: ['Advanced Micro Devices'] },
+  // USCIS lists "T-Mobile USA"; the one-letter "T" is dropped by normSlug.
+  { source: 'adzuna', slug: 't-mobile',   displayName: 'T-Mobile',   company: 'T-Mobile',   cadence: 'daily', uscisNames: ['Mobile USA'] },
+  { source: 'adzuna', slug: 'elevance',   displayName: 'Elevance Health', company: 'Elevance', cadence: 'daily', uscisNames: ['Anthem'] },
+  { source: 'adzuna', slug: 'workday',    displayName: 'Workday',    company: 'Workday',    cadence: 'daily' },
+  { source: 'adzuna', slug: 'adp',        displayName: 'ADP',        company: 'ADP',        cadence: 'daily', uscisNames: ['ADP Technology Services'] },
+  { source: 'adzuna', slug: 'cvs',        displayName: 'CVS Health', company: 'CVS',        cadence: 'daily', uscisNames: ['Caremark', 'CVS Pharmacy'] },
+  { source: 'adzuna', slug: 'yahoo',      displayName: 'Yahoo',      company: 'Yahoo',      cadence: 'daily', uscisNames: ['Oath Holdings'] },
+  { source: 'adzuna', slug: 'fedex',      displayName: 'FedEx',      company: 'FedEx',      cadence: 'daily', uscisNames: ['FedEx Corporate Services'] },
+  { source: 'adzuna', slug: 'nike',       displayName: 'Nike',       company: 'Nike',       cadence: 'daily' },
+  { source: 'adzuna', slug: 'synopsys',   displayName: 'Synopsys',   company: 'Synopsys',   cadence: 'daily' },
+  { source: 'adzuna', slug: 'mathworks',  displayName: 'MathWorks',  company: 'MathWorks',  cadence: 'daily' },
 
   // ── JSearch / Google for Jobs (see src/collectors/jsearch.js) ─────────────
   // Full descriptions, unlike Adzuna, and only rows whose apply link is on
   // `applyHost` are kept. `cadence: 'daily'` keeps these out of the 2-hourly
   // collect: the free plan is 200 requests/month, so they run once a day from
-  // .github/workflows/jsearch.yml. Inert until JSEARCH_API_KEY is set.
+  // .github/workflows/daily.yml. Inert until JSEARCH_API_KEY is set.
   { source: 'jsearch', slug: 'tesla', displayName: 'Tesla', employer: 'Tesla',
     applyHost: 'tesla.com', cadence: 'daily' },
 

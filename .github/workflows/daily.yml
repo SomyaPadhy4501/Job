@@ -1,0 +1,59 @@
+name: daily
+
+# Sources on metered free plans, run once a day instead of every 2 h. The
+# 2-hourly collect never touches them (`cadence: 'daily'` in src/config.js).
+# Manual "Run workflow" clicks spend the same quotas — don't loop them.
+#
+# JSearch (src/collectors/jsearch.js) — Google for Jobs, currently Tesla. Free
+# plan: 200 requests/month, a hard limit. One run costs at most 4 (one per
+# query), ~124/month.
+#
+# Adzuna (src/collectors/adzuna.js) — Tesla and other large sponsors with no
+# reachable board. Free key: 25/minute, 250/day, 2,500/month. One run costs at
+# most 3 per entry, held under 60/day by a test; requests are spaced 2.6s apart,
+# so the step takes about 3 minutes.
+
+on:
+  schedule:
+    - cron: '45 14 * * *'   # daily; :45 stays clear of collect (:00) and scrape (:30)
+  workflow_dispatch:
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATABASE_URL:     ${{ secrets.DATABASE_URL }}
+      FILTER_US:        'true'
+      FILTER_SOFTWARE:  'true'
+      ENTRY_LEVEL_MODE: 'permissive'
+      RETENTION_DAYS:   '30'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect JSearch sources
+        run: npm run collect -- --source jsearch
+        env:
+          # RapidAPI key with the free JSearch Basic plan. Without it the
+          # collector logs a skip and the run succeeds with no rows.
+          JSEARCH_API_KEY:  ${{ secrets.JSEARCH_API_KEY }}
+
+      - name: Collect Adzuna sources
+        # Independent of JSearch: one source failing shouldn't cost the other.
+        if: ${{ !cancelled() }}
+        run: npm run collect -- --source adzuna
+        env:
+          # Free keys from https://developer.adzuna.com/. Without both the
+          # collector logs a skip and the run succeeds with no rows.
+          ADZUNA_APP_ID:    ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY:   ${{ secrets.ADZUNA_APP_KEY }}

@@ -2,7 +2,7 @@
 
 const { SCHEDULED_COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
-const { normalizeJob } = require('./normalize');
+const { normalizeJob, addSponsorNames } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
 const { MAX_YOE } = require('./experience');
 const { refreshedSources } = require('./freshness');
@@ -65,7 +65,7 @@ async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
         slug: r.company.slug,
         count: r.jobs.length,
       });
-      rawJobs.push(...r.jobs);
+      rawJobs.push(...addSponsorNames(r.jobs, r.company.uscisNames));
     } else {
       companiesFail++;
       log.warn('collector.fail', {

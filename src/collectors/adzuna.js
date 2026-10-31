@@ -31,14 +31,41 @@ const { fetchJson } = require('./http');
 //
 // Config shape:
 //   { source: 'adzuna', slug, displayName, company, country, queries, maxPages }
+//
+// Quota. The free key is capped at 25 requests/minute, 250/day, 1,000/week and
+// 2,500/month (developer.adzuna.com terms, 2026-10-31); the monthly cap binds,
+// at ~80/day. So every entry is `cadence: 'daily'` (run from
+// .github/workflows/daily.yml), each search asks for one page of the 50 newest
+// postings — a daily run only needs what's new since yesterday — and the
+// config test holds the daily total at DAILY_REQUEST_BUDGET. Requests are spaced
+// MIN_GAP_MS apart across all entries, since collectAll runs four at once, and
+// never retried: a retry is another request against the cap.
 
 const API_BASE = 'https://api.adzuna.com/v1/api/jobs';
 const DEFAULT_COUNTRY = 'us';
 const DEFAULT_RESULTS_PER_PAGE = 50;
-const DEFAULT_MAX_PAGES = 3;
+const DEFAULT_MAX_PAGES = 1;
 const DEFAULT_MAX_DAYS_OLD = 30;
 
 const DEFAULT_QUERIES = ['software engineer', 'machine learning engineer', 'data engineer'];
+
+// 60/day is 1,860 a month, leaving ~640 of the 2,500 for manual runs and
+// scripts/probe-adzuna.js.
+const DAILY_REQUEST_BUDGET = 60;
+const MIN_GAP_MS = 2600; // 25/minute is one per 2.4s
+
+// Most requests one run of this entry can make.
+function requestsPerRun(config) {
+  return (config.queries || DEFAULT_QUERIES).length * (config.maxPages || DEFAULT_MAX_PAGES);
+}
+
+let nextSlot = 0;
+async function throttle() {
+  const now = Date.now();
+  const at = Math.max(now, nextSlot);
+  nextSlot = at + MIN_GAP_MS;
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
 
 function credentials() {
   const id = process.env.ADZUNA_APP_ID;
@@ -52,6 +79,7 @@ function buildUrl({ country, page, what, company, resultsPerPage, maxDaysOld }, 
   url.searchParams.set('app_key', creds.key);
   url.searchParams.set('results_per_page', String(resultsPerPage));
   url.searchParams.set('max_days_old', String(maxDaysOld));
+  url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
   if (what) url.searchParams.set('what', what);
   if (company) url.searchParams.set('company', company);
@@ -96,7 +124,9 @@ async function fetchCompany(config) {
         creds,
       );
       // eslint-disable-next-line no-await-in-loop
-      const data = await fetchJson(url, { retries: 1 });
+      await throttle();
+      // eslint-disable-next-line no-await-in-loop
+      const data = await fetchJson(url, { retries: 0 });
       const results = Array.isArray(data?.results) ? data.results : [];
       if (results.length === 0) break;
 
@@ -126,4 +156,6 @@ async function fetchCompany(config) {
   return jobs.filter((j) => j.external_id && j.job_title && j.apply_url);
 }
 
-module.exports = { fetchCompany, source: 'adzuna' };
+module.exports = {
+  fetchCompany, buildUrl, matchesCompany, requestsPerRun, DAILY_REQUEST_BUDGET, source: 'adzuna',
+};

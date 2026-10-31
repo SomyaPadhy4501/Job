@@ -392,6 +392,20 @@ function buildDedupeKey(company, title, location) {
   return `${normCompany(company)}|${normTitle(title)}|${normLocation(location)}`;
 }
 
+// A config entry's `uscisNames` are the names its employer files H-1B petitions
+// under, where the display name isn't one of them: Cisco files as Cisco
+// Systems, Yahoo as Oath Holdings, AMD as Advanced Micro Devices. They join the
+// row's sponsor_company_fallbacks so the USCIS lookup can find the employer.
+// Matters most for Adzuna rows, whose descriptions are empty and so can only
+// be labelled by that lookup.
+function addSponsorNames(jobs, names) {
+  if (!names || !names.length) return jobs;
+  return jobs.map((j) => ({
+    ...j,
+    sponsor_company_fallbacks: [...(j.sponsor_company_fallbacks || []), ...names],
+  }));
+}
+
 // Main entry. Returns a DB-ready row or null if filtered out.
 function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, retentionDays } = {}) {
   const company_name = (raw.company_name || '').trim();
@@ -494,6 +508,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
 module.exports = {
   normalizeJob,
+  addSponsorNames,
   isExcludedCompany,
   stripHtml,
   buildDedupeKey,

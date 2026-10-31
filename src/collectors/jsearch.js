@@ -21,7 +21,7 @@ const { fetchJson } = require('./http');
 // BUDGET. The free Basic plan is 200 requests/month, a hard limit, and each page
 // of up to 10 results costs one request. So this source:
 //   - never runs in the 2-hourly collect: its entry has `cadence: 'daily'`,
-//     which SCHEDULED_COMPANIES leaves out, and .github/workflows/jsearch.yml
+//     which SCHEDULED_COMPANIES leaves out, and .github/workflows/daily.yml
 //     runs it once a day via `npm run collect -- --source jsearch`;
 //   - asks for one page per query and at most MAX_QUERIES queries, so a run
 //     costs at most 4 requests (~124/month), leaving room for manual runs;

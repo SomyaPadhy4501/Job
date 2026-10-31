@@ -573,3 +573,57 @@ test('jsearch: the 2-hourly collect never runs daily-cadence entries', () => {
   assert.ok(!SCHEDULED_COMPANIES.some((c) => c.cadence === 'daily'));
   assert.ok(!SCHEDULED_COMPANIES.some((c) => c.source === 'jsearch'));
 });
+
+// ─── Adzuna ───────────────────────────────────────────────────────────────────
+
+const adzuna = require('../src/collectors/adzuna');
+const { classifySponsorship } = require('../src/services/classifier');
+
+test('adzuna: every entry runs daily and the day fits the free key', () => {
+  // The key allows 2,500 requests a month (developer.adzuna.com terms). Every
+  // 2 hours, the original four entries alone came to ~4,300.
+  const entries = COMPANIES.filter((c) => c.source === 'adzuna');
+  assert.ok(entries.length > 0);
+  for (const c of entries) assert.strictEqual(c.cadence, 'daily', c.slug);
+  assert.ok(!SCHEDULED_COMPANIES.some((c) => c.source === 'adzuna'));
+
+  const perDay = entries.reduce((n, c) => n + adzuna.requestsPerRun(c), 0);
+  assert.ok(perDay <= adzuna.DAILY_REQUEST_BUDGET, `${perDay} requests a day`);
+  assert.ok(adzuna.DAILY_REQUEST_BUDGET * 31 <= 2500);
+});
+
+test('adzuna: asks for one page of the newest postings', () => {
+  const url = new URL(adzuna.buildUrl(
+    { country: 'us', page: 1, what: 'software engineer', company: 'Tesla', resultsPerPage: 50, maxDaysOld: 30 },
+    { id: 'id', key: 'key' }
+  ));
+  assert.strictEqual(url.pathname, '/v1/api/jobs/us/search/1');
+  assert.strictEqual(url.searchParams.get('sort_by'), 'date');
+  assert.strictEqual(url.searchParams.get('company'), 'Tesla');
+  assert.strictEqual(adzuna.requestsPerRun({}), 3);
+});
+
+test('adzuna: a failed request is not retried', async () => {
+  const realId = process.env.ADZUNA_APP_ID;
+  const realKey = process.env.ADZUNA_APP_KEY;
+  process.env.ADZUNA_APP_ID = 'id';
+  process.env.ADZUNA_APP_KEY = 'key';
+  try {
+    await withFetch(() => ({ status: 429, ok: false }), async (calls) => {
+      await assert.rejects(adzuna.fetchCompany({ slug: 'tesla', company: 'Tesla', queries: ['x'] }), /HTTP 429/);
+      assert.strictEqual(calls.length, 1, 'a retry is another request against the cap');
+    });
+  } finally {
+    if (realId === undefined) delete process.env.ADZUNA_APP_ID; else process.env.ADZUNA_APP_ID = realId;
+    if (realKey === undefined) delete process.env.ADZUNA_APP_KEY; else process.env.ADZUNA_APP_KEY = realKey;
+  }
+});
+
+test('uscisNames all resolve to a sponsor in the USCIS data', () => {
+  // A misspelt filing name fails silently: the row just reads UNKNOWN.
+  for (const c of COMPANIES.filter((e) => e.uscisNames)) {
+    for (const name of c.uscisNames) {
+      assert.strictEqual(classifySponsorship('Software Engineer', '', [name]), 'YES', `${c.slug}: ${name}`);
+    }
+  }
+});
