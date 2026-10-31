@@ -407,8 +407,16 @@ function looksIntern(title) {
   return INTERN_REJECT.some((r) => r.test(t));
 }
 
+// A trailing ", IC" band label ("Machine Learning Engineer 5 (Senior Manager,
+// IC)", "Data Engineer 4 (Manager, IC)") names the pay band an individual
+// contributor sits in. It is not the job's seniority: the same role written
+// without the label passes, so reading "Senior" and "Manager" out of it drops
+// Capital One's level-5 ML and AI roles — the ones whose JDs say it will consider
+// sponsoring — while keeping their unlabelled twins.
+const IC_BAND_LABEL = /\([^)]*,\s*ic\s*\)/g;
+
 function looksSeniorReject(title) {
-  const t = (title || '').toLowerCase();
+  const t = (title || '').toLowerCase().replace(IC_BAND_LABEL, ' ');
   return SENIOR_REJECT.some((r) => r.test(t));
 }
 

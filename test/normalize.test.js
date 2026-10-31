@@ -174,3 +174,34 @@ test('shop-floor and manufacturing titles are not software roles (Tesla audit)',
   assert.strictEqual(looksUS('Barcelona, Ct'), false);
   assert.strictEqual(classifyRole('Software Engineer, Factory Software'), 'SWE');
 });
+
+// Capital One writes the pay band after the title: "Machine Learning Engineer 5
+// (Senior Manager, IC)". IC = individual contributor, so the band is not the
+// job's seniority. The plain title passed the level filter while the labelled
+// one was rejected for the words "Senior" and "Manager" inside the label — which
+// dropped the level-5 AI/ML roles whose JDs say Capital One will consider
+// sponsoring. Titles are verbatim from the live Workday list, 2026-10-31.
+test('an ", IC" pay-band label does not make an individual-contributor role senior', () => {
+  const { passesLevel } = require('../src/services/normalize');
+  for (const title of [
+    'Machine Learning Engineer 5 (Senior Manager, IC)',
+    'Machine Learning Engineer 5',
+    'Data Engineer 4 (Manager, IC)',
+    'Full-stack Engineer 4 (Manager, IC)',
+  ]) {
+    assert.strictEqual(passesLevel(title, 'permissive'), true, title);
+  }
+});
+
+test('genuine management and seniority titles are still rejected', () => {
+  const { passesLevel } = require('../src/services/normalize');
+  for (const title of [
+    'Director - AI Engineering',
+    'Senior Manager- AI Engineer',
+    'Distinguished AI Engineer',
+    'Engineering Manager (IC)', // no comma: not a band label, still a manager
+    'Senior Software Engineer (Remote)',
+  ]) {
+    assert.strictEqual(passesLevel(title, 'permissive'), false, title);
+  }
+});

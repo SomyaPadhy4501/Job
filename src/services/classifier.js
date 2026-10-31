@@ -22,6 +22,10 @@ const YES_PATTERNS = [
   /will sponsor(?:ship)?/,
   /sponsor(?: a)? visa/,
   /immigration sponsorship/,
+  // Capital One's level-5 roles: "Capital One will consider sponsoring a new
+  // qualified applicant for employment authorization for this position." Without
+  // this the JD's own yes was invisible and the row was YES only through USCIS.
+  /consider(?:s|ing)? sponsor/,
 ];
 
 // Only statements that the employer will not sponsor. A NO here hides the row
@@ -51,6 +55,7 @@ const NO_PATTERNS = [
   new RegExp(`unable to (?:sponsor|(?:offer|provide) ${SPONSORSHIP})`),
   /cannot sponsor/,
   /(?:will|would|do|does|are|can) not (?:currently )?sponsor/,
+  /not (?:currently )?consider(?:ing)? (?:[a-z-]+ ){0,3}sponsor/,
   /won'?t sponsor/,
   new RegExp(`(?:will|would|do|does|is|are|can) not (?:currently )?(?:offer|provide) ${SPONSORSHIP}`),
   new RegExp(`not (?:currently )?(?:offering|providing) ${SPONSORSHIP}`),
@@ -83,7 +88,7 @@ const NEGATION = /\b(?:not|no|never|cannot|unable|unavailable|ineligible|without
 // The sentence is affirming sponsorship, so a stray "not" nearby is about
 // something else ("we sponsor visas for candidates who do not hold a permit").
 const AFFIRMATION =
-  /\b(?:will|can|may|able to|happy to|glad to|willing to) sponsor|\b(?:offer|offers|offering|provide|provides|providing) (?:\w+ ){0,2}sponsorship|sponsorship (?:is |may be |will be |can be )?(?:available|offered|provided)|\bsponsors? (?:visas?|h-?1b|work|employees|candidates)/;
+  /\b(?:will|can|may|able to|happy to|glad to|willing to) sponsor|\bconsider(?:s|ing)? sponsor|\b(?:offer|offers|offering|provide|provides|providing) (?:\w+ ){0,2}sponsorship|sponsorship (?:is |may be |will be |can be )?(?:available|offered|provided)|\bsponsors? (?:visas?|h-?1b|work|employees|candidates)/;
 
 function doubtsSponsorship(t) {
   for (const sentence of t.split(/[.;!?\n]/)) {

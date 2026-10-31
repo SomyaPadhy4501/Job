@@ -240,6 +240,23 @@ test('a refusal no pattern can parse is withheld from YES instead of trusted', (
   }
 });
 
+// Capital One words sponsorship by level. Level 4 roles refuse; level 5 roles say
+// they will consider it — the P1 AI/ML/data roles. Sentences are verbatim from the
+// live Workday JDs (2026-10-31). The YES case used to read UNKNOWN from the text
+// alone and was YES only because of USCIS history, so it is pinned with no company.
+test('capital one: level 4 refuses, level 5 will consider sponsoring — from the JD alone', () => {
+  const level4 =
+    'at this time, capital one will not sponsor a new applicant for employment authorization, or offer any immigration related support for this position.';
+  const level5 =
+    'capital one will consider sponsoring a new qualified applicant for employment authorization for this position. the minimum salary is competitive.';
+  for (const company of ['', 'Capital One']) {
+    assert.strictEqual(classifySponsorship(level4, company), 'NO', `level 4 / ${company || '(none)'}`);
+    assert.strictEqual(classifySponsorship(level5, company), 'YES', `level 5 / ${company || '(none)'}`);
+  }
+  // A refusal phrased with "consider" must not be read as the affirmative.
+  assert.strictEqual(classifySponsorship('we will not consider sponsoring new applicants.', 'Capital One'), 'NO');
+});
+
 test("owner's exclusion list hides Netflix, xAI and Capgemini from any source", () => {
   for (const company_name of ['Netflix', 'xAI', 'X.ai', 'Capgemini', 'Capgemini America']) {
     assert.strictEqual(
