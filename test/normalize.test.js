@@ -154,3 +154,19 @@ test('cleanCompanyName turns a careers-page headline into the employer', () => {
   assert.strictEqual(cleanCompanyName('Capital One'), 'Capital One');
   assert.strictEqual(cleanCompanyName('Jobs at'), 'Jobs at');
 });
+
+test('shop-floor and manufacturing titles are not software roles (Tesla audit)', () => {
+  const { classifyRole, passesLevel, looksUS } = require('../src/services/normalize');
+  for (const t of [
+    'CNC Programmer, Die Shop',
+    'Metrology Programmer, LFP Cell Manufacturing',
+    'Technical Sourcer, Software Engineering',
+    'IT Manufacturing Support Technician, Infrastructure Engineering',
+    'Production Engineer, Cathode',
+  ]) assert.strictEqual(classifyRole(t), 'OTHER', t);
+  assert.strictEqual(classifyRole('Production Engineer'), 'SRE');
+  assert.strictEqual(classifyRole('Production Engineer, Infrastructure'), 'SRE');
+  assert.strictEqual(passesLevel('Production Engineering Supervisor, Megapack (Night Shift)', 'permissive'), false);
+  assert.strictEqual(looksUS('Barcelona, Ct'), false);
+  assert.strictEqual(classifyRole('Software Engineer, Factory Software'), 'SWE');
+});

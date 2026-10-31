@@ -35,6 +35,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Remove rows today's filters reject
+        run: |
+          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+            node src/scripts/prune-rejected.js --apply
+          else
+            node src/scripts/prune-rejected.js
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FILTER_US:         'true'
+          FILTER_SOFTWARE:   'true'
+          ENTRY_LEVEL_MODE:  'permissive'
+
       - name: Remove duplicate apply links
         run: |
           if [ "${{ github.event.inputs.apply }}" = "true" ]; then

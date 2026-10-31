@@ -168,7 +168,7 @@ const FOREIGN_TRAILING =
   /^(?:ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland(?: and labrador)?|prince edward island|on|bc|qc|ab|canada|mexico|india|china|japan|germany|france|spain|ireland|united kingdom|uk|england|netherlands|poland|israel|singapore|philippines|brazil|australia|south korea|korea|taiwan)$/;
 
 const FOREIGN_MARKERS =
-  /\b(worldwide|global|anywhere|emea|apac|latam|eu|europe|european|asia|asian|india|uk|united kingdom|ireland|scotland|wales|germany|deutschland|france|spain|portugal|netherlands|belgium|poland|czech|romania|hungary|denmark|norway|sweden|finland|switzerland|austria|canada|canadian|ontario|toronto|montreal|quebec|vancouver|calgary|british columbia|alberta|manitoba|brazil|mexico|argentina|chile|colombia|peru|australia|japan|singapore|israel|nigeria|egypt|china|turkey|dubai|uae|united arab emirates|saudi|qatar|bahrain|new zealand|south africa|thailand|vietnam|philippines|indonesia|malaysia|pakistan|bangladesh|berlin|london|paris|amsterdam|sydney|melbourne|bangalore|bengaluru|hyderabad|delhi|mumbai|chennai|pune|tokyo|seoul|tel aviv|bogota|santiago|buenos aires|taipei|hong kong|madrid|rome|athens|oslo|stockholm|copenhagen|helsinki|zurich|geneva|brussels|prague|budapest|warsaw|bucharest|lisbon|istanbul)\b/i;
+  /\b(worldwide|global|anywhere|emea|apac|latam|eu|europe|european|asia|asian|india|uk|united kingdom|ireland|scotland|wales|germany|deutschland|france|spain|portugal|netherlands|belgium|poland|czech|romania|hungary|denmark|norway|sweden|finland|switzerland|austria|canada|canadian|ontario|toronto|montreal|quebec|vancouver|calgary|british columbia|alberta|manitoba|brazil|mexico|argentina|chile|colombia|peru|australia|japan|singapore|israel|nigeria|egypt|china|turkey|dubai|uae|united arab emirates|saudi|qatar|bahrain|new zealand|south africa|thailand|vietnam|philippines|indonesia|malaysia|pakistan|bangladesh|berlin|london|paris|amsterdam|sydney|melbourne|bangalore|bengaluru|hyderabad|delhi|mumbai|chennai|pune|tokyo|seoul|tel aviv|bogota|santiago|buenos aires|taipei|hong kong|madrid|rome|athens|oslo|stockholm|copenhagen|helsinki|zurich|geneva|brussels|prague|budapest|warsaw|bucharest|lisbon|istanbul|barcelona|munich|frankfurt|milan|shanghai|beijing|grünheide|gruenheide|tilburg|eindhoven|krakow)\b/i;
 
 function looksUS(location) {
   if (!location) return true; // unknown → don't drop
@@ -253,6 +253,13 @@ const HARDWARE_CUE =
 const HAS_SOFTWARE_CUE =
   /\b(software|\bml\b|machine\s+learning|\bai\b|artificial\s+intelligence|\bsde\b|\bswe\b|site\s+reliability|\bsre\b|devops|simulation|algorithm|compiler|embedded\s+software|data\s+(?:engineer|scientist)|programmer|backend|frontend|full[-\s]?stack)\b/i;
 
+// Shop-floor and support roles whose titles borrow software words: "CNC
+// Programmer, Die Shop", "Metrology Programmer", "IT Manufacturing Support
+// Technician, Infrastructure Engineering", "Technical Sourcer, Software
+// Engineering" all classified as SWE/SRE from Tesla's board (2026-10-31).
+const SHOP_FLOOR_ROLE = /\b(?:cnc|metrology|machinist|technician|sourcer|operator)\b/i;
+const PROD_ENG_SOFTWARE = /\b(?:software|infrastructure|platform|cloud|systems|reliability|network|data|ml)\b/i;
+
 // Non-CS engineering disciplines as the prefix to "engineer/developer".
 // Catches "Electrical Engineer", "Propulsion Engineer", "Industrial Engineer",
 // "Aerospace Engineer", etc.
@@ -316,6 +323,11 @@ function classifyRole(title) {
   // Early rejects — anything flagged here is NOT a CS role, even if the rest
   // of the title would otherwise match a CS pattern.
   if (NON_CS_DISCIPLINE.test(t)) return 'OTHER';
+  if (SHOP_FLOOR_ROLE.test(t)) return 'OTHER';
+  // "Production Engineer" alone is an SRE title (Meta's usage). Tesla's
+  // "Production Engineer, Cathode" / "…, Lithium" are factory process roles:
+  // a qualifier with no software cue means manufacturing.
+  if (/^production engineer(?:ing)?\b/i.test(t) && /[,(–—]|\s-\s/.test(t) && !PROD_ENG_SOFTWARE.test(t)) return 'OTHER';
   if (RESEARCH_DISCIPLINE_SUFFIX.test(t)) return 'OTHER';
   if (STARTS_NON_CS_DISCIPLINE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
   if (HARDWARE_CUE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
@@ -366,7 +378,7 @@ const INTERN_REJECT = [
 const SENIOR_REJECT = [
   /\bsenior\b/, /\bsr\.?\b/, /\bstaff\b/, /\bprincipal\b/, /\bdistinguished\b/,
   /\blead\b/, /\bdirector\b/, /\bmanager\b/, /\bhead of\b/,
-  /\bvp\b/, /\bvice\s+president\b/, /\barchitect\b/,
+  /\bvp\b/, /\bvice\s+president\b/, /\barchitect\b/, /\bsupervisor\b/,
   /\bchief\b/, // "Programs Chief Engineer", "Chief of Staff", etc.
   /\s(iii|iv|v|vi)\b/i, // space + III/IV/…  (II is intentionally NOT rejected)
   /\s-\s*(iii|iv|v|vi)\b/i,
