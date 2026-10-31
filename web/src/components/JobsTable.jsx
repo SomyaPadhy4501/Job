@@ -97,6 +97,9 @@ const RESTRICTION_LABEL = {
   CLEARANCE: 'clearance',
   EXPORT_CONTROL: 'ITAR / US person',
   CITIZENSHIP: 'US citizens only',
+  GOVERNMENT: 'gov / federal',
+  DEFENSE_EMPLOYER: 'defense employer',
+  NO_SPONSORSHIP: 'no sponsorship',
   EXPORT_ADVISORY: 'export note',
   CLEARANCE_PREFERRED: 'clearance a plus',
 };
@@ -105,6 +108,9 @@ const RESTRICTION_TITLE = {
   CLEARANCE: 'Requires a US security clearance — needs US citizenship, not obtainable on a visa.',
   EXPORT_CONTROL: 'ITAR / export control: restricted to US persons (citizens or green-card holders).',
   CITIZENSHIP: 'Posting explicitly requires US citizenship.',
+  GOVERNMENT: 'Government / federal / defense programme role — almost always needs citizenship or a clearance.',
+  DEFENSE_EMPLOYER: 'Defense / ITAR employer whose roles are effectively US-person only; no description was available to say otherwise.',
+  NO_SPONSORSHIP: 'Posting says the employer will not sponsor a visa.',
   EXPORT_ADVISORY: 'Mentions export-control law but imposes no citizenship requirement — still applicable.',
   CLEARANCE_PREFERRED: 'Clearance listed as preferred, not required — still applicable.',
 };

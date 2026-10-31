@@ -44,6 +44,10 @@ async function fetchCompany({ url, slug, displayName }) {
       description: '',
       date_posted: d.date_posted ? d.date_posted * 1000 : null, // seconds → ms; parseDateToIso handles it
       sponsorship_override: SPONSOR_MAP[d.sponsorship],
+      // The rows carry no description, so this label is the only evidence of
+      // a citizenship bar the restriction filter will ever see.
+      restriction_override:
+        d.sponsorship === 'U.S. Citizenship is Required' ? 'CITIZENSHIP' : undefined,
       entry_level_override: 1,
     });
   }

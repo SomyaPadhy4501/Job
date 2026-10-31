@@ -1,7 +1,8 @@
 'use strict';
 
 // One-shot backfill: recompute the fields derived from a posting's text —
-// `restriction` (clearance / ITAR / citizenship) and `yoe_min` plus the
+// `sponsorship`, `restriction` (clearance / ITAR / citizenship / no-sponsorship
+// / defense employer) and `yoe_min` plus the
 // is_entry_level / is_mid_level flags it drives — and update rows that changed.
 //
 // Usage (safe, dry-run by default):
@@ -18,11 +19,12 @@
 // SQLite also self-heals via the boot pass in src/db/sqlite.js, so this script
 // is strictly required only for Postgres, which has no programmatic migration.
 //
-// Idempotent: every field here is a pure function of job_title + description,
-// neither of which this script writes. Re-running always converges, so a bad
+// Idempotent: every field here is a pure function of job_title, description
+// and company_name, none of which this script writes. Re-running always converges, so a bad
 // pattern set is fixed by correcting it and running again — no restore needed.
 
-const { classifyRestriction } = require('../services/clearance');
+const { deriveRestriction, DISQUALIFYING } = require('../services/clearance');
+const { classifySponsorship } = require('../services/classifier');
 const { extractExperience, levelFromYears } = require('../services/experience');
 const { stripHtml } = require('../services/normalize');
 
@@ -37,6 +39,10 @@ function textFor(row) {
   return `${row.job_title || ''}\n${stripHtml(row.description || '')}`;
 }
 
+// Same list as the boot pass in src/db/sqlite.js: these sources pre-label
+// sponsorship and carry no description, so recomputing would discard the label.
+const CURATED_SPONSORSHIP_SOURCES = ['ghlistings'];
+
 // Compute every derived field for one row. Level flags are only overwritten
 // when the description actually states a number — otherwise the collector's
 // value (which may come from a curated source override) is left alone.
@@ -44,8 +50,20 @@ function derive(row) {
   const text = textFor(row);
   const years = extractExperience(text);
   const lvl = levelFromYears(years);
+  const curated = CURATED_SPONSORSHIP_SOURCES.includes(row.source);
+  const sponsorship = curated
+    ? row.sponsorship
+    : classifySponsorship(text, row.company_name);
   return {
-    restriction: classifyRestriction(text),
+    sponsorship,
+    restriction: deriveRestriction({
+      job_title: row.job_title,
+      description: stripHtml(row.description || ''),
+      company_name: row.company_name,
+      sponsorship,
+      // The curated label isn't stored separately; the stored verdict stands in.
+      restriction_override: curated ? row.restriction : undefined,
+    }),
     yoe_min: years ? years.min : -1,
     is_entry_level: lvl ? lvl.is_entry_level : row.is_entry_level,
     is_mid_level: lvl ? lvl.is_mid_level : row.is_mid_level,
@@ -54,6 +72,7 @@ function derive(row) {
 
 function changed(row, next) {
   return (
+    next.sponsorship !== row.sponsorship ||
     next.restriction !== (row.restriction || '') ||
     next.yoe_min !== row.yoe_min ||
     next.is_entry_level !== row.is_entry_level ||
@@ -72,7 +91,7 @@ function report(rows, toUpdate, transitions, started) {
     console.log(`  ${k.padEnd(34)} ${v}`);
   }
   const blocking = [...transitions.entries()]
-    .filter(([k]) => /->(CLEARANCE|EXPORT_CONTROL|CITIZENSHIP)$/.test(k))
+    .filter(([k]) => DISQUALIFYING.has(k.split('->')[1]))
     .reduce((n, [, v]) => n + v, 0);
   console.log(`\n  will be hidden by default: ${blocking}`);
   console.log(`  elapsed: ${((Date.now() - started) / 1000).toFixed(1)}s`);
@@ -98,7 +117,7 @@ async function runPg() {
     for (let offset = 0; ; offset += BATCH) {
       // eslint-disable-next-line no-await-in-loop
       const { rows } = await pool.query(
-        `SELECT id, job_title, description, restriction, yoe_min,
+        `SELECT id, job_title, description, company_name, source, sponsorship, restriction, yoe_min,
                 is_entry_level, is_mid_level
            FROM jobs ORDER BY id LIMIT $1 OFFSET $2`,
         [BATCH, offset],
@@ -108,6 +127,10 @@ async function runPg() {
       for (const r of rows) {
         const next = derive(r);
         if (!changed(r, next)) continue;
+        if (next.sponsorship !== r.sponsorship) {
+          const key = `sponsorship ${r.sponsorship}->${next.sponsorship}`;
+          transitions.set(key, (transitions.get(key) || 0) + 1);
+        }
         const cur = r.restriction || '';
         if (next.restriction !== cur) {
           const key = `${cur || "''"}->${next.restriction || "''"}`;
@@ -141,9 +164,9 @@ async function runPg() {
         await client.query(
           `UPDATE jobs
               SET restriction = $1, yoe_min = $2,
-                  is_entry_level = $3, is_mid_level = $4
-            WHERE id = $5`,
-          [u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.id],
+                  is_entry_level = $3, is_mid_level = $4, sponsorship = $5
+            WHERE id = $6`,
+          [u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.next.sponsorship, u.id],
         );
       }
       await client.query('COMMIT');
@@ -185,7 +208,7 @@ function runSqlite() {
   let scanned = 0;
 
   const select = db.prepare(
-    `SELECT id, job_title, description, restriction, yoe_min,
+    `SELECT id, job_title, description, company_name, source, sponsorship, restriction, yoe_min,
             is_entry_level, is_mid_level
        FROM jobs ORDER BY id LIMIT ? OFFSET ?`,
   );
@@ -196,6 +219,10 @@ function runSqlite() {
     for (const r of rows) {
       const next = derive(r);
       if (!changed(r, next)) continue;
+      if (next.sponsorship !== r.sponsorship) {
+        const key = `sponsorship ${r.sponsorship}->${next.sponsorship}`;
+        transitions.set(key, (transitions.get(key) || 0) + 1);
+      }
       const cur = r.restriction || '';
       if (next.restriction !== cur) {
         const key = `${cur || "''"}->${next.restriction || "''"}`;
@@ -225,12 +252,12 @@ function runSqlite() {
   console.log(`\nApplying ${toUpdate.length} updates...`);
   const upd = db.prepare(
     `UPDATE jobs
-        SET restriction = ?, yoe_min = ?, is_entry_level = ?, is_mid_level = ?
+        SET restriction = ?, yoe_min = ?, is_entry_level = ?, is_mid_level = ?, sponsorship = ?
       WHERE id = ?`,
   );
   const tx = db.transaction((list) => {
     for (const u of list) {
-      upd.run(u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.id);
+      upd.run(u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.next.sponsorship, u.id);
     }
   });
   tx(toUpdate);

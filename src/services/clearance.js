@@ -16,7 +16,8 @@
 //   6. Otherwise                            → ''
 //
 // Only 1–3 disqualify. 4–5 are surfaced as badges but deliberately NOT filtered
-// out — see isDisqualifying().
+// out — see isDisqualifying(). deriveRestriction() at the bottom layers title,
+// employer and no-sponsorship signals on top for rows with little or no text.
 //
 // Returns '' (never null) so the DB column stays NOT NULL and the frontend can
 // treat falsy as "no badge" — same convention as category.js.
@@ -65,7 +66,7 @@ function normalizeForMatch(s) {
 // "m-ilitar-y", which appears in the EEO boilerplate of 237 postings here
 // ("discharge status from the military") — 245 naive hits vs 8 real ones.
 const CLEARANCE_TERMS =
-  /\b(?:security clearance|ts\s*\/\s*sci|top[\s-]secret|secret clearance|polygraph|dod clearance|sci clearance)\b/;
+  /\b(?:security clearance|ts\s*\/\s*sci|top[\s-]secret|secret clearance|ts clearance|polygraph|dod clearance|sci clearance|clearance[\s-]eligible)\b/;
 
 // Requirement-bound phrasings. "Eligible/able to obtain" is deliberately in the
 // REQUIRED set: clearance eligibility itself requires US citizenship, so it
@@ -79,6 +80,7 @@ const CLEARANCE_REQUIRED = [
   /(?:eligible|ability|able|willing)[^.]{0,20}to obtain[^.]{0,60}clearance/,
   /requires?[^.]{0,60}clearance/,
   /eligibility for[^.]{0,40}clearance/,
+  /clearance[\s-]eligible/,
   /\bts\s*\/\s*sci\b/,
   /\bpolygraph\b/,
 ];
@@ -107,7 +109,9 @@ const CLEARANCE_PREFERRED_PATTERNS = [
 const US_PERSON_REQUIRED = [
   /\bitar requirements?\b/,
   /subject to itar\b/,
-  /must be (?:a |an )?us person/,
+  // "either" and the curly quote are both real: "must either be a “U.S.
+  // person” as defined by 22 C.F.R. § 120.62" (Anduril's export clause).
+  /must (?:either )?be (?:a |an )?["'“]? ?us persons?/,
   /us person["'”]? status is (?:required|needed)/,
   /require[sd]?[^.]{0,80}["'“]?us person/,
 ];
@@ -129,6 +133,10 @@ const CITIZENSHIP_PATTERNS = [
   /\bus citizens? only\b/,
   /restricted to us citizens/,
   /proof of us citizenship/,
+  // "U.S. Citizen or Green Card (Lawful Permanent Resident) holder only"
+  /citizens? or (?:a )?green card[^.]{0,60}\bonly\b/,
+  /green card holders? only\b/,
+  /us citizens? (?:or|and) (?:lawful )?permanent residents? only\b/,
 ];
 
 function classifyRestriction(text) {
@@ -173,9 +181,159 @@ function classifyRestriction(text) {
   return '';
 }
 
-// Restrictions that make visa sponsorship legally impossible. EXPORT_ADVISORY
-// and CLEARANCE_PREFERRED are intentionally absent — those roles stay visible.
-const DISQUALIFYING = new Set(['CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP']);
+// ─── Signals beyond the description ───────────────────────────────────────────
+//
+// classifyRestriction() can only judge text it is given, and most rows arrive
+// without any: on 2026-10-31, 1,092 of 1,200 visible defense/government rows
+// had an empty description (ghlistings 653/654, Workday 186/186, BuiltIn,
+// Getro). Every one of them sailed through the filter. The rules below use
+// what those rows DO carry — title, employer, and a source's own label.
+
+// A title that names the clearance is as explicit as a description that does:
+// "Software Engineer - Cleared", "Software Engineer II - CTJ - Top Secret",
+// "Cloud Engineer (with POLY Clearance)".
+const TITLE_CLEARANCE =
+  /\b(?:cleared|clearance|ts\s*\/\s*sci|top[\s-]secret|secret|polygraph|poly)\b/;
+// Qualcomm: "Embedded Software Engineer (QGOV Division) - (Top Secret Clearance
+// Highly Desired)" — optional, same as CLEARANCE_PREFERRED in a description.
+const TITLE_CLEARANCE_OPTIONAL = /\b(?:highly desired|desired|preferred|a plus|nice to have)\b/;
+
+// Government-programme titles. These postings almost always carry a
+// citizenship or clearance bar even when the description is missing or words
+// it vaguely ("Software Engineer - Federal", "Forward Deployed Engineer, US
+// Government", "Software Engineer, Public Sector").
+const TITLE_GOVERNMENT =
+  /\b(?:federal|us government|government|public sector|defense|dod|national security|intelligence community|govcloud|fedramp)\b/;
+// …but not roles ABOUT government that sit in an ordinary commercial team
+// (Zipline: "Forward Deployed AI Engineer, Land Use and Government Affairs").
+const TITLE_GOVERNMENT_EXCEPT = /\bgovernment (?:affairs|relations)\b/;
+
+// Employers whose engineering roles are effectively all US-person-only (ITAR
+// primes, cleared-work contractors, export-controlled space hardware).
+//
+// Applied ONLY when a row has no description to judge. Where text exists, the
+// description classifier stays authoritative — RTX, for one, does sponsor
+// specific roles ("The company will offer immigration sponsorship for this
+// role"), and those must stay visible.
+//
+// Evidence, from rows that did carry a description on 2026-10-31: Anduril
+// 376/423 restricted, SpaceX 147/147, True Anomaly 13/13, Varda 24/24,
+// Saronic 18/18, Astranis 18/18, Chaos 12/12, Rocket Lab 8/8; a live sample of
+// Workday postings came back restricted for KBR, Leidos, Booz Allen, Blue
+// Origin, Parsons, Sierra Space and RTX. The primes (Lockheed, Northrop, GD,
+// L3Harris, BAE, Boeing…) arrive with no description from every source.
+//
+// Deliberately NOT listed, because a meaningful share of their roles stay open
+// to visa holders: Palantir, Scale AI, Shield AI (3 of 7 restricted),
+// Relativity Space (0 of 9), Hermeus (0 of 7), Applied Intuition, Google,
+// Microsoft. Their government roles are caught by the title rules above.
+//
+// Patterns run against normalizeForMatch(company_name), anchored at the start
+// so "BAE Systems, Inc." and "The Boeing Company" match but a company that
+// merely contains the word does not.
+const RESTRICTED_EMPLOYERS = [
+  /^(?:the )?boeing\b/,
+  /^lockheed\b/,
+  /^northrop\b/,
+  /^rtx\b/,
+  /^raytheon\b/,
+  /^l3 ?harris\b/,
+  /^general dynamics\b/,
+  /^gdit\b/,
+  /^bae systems\b/,
+  /^huntington ingalls\b/,
+  /^leidos\b/,
+  /^caci\b/,
+  /^saic\b/,
+  /^science applications international\b/,
+  /^booz allen\b/,
+  /^peraton\b/,
+  /^parsons\b/,
+  /^kbr\b/,
+  /^mantech\b/,
+  /^noblis\b/,
+  /^mitre\b/,
+  /^(?:the )?aerospace corporation\b/,
+  /^johns hopkins (?:university )?applied physics/,
+  /^mit lincoln/,
+  /^anduril\b/,
+  /^spacex\b/,
+  /^space exploration technologies\b/,
+  /^blue origin\b/,
+  /^sierra space\b/,
+  /^rocket lab\b/,
+  /^true anomaly\b/,
+  /^varda\b/,
+  /^saronic\b/,
+  /^astranis\b/,
+  /^chaos industries\b/,
+  /^defense unicorns\b/,
+  /^vannevar\b/,
+  /^epirus\b/,
+  /^castelion\b/,
+];
+
+// Shorter than this after stripping markup = "no description to judge".
+// Getro and BuiltIn sometimes store a one-line teaser instead of an empty
+// string.
+const MIN_DESCRIPTION_CHARS = 200;
+
+function isRestrictedEmployer(companyName) {
+  const name = normalizeForMatch(companyName);
+  return !!name && RESTRICTED_EMPLOYERS.some((p) => p.test(name));
+}
+
+// Full restriction verdict for a row. Precedence (first match wins):
+//   1. Source-supplied label (ghlistings "U.S. Citizenship is Required")
+//   2. Blocking verdict from the description           → CLEARANCE / EXPORT_CONTROL / CITIZENSHIP
+//   3. Clearance named in the title                    → CLEARANCE
+//   4. Government-programme title                      → GOVERNMENT
+//   5. Explicit "we won't sponsor" (sponsorship = NO)  → NO_SPONSORSHIP
+//   6. No description + restricted employer            → DEFENSE_EMPLOYER
+//   7. Advisory verdict from the description, or ''
+//
+// Kept separate from classifyRestriction() so that function stays a pure
+// text → verdict mapping (and its regression tests stay meaningful).
+function deriveRestriction({ job_title, description, company_name, sponsorship, restriction_override } = {}) {
+  if (restriction_override && DISQUALIFYING.has(restriction_override)) return restriction_override;
+
+  const fromText = classifyRestriction(`${job_title || ''}\n${description || ''}`);
+  if (DISQUALIFYING.has(fromText)) return fromText;
+
+  const title = normalizeForMatch(job_title);
+  if (TITLE_CLEARANCE.test(title) && !TITLE_CLEARANCE_OPTIONAL.test(title)) return 'CLEARANCE';
+  if (TITLE_GOVERNMENT.test(title) && !TITLE_GOVERNMENT_EXCEPT.test(title)) return 'GOVERNMENT';
+
+  if (sponsorship === 'NO') return 'NO_SPONSORSHIP';
+
+  const bodyChars = normalizeForMatch(description).length;
+  if (bodyChars < MIN_DESCRIPTION_CHARS && isRestrictedEmployer(company_name)) {
+    return 'DEFENSE_EMPLOYER';
+  }
+
+  return fromText;
+}
+
+// Restrictions hidden by default. EXPORT_ADVISORY and CLEARANCE_PREFERRED are
+// intentionally absent — those roles stay visible.
+//
+// The first three make visa sponsorship legally impossible. The rest are
+// "this posting won't work for a visa holder" by the employer's statement
+// (NO_SPONSORSHIP) or by strong inference (GOVERNMENT, DEFENSE_EMPLOYER). All
+// stay in the DB, so ?restriction=all brings them back.
+const DISQUALIFYING = new Set([
+  'CLEARANCE',
+  'EXPORT_CONTROL',
+  'CITIZENSHIP',
+  'GOVERNMENT',
+  'DEFENSE_EMPLOYER',
+  'NO_SPONSORSHIP',
+]);
+
+// SQL literal list for the `restriction IN (...)` filter. Built from the set so
+// the two DB backends can't drift from it. Values are fixed identifiers, never
+// user input.
+const DISQUALIFYING_SQL = [...DISQUALIFYING].map((r) => `'${r}'`).join(', ');
 
 function isDisqualifying(restriction) {
   return DISQUALIFYING.has(restriction);
@@ -183,7 +341,10 @@ function isDisqualifying(restriction) {
 
 module.exports = {
   classifyRestriction,
+  deriveRestriction,
   isDisqualifying,
+  isRestrictedEmployer,
   normalizeForMatch,
   DISQUALIFYING,
+  DISQUALIFYING_SQL,
 };

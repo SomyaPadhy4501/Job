@@ -10,7 +10,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { classifyRestriction, isDisqualifying } = require('../src/services/clearance');
+const { classifyRestriction, deriveRestriction, isDisqualifying } = require('../src/services/clearance');
+const { classifySponsorship } = require('../src/services/classifier');
 
 // ─── Must BLOCK ───────────────────────────────────────────────────────────────
 
@@ -31,6 +32,11 @@ const BLOCKING = [
   ['this role requires access to export-controlled items that require "U.S. person" status', 'EXPORT_CONTROL'],
   ['applicants for this position must be U.S. citizens', 'CITIZENSHIP'],
   ['Proof of U.S. citizenship and residency', 'CITIZENSHIP'],
+  // Anduril's export clause — "either" and the curly quotes defeated the
+  // earlier pattern.
+  ['must either be a “U.S. person” as defined by 22 C.F.R. § 120.62', 'EXPORT_CONTROL'],
+  ['U.S. Citizen or Green Card (Lawful Permanent Resident) holder only', 'CITIZENSHIP'],
+  ['Must be clearance eligible', 'CLEARANCE'],
 ];
 
 test('blocks roles that require clearance, US-person status, or citizenship', () => {
@@ -93,12 +99,88 @@ test('returns empty string, never null, for unusable input', () => {
 
 // ─── Disqualification set ─────────────────────────────────────────────────────
 
-test('only the three hard tiers disqualify', () => {
-  for (const r of ['CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP']) {
+test('blocking tiers disqualify, advisory ones do not', () => {
+  for (const r of ['CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP', 'GOVERNMENT', 'DEFENSE_EMPLOYER', 'NO_SPONSORSHIP']) {
     assert.strictEqual(isDisqualifying(r), true, r);
   }
   // These name a restriction without imposing one, and must stay visible.
   for (const r of ['EXPORT_ADVISORY', 'CLEARANCE_PREFERRED', '']) {
     assert.strictEqual(isDisqualifying(r), false, r);
   }
+});
+
+// ─── deriveRestriction: rows with little or no description ───────────────────
+
+const LONG_NEUTRAL = 'Build distributed systems in Go and Python. '.repeat(10);
+
+test('title alone can block', () => {
+  assert.strictEqual(deriveRestriction({ job_title: 'Software Engineer - Cleared' }), 'CLEARANCE');
+  assert.strictEqual(deriveRestriction({ job_title: 'Software Engineer II - CTJ - Top Secret' }), 'CLEARANCE');
+  assert.strictEqual(deriveRestriction({ job_title: 'Software Engineer - Federal' }), 'GOVERNMENT');
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'Forward Deployed Software Engineer - U.S. Government' }),
+    'GOVERNMENT',
+  );
+});
+
+test('title rules leave ordinary titles alone', () => {
+  for (const job_title of [
+    'Software Engineer, Secrets Management', // "secrets", not a clearance
+    'Forward Deployed AI Engineer, Land Use and Government Affairs', // Zipline
+    'Software Engineer, Mission Control', // Torc Robotics
+  ]) {
+    assert.strictEqual(deriveRestriction({ job_title, description: LONG_NEUTRAL }), '', job_title);
+  }
+});
+
+test('restricted employer blocks only when there is no description to judge', () => {
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'Software Engineer', company_name: 'Northrop Grumman' }),
+    'DEFENSE_EMPLOYER',
+  );
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'Software Engineer', company_name: 'The Boeing Company' }),
+    'DEFENSE_EMPLOYER',
+  );
+  // With text, the description decides. RTX does sponsor specific roles.
+  assert.strictEqual(
+    deriveRestriction({
+      job_title: 'Software Engineer',
+      company_name: 'RTX',
+      description: `${LONG_NEUTRAL} The company will offer immigration sponsorship for this role.`,
+    }),
+    '',
+  );
+  // Name must start with the employer, not merely contain it.
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'Software Engineer', company_name: 'Friends of Boeing Field' }),
+    '',
+  );
+});
+
+test('explicit no-sponsorship blocks; source labels win', () => {
+  assert.strictEqual(deriveRestriction({ job_title: 'SWE', sponsorship: 'NO' }), 'NO_SPONSORSHIP');
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'SWE', sponsorship: 'NO', restriction_override: 'CITIZENSHIP' }),
+    'CITIZENSHIP',
+  );
+});
+
+// ─── Sponsorship NO patterns ──────────────────────────────────────────────────
+
+test('sponsorship NO needs an explicit refusal', () => {
+  for (const text of [
+    'You must be authorized to work in the United States without the need for employer sponsorship',
+    'This position is not eligible for employment-based sponsorship',
+    'We will not sponsor visas for this role',
+    'Candidates must not now or in the future require visa sponsorship',
+    'Visa sponsorship is not available for this position',
+  ]) {
+    assert.strictEqual(classifySponsorship(text.toLowerCase(), ''), 'NO', text);
+  }
+  // H-1B and OPT holders ARE authorized to work; this line alone says nothing.
+  assert.notStrictEqual(
+    classifySponsorship('must be legally authorized to work in the united states', ''),
+    'NO',
+  );
 });

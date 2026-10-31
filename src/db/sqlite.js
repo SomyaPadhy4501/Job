@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 const { CONFIG } = require('../config');
+const { DISQUALIFYING_SQL } = require('../services/clearance');
 
 let db = null;
 
@@ -186,7 +187,7 @@ function migrate(database) {
   const { classifySponsorship } = require('../services/classifier');
   const { stripHtml } = require('../services/normalize');
   // eslint-disable-next-line global-require
-  const { classifyRestriction } = require('../services/clearance');
+  const { deriveRestriction } = require('../services/clearance');
   // Sources that pre-label sponsorship via `sponsorship_override` in
   // normalizeJob (see src/collectors/ghlistings.js). Their rows carry an empty
   // description, so re-running the rule-based classifier over them throws the
@@ -217,14 +218,24 @@ function migrate(database) {
       // Only update if changed — avoids unnecessary writes on every boot.
       // The current values come from the outer SELECT; re-querying per row here
       // was an N+1 (the category pass above is the pattern to follow).
-      if (!CURATED_SPONSORSHIP_SOURCES.includes(r.source)) {
-        const next = classifySponsorship(text, r.company_name);
-        if (next !== r.sponsorship) {
-          updSpons.run(next, r.id);
+      const curated = CURATED_SPONSORSHIP_SOURCES.includes(r.source);
+      let sponsorship = r.sponsorship;
+      if (!curated) {
+        sponsorship = classifySponsorship(text, r.company_name);
+        if (sponsorship !== r.sponsorship) {
+          updSpons.run(sponsorship, r.id);
           sponsorUpdated++;
         }
       }
-      const nextRestriction = classifyRestriction(text);
+      // A curated source's label (ghlistings "U.S. Citizenship is Required")
+      // is never persisted separately, so the stored verdict stands in for it.
+      const nextRestriction = deriveRestriction({
+        job_title: r.job_title,
+        description: stripHtml(r.description || ''),
+        company_name: r.company_name,
+        sponsorship,
+        restriction_override: curated ? r.restriction : undefined,
+      });
       if (nextRestriction !== r.restriction) {
         updRestr.run(nextRestriction, r.id);
         restrictionUpdated++;
@@ -490,9 +501,9 @@ function queryJobs({ search, title, sponsorship, company, role, level, source, r
   //              they name a restriction but don't impose one on the candidate.
   //              'only' → just those roles. 'all' → no clause.
   if (restriction === 'hide') {
-    clauses.push("restriction NOT IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')");
+    clauses.push(`restriction NOT IN (${DISQUALIFYING_SQL})`);
   } else if (restriction === 'only') {
-    clauses.push("restriction IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')");
+    clauses.push(`restriction IN (${DISQUALIFYING_SQL})`);
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 

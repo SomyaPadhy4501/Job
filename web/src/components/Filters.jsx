@@ -73,7 +73,7 @@ export default function Filters({ filters, onChange }) {
         value={filters.restriction}
         onChange={(e) => onChange('restriction', e.target.value)}
       >
-        <option value="hide">Hide clearance / citizens-only</option>
+        <option value="hide">Hide no-sponsorship / ITAR / clearance</option>
         <option value="all">Show all roles</option>
         <option value="only">Only restricted roles</option>
       </select>

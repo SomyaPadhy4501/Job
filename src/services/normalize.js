@@ -2,7 +2,7 @@
 
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
-const { classifyRestriction } = require('./clearance');
+const { deriveRestriction } = require('./clearance');
 const { extractExperience, levelFromYears } = require('./experience');
 
 function stripHtml(html) {
@@ -453,7 +453,15 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   // sponsor" and "I am legally barred from this role" are different facts, and
   // separating them keeps the filter reversible and the reason auditable.
   // Classified against the full description, before the 20k truncation below.
-  const restriction = classifyRestriction(`${job_title}\n${description}`);
+  // deriveRestriction also covers rows with no description to read — see the
+  // title / employer / no-sponsorship rules in clearance.js.
+  const restriction = deriveRestriction({
+    job_title,
+    description,
+    company_name,
+    sponsorship,
+    restriction_override: raw.restriction_override,
+  });
 
   return {
     dedupe_key: buildDedupeKey(company_name, job_title, location),

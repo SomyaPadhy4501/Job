@@ -10,6 +10,7 @@
  */
 
 const { Pool } = require('pg');
+const { DISQUALIFYING_SQL } = require('../services/clearance');
 
 let pool = null;
 
@@ -244,9 +245,9 @@ async function queryJobs({ search, title, sponsorship, company, role, level, sou
   // restriction without imposing one. Literal enum, no bind param, so `idx`
   // is undisturbed.
   if (restriction === 'hide') {
-    clauses.push(`restriction NOT IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')`);
+    clauses.push(`restriction NOT IN (${DISQUALIFYING_SQL})`);
   } else if (restriction === 'only') {
-    clauses.push(`restriction IN ('CLEARANCE', 'EXPORT_CONTROL', 'CITIZENSHIP')`);
+    clauses.push(`restriction IN (${DISQUALIFYING_SQL})`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';

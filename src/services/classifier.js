@@ -18,16 +18,30 @@ const YES_PATTERNS = [
   /h-?1b visa sponsorship/,
   /will sponsor(?:ship)?/,
   /sponsor(?: a)? visa/,
+  /immigration sponsorship/,
 ];
 
+// Only statements that the employer will not sponsor. A NO here hides the row
+// by default (see deriveRestriction in clearance.js), so a weak pattern costs
+// real jobs.
+//
+// "Must be (legally) authorized to work in the US" was here and is gone on
+// purpose: an H-1B or OPT holder IS authorized to work, and heavy sponsors put
+// that line in boilerplate. When the sentence goes on to say "...without
+// sponsorship", the `without … sponsorship` pattern below still catches it.
 const NO_PATTERNS = [
-  /must be authorized to work/,
-  /must be legally authorized to work/,
-  /no sponsorship/,
+  /no (?:visa |immigration )?sponsorship/,
   /unable to sponsor/,
   /cannot sponsor/,
-  /do(?:es)? not (?:offer|provide) (?:visa )?sponsorship/,
-  /not (?:offering|providing) (?:visa )?sponsorship/,
+  /(?:will|do|does|are|can) not (?:currently )?sponsor/,
+  /won'?t sponsor/,
+  /do(?:es)? not (?:offer|provide) (?:visa |immigration )?sponsorship/,
+  /not (?:offering|providing) (?:visa |immigration )?sponsorship/,
+  /not (?:be )?(?:able|eligible) (?:to|for) (?:[a-z-]+ ){0,2}sponsor/,
+  /sponsorship (?:is |will )?not (?:be )?(?:available|offered|provided|considered)/,
+  /without (?:the need for |requiring |needing )?(?:any )?(?:current or future |now or in the future )?(?:employer |visa |company |immigration )?sponsorship/,
+  /not (?:now or in the future )?require[^.]{0,40}sponsorship/,
+  /unable to (?:consider|accept)[^.]{0,80}sponsorship/,
 ];
 
 // Threshold for USCIS YES signal: ≥ 3 approved H-1B petitions in last 2 FY.
