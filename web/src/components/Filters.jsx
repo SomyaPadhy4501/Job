@@ -58,8 +58,8 @@ export default function Filters({ filters, onChange }) {
         value={filters.sponsorship}
         onChange={(e) => onChange('sponsorship', e.target.value)}
       >
-        <option value="">Any sponsorship</option>
-        <option value="YES">Sponsorship: YES</option>
+        <option value="YES">Sponsors visas (confirmed)</option>
+        <option value="ANY">Any sponsorship</option>
         <option value="NO">Sponsorship: NO</option>
         <option value="UNKNOWN">Sponsorship: UNKNOWN</option>
       </select>
@@ -76,6 +76,10 @@ export default function Filters({ filters, onChange }) {
         <option value="hide">Hide no-sponsorship / ITAR / clearance</option>
         <option value="all">Show all roles</option>
         <option value="only">Only restricted roles</option>
+      </select>
+      <select value={filters.view} onChange={(e) => onChange('view', e.target.value)}>
+        <option value="grouped">Group by company</option>
+        <option value="list">Flat list</option>
       </select>
     </section>
   );

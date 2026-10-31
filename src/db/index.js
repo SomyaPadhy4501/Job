@@ -7,7 +7,7 @@
  *
  * Both backends export the identical async API:
  *   getDb, upsertJob, bulkUpsert, startRun, finishRun,
- *   queryJobs, getJobById, statsSummary, pruneStaleJobs
+ *   queryJobs, queryCompanies, getJobById, statsSummary, pruneStaleJobs
  */
 module.exports = process.env.DATABASE_URL
   ? require('./pg')

@@ -11,6 +11,7 @@ export default defineConfig({
     proxy: {
       '/jobs': { target: 'http://localhost:4000', changeOrigin: true },
       '/stats': { target: 'http://localhost:4000', changeOrigin: true },
+      '/companies': { target: 'http://localhost:4000', changeOrigin: true },
       '/health': { target: 'http://localhost:4000', changeOrigin: true },
       '/admin': { target: 'http://localhost:4000', changeOrigin: true },
     },

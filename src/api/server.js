@@ -3,11 +3,56 @@
 const path = require('path');
 const express = require('express');
 const { CONFIG } = require('../config');
-const { queryJobs, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
+const { queryJobs, queryCompanies, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
 const { jobsCache } = require('./cache');
 const { collectAll } = require('../services/collect');
 const { normalizeJob } = require('../services/normalize');
 const log = require('../logger');
+
+// Filter parsing shared by /jobs and /companies, so the grouped view and the
+// flat list always apply the same filters.
+function parseFilters(req) {
+  const search = (req.query.search || '').toString().trim();
+  const title = (req.query.title || '').toString().trim();
+  const sponsorshipRaw = (req.query.sponsorship || '').toString().toUpperCase();
+  const company = (req.query.company || '').toString().trim();
+  const roleRaw = (req.query.role || '').toString().toUpperCase();
+  const levelRaw = (req.query.level || '').toString().toLowerCase();
+
+  // Back-compat: old clients pass ?entry=true; map it to level=entry.
+  const entryLegacy =
+    String(req.query.entry || '').toLowerCase() === 'true' || req.query.entry === '1';
+
+  const VALID_ROLES = ['SWE', 'MLE', 'AI', 'DS', 'DATA_ENG', 'SRE', 'SECURITY', 'MOBILE'];
+  const VALID_LEVELS = ['entry', 'mid', 'early'];
+  const sponsorship = ['YES', 'NO', 'UNKNOWN'].includes(sponsorshipRaw) ? sponsorshipRaw : '';
+  const role = VALID_ROLES.includes(roleRaw) ? roleRaw : '';
+  const level = VALID_LEVELS.includes(levelRaw) ? levelRaw : entryLegacy ? 'entry' : '';
+  // Source filter — only let through sources we actually have. Pulled live
+  // from the DB rather than hardcoded so new collectors become filterable
+  // without a second edit.
+  const sourceRaw = (req.query.source || '').toString().trim();
+  const source = sourceRaw || '';
+
+  // Restriction filter — fail CLOSED, unlike the sponsorship whitelist above.
+  // An unrecognised `sponsorship` value degrading to "no filter" only widens
+  // results, which is harmless. Doing the same here would SHOW clearance and
+  // citizens-only roles, which is precisely what this filter exists to
+  // prevent — so both the default and the fallback are 'hide'.
+  const restrictionRaw = (req.query.restriction || '').toString().toLowerCase();
+  const restriction = ['hide', 'all', 'only'].includes(restrictionRaw) ? restrictionRaw : 'hide';
+
+  return { search, title, sponsorship, company, role, level, source, restriction };
+}
+
+function parsePage(req) {
+  const limit = Math.min(
+    CONFIG.maxPageSize,
+    Math.max(1, Number(req.query.limit) || CONFIG.defaultPageSize)
+  );
+  const page = Math.max(1, Number(req.query.page) || 1);
+  return { limit, page, offset: (page - 1) * limit };
+}
 
 function createApp() {
   const app = express();
@@ -31,42 +76,8 @@ function createApp() {
   });
 
   app.get('/jobs', async (req, res) => {
-    const search = (req.query.search || '').toString().trim();
-    const title = (req.query.title || '').toString().trim();
-    const sponsorshipRaw = (req.query.sponsorship || '').toString().toUpperCase();
-    const company = (req.query.company || '').toString().trim();
-    const roleRaw = (req.query.role || '').toString().toUpperCase();
-    const levelRaw = (req.query.level || '').toString().toLowerCase();
-
-    // Back-compat: old clients pass ?entry=true; map it to level=entry.
-    const entryLegacy =
-      String(req.query.entry || '').toLowerCase() === 'true' || req.query.entry === '1';
-
-    const VALID_ROLES = ['SWE', 'MLE', 'AI', 'DS', 'DATA_ENG', 'SRE', 'SECURITY', 'MOBILE'];
-    const VALID_LEVELS = ['entry', 'mid', 'early'];
-    const sponsorship = ['YES', 'NO', 'UNKNOWN'].includes(sponsorshipRaw) ? sponsorshipRaw : '';
-    const role = VALID_ROLES.includes(roleRaw) ? roleRaw : '';
-    const level = VALID_LEVELS.includes(levelRaw) ? levelRaw : entryLegacy ? 'entry' : '';
-    // Source filter — only let through sources we actually have. Pulled live
-    // from the DB rather than hardcoded so new collectors become filterable
-    // without a second edit.
-    const sourceRaw = (req.query.source || '').toString().trim();
-    const source = sourceRaw || '';
-
-    // Restriction filter — fail CLOSED, unlike the sponsorship whitelist above.
-    // An unrecognised `sponsorship` value degrading to "no filter" only widens
-    // results, which is harmless. Doing the same here would SHOW clearance and
-    // citizens-only roles, which is precisely what this filter exists to
-    // prevent — so both the default and the fallback are 'hide'.
-    const restrictionRaw = (req.query.restriction || '').toString().toLowerCase();
-    const restriction = ['hide', 'all', 'only'].includes(restrictionRaw) ? restrictionRaw : 'hide';
-
-    const limit = Math.min(
-      CONFIG.maxPageSize,
-      Math.max(1, Number(req.query.limit) || CONFIG.defaultPageSize)
-    );
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const offset = (page - 1) * limit;
+    const { search, title, sponsorship, company, role, level, source, restriction } = parseFilters(req);
+    const { limit, page, offset } = parsePage(req);
 
     // `restriction` MUST be in the cache key — without it a hide= request and
     // an all= request collide and serve each other's bodies for the 30s TTL,
@@ -95,6 +106,38 @@ function createApp() {
     jobsCache.set(cacheKey, body);
     res.setHeader('x-cache', 'MISS');
     // Vercel edge cache: serve fresh for 30 s, then stale while revalidating.
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+    res.json(body);
+  });
+
+  // Grouped view: one row per company with its matching role count. The UI
+  // expands a company by calling /jobs?company=<name> with the same filters.
+  app.get('/companies', async (req, res) => {
+    const filters = parseFilters(req);
+    const { limit, page, offset } = parsePage(req);
+    const cacheKey = JSON.stringify({ route: 'companies', ...filters, limit, offset });
+    const cached = jobsCache.get(cacheKey);
+    if (cached) {
+      res.setHeader('x-cache', 'HIT');
+      return res.json(cached);
+    }
+    const { total, rows } = await queryCompanies({ ...filters, limit, offset });
+    // A company with one matching role renders that role inline — a dropdown
+    // for a single item is a click with nothing behind it. One extra query
+    // fetches all of them for the page.
+    const singles = rows.filter((r) => r.roles === 1).map((r) => r.company_name);
+    if (singles.length) {
+      const { rows: jobs } = await queryJobs({ ...filters, companies: singles, limit: singles.length, offset: 0 });
+      const byCompany = new Map(jobs.map((j) => [j.company_name, j]));
+      for (const r of rows) if (r.roles === 1) r.job = byCompany.get(r.company_name) || null;
+    }
+    const body = {
+      data: rows,
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      filters,
+    };
+    jobsCache.set(cacheKey, body);
+    res.setHeader('x-cache', 'MISS');
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
     res.json(body);
   });

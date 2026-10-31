@@ -10,6 +10,7 @@
  */
 
 const { Pool } = require('pg');
+const { CONFIG } = require('../config');
 const { DISQUALIFYING_SQL } = require('../services/clearance');
 
 let pool = null;
@@ -208,10 +209,23 @@ async function finishRun(id, stats) {
   );
 }
 
-async function queryJobs({ search, title, sponsorship, company, role, level, source, restriction, limit, offset }) {
+// WHERE clause shared by queryJobs and queryCompanies, so the grouped view
+// and the flat list can never disagree about which rows a filter admits.
+function buildWhere({ search, title, sponsorship, company, companies, role, level, source, restriction }) {
   const clauses = [];
   const params = [];
   let idx = 1;
+
+  if (Array.isArray(companies) && companies.length) {
+    clauses.push(`company_name = ANY($${idx++})`);
+    params.push(companies);
+  }
+  // Display window (CONFIG.visibleDays). ISO-8601 strings compare correctly
+  // as text, so no cast is needed.
+  if (CONFIG.visibleDays > 0) {
+    clauses.push(`COALESCE(date_posted, first_seen_at) >= $${idx++}`);
+    params.push(new Date(Date.now() - CONFIG.visibleDays * 86_400_000).toISOString());
+  }
 
   if (search) {
     clauses.push(`LOWER(company_name) LIKE $${idx++}`);
@@ -251,6 +265,12 @@ async function queryJobs({ search, title, sponsorship, company, role, level, sou
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return { where, params, idx };
+}
+
+async function queryJobs(filters) {
+  const { limit, offset } = filters;
+  let { where, params, idx } = buildWhere(filters);
 
   // COUNT query (same params, no limit/offset)
   const { rows: [{ c }] } = await getPool().query(
@@ -278,6 +298,34 @@ async function queryJobs({ search, title, sponsorship, company, role, level, sou
     dataParams,
   );
 
+  return { total: c, rows };
+}
+
+// One row per company: how many roles match the filters, and the newest
+// posting date — the grouped view's sort key, so a company surfaces when it
+// posts something new, same as the flat list's newest-first order.
+async function queryCompanies(filters) {
+  const { limit, offset } = filters;
+  let { where, params, idx } = buildWhere(filters);
+  const { rows: [{ c }] } = await getPool().query(
+    `SELECT COUNT(DISTINCT company_name)::int AS c FROM jobs ${where}`,
+    params,
+  );
+  const limitIdx = idx++;
+  const offsetIdx = idx++;
+  const { rows } = await getPool().query(
+    `SELECT company_name,
+            COUNT(*)::int AS roles,
+            MAX(date_posted) AS latest_posted,
+            MAX(first_seen_at) AS latest_seen,
+            BOOL_OR(sponsorship = 'YES') AS sponsors
+       FROM jobs
+       ${where}
+      GROUP BY company_name
+      ORDER BY MAX(date_posted) DESC NULLS LAST, MAX(first_seen_at) DESC, company_name
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    [...params, limit, offset],
+  );
   return { total: c, rows };
 }
 
@@ -324,6 +372,7 @@ module.exports = {
   startRun,
   finishRun,
   queryJobs,
+  queryCompanies,
   getJobById,
   statsSummary,
   pruneStaleJobs,

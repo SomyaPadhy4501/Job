@@ -461,10 +461,22 @@ function finishRun(id, stats) {
     .run({ id, ...stats, errors: stats.errors ? JSON.stringify(stats.errors) : null });
 }
 
-function queryJobs({ search, title, sponsorship, company, role, level, source, restriction, limit, offset }) {
-  const database = getDb();
+// WHERE clause shared by queryJobs and queryCompanies (see pg.js).
+function buildWhere({ search, title, sponsorship, company, companies, role, level, source, restriction }) {
   const clauses = [];
   const params = {};
+  if (Array.isArray(companies) && companies.length) {
+    const names = companies.map((c, i) => {
+      params[`co${i}`] = c;
+      return `@co${i}`;
+    });
+    clauses.push(`company_name IN (${names.join(', ')})`);
+  }
+  // Display window (CONFIG.visibleDays) — see pg.js.
+  if (CONFIG.visibleDays > 0) {
+    clauses.push('COALESCE(date_posted, first_seen_at) >= @visibleSince');
+    params.visibleSince = new Date(Date.now() - CONFIG.visibleDays * 86_400_000).toISOString();
+  }
   // `search` is strict company-name match now. "Meta" should surface Meta's
   // roles, not every title containing the word "meta" (e.g. GitLab's
   // "Professional Services Engineer - META"). A separate `title` param
@@ -510,6 +522,13 @@ function queryJobs({ search, title, sponsorship, company, role, level, source, r
     clauses.push(`restriction IN (${DISQUALIFYING_SQL})`);
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return { where, params };
+}
+
+function queryJobs(filters) {
+  const database = getDb();
+  const { limit, offset } = filters;
+  const { where, params } = buildWhere(filters);
 
   const total = database.prepare(`SELECT COUNT(*) AS c FROM jobs ${where}`).get(params).c;
 
@@ -584,6 +603,31 @@ function bulkUpsert(rows) {
   return Promise.resolve({ inserted, updated });
 }
 
+function queryCompanies(filters) {
+  const database = getDb();
+  const { limit, offset } = filters;
+  const { where, params } = buildWhere(filters);
+  const total = database
+    .prepare(`SELECT COUNT(DISTINCT company_name) AS c FROM jobs ${where}`)
+    .get(params).c;
+  const rows = database
+    .prepare(
+      `SELECT company_name,
+              COUNT(*) AS roles,
+              MAX(date_posted) AS latest_posted,
+              MAX(first_seen_at) AS latest_seen,
+              MAX(sponsorship = 'YES') AS sponsors
+         FROM jobs
+         ${where}
+        GROUP BY company_name
+        ORDER BY MAX(date_posted) IS NULL, MAX(date_posted) DESC, MAX(first_seen_at) DESC, company_name
+        LIMIT @limit OFFSET @offset`
+    )
+    .all({ ...params, limit, offset })
+    .map((r) => ({ ...r, sponsors: !!r.sponsors }));
+  return { total, rows };
+}
+
 module.exports = {
   getDb,
   upsertJob,
@@ -591,6 +635,7 @@ module.exports = {
   startRun,
   finishRun,
   queryJobs,
+  queryCompanies,
   getJobById,
   statsSummary,
   pruneStaleJobs,

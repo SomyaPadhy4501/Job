@@ -10,12 +10,15 @@ async function httpJson(url, init) {
   return res.json();
 }
 
-export async function fetchJobs({
+// Shared query-string builder for /jobs and /companies. 'ANY' is the UI's
+// explicit "no sponsorship filter" value (see useUrlFilters) and is omitted.
+function filterParams({
   page = 1,
   limit = 50,
   search = '',
   title = '',
   sponsorship = '',
+  company = '',
   role = '',
   level = '',
   restriction = 'hide',
@@ -25,13 +28,28 @@ export async function fetchJobs({
   params.set('limit', limit);
   if (search) params.set('search', search);
   if (title) params.set('title', title);
-  if (sponsorship) params.set('sponsorship', sponsorship);
+  if (sponsorship && sponsorship !== 'ANY') params.set('sponsorship', sponsorship);
+  if (company) params.set('company', company);
   if (role) params.set('role', role);
   if (level) params.set('level', level);
   if (restriction) params.set('restriction', restriction);
-  const payload = await httpJson(`/jobs?${params.toString()}`);
+  return params.toString();
+}
+
+export async function fetchJobs(filters = {}) {
+  const payload = await httpJson(`/jobs?${filterParams(filters)}`);
   if (!payload || !Array.isArray(payload.data) || !payload.pagination) {
     throw new Error('Malformed /jobs response');
+  }
+  return payload;
+}
+
+// One row per company: { company_name, roles, latest_posted, latest_seen,
+// sponsors, job? } — `job` is present when roles === 1.
+export async function fetchCompanies(filters = {}) {
+  const payload = await httpJson(`/companies?${filterParams(filters)}`);
+  if (!payload || !Array.isArray(payload.data) || !payload.pagination) {
+    throw new Error('Malformed /companies response');
   }
   return payload;
 }

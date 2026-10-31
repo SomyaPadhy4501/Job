@@ -3,9 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import TopBar from './components/TopBar.jsx';
 import Filters from './components/Filters.jsx';
 import JobsTable from './components/JobsTable.jsx';
+import CompanyGroups from './components/CompanyGroups.jsx';
 import Pager from './components/Pager.jsx';
 import NewJobsToast from './components/NewJobsToast.jsx';
-import { useJobs } from './hooks/useJobs.js';
+import { useJobs, useCompanies } from './hooks/useJobs.js';
 import useUrlFilters from './hooks/useUrlFilters.js';
 
 export default function App() {
@@ -14,7 +15,16 @@ export default function App() {
   // then serves the prior rows instantly while it revalidates in the
   // background. No cold-boot flash on refresh.
   const [filters, dispatch] = useUrlFilters();
-  const { data, isFetching, isLoading, error, refetch } = useJobs(filters);
+  const grouped = filters.view === 'grouped';
+  // In grouped mode the job query only supplies the role total (TopBar, new-
+  // jobs toast), so it asks for a single row; the companies query drives the
+  // page.
+  const jobsQuery = useJobs(grouped ? { ...filters, page: 1, limit: 1 } : filters);
+  const companiesQuery = useCompanies(filters, { enabled: grouped });
+  const { data, refetch } = jobsQuery;
+  const active = grouped ? companiesQuery : jobsQuery;
+  const { isLoading, error } = active;
+  const isFetching = jobsQuery.isFetching || (grouped && companiesQuery.isFetching);
 
   // Detect new jobs on background refetch. `lastSeenTotal` is the total we
   // last *rendered* to the user, not the most recent server reading —
@@ -34,7 +44,7 @@ export default function App() {
   }, [total, lastSeenTotal]);
 
   // Clamp page if filter change narrows totalPages below current page.
-  const totalPages = data?.pagination?.totalPages ?? 1;
+  const totalPages = active.data?.pagination?.totalPages ?? 1;
   const prevTotalPages = useRef(totalPages);
   useEffect(() => {
     if (totalPages !== prevTotalPages.current) {
@@ -51,11 +61,13 @@ export default function App() {
     // Invalidate instead of a hard refetch so any matching query (page 1,
     // page 2, …) gets refreshed consistently.
     qc.invalidateQueries({ queryKey: ['jobs'] });
+    qc.invalidateQueries({ queryKey: ['companies'] });
   };
 
   const handleManualRefresh = () => {
     setLastSeenTotal(null);
     refetch();
+    if (grouped) companiesQuery.refetch();
   };
 
   return (
@@ -66,11 +78,16 @@ export default function App() {
         onChange={(key, value) => dispatch({ type: 'set', key, value })}
       />
       <main className="main">
-        <JobsTable
-          rows={data?.data ?? []}
-          isLoading={isLoading}
-          error={error}
-        />
+        {grouped ? (
+          <CompanyGroups
+            groups={companiesQuery.data?.data ?? []}
+            filters={filters}
+            isLoading={isLoading}
+            error={error}
+          />
+        ) : (
+          <JobsTable rows={data?.data ?? []} isLoading={isLoading} error={error} />
+        )}
         <Pager
           page={filters.page}
           totalPages={totalPages}

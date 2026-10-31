@@ -8,6 +8,7 @@
     { "source": "/stats",          "destination": "/api/index" },
     { "source": "/jobs",           "destination": "/api/index" },
     { "source": "/jobs/:path*",    "destination": "/api/index" },
+    { "source": "/companies",      "destination": "/api/index" },
     { "source": "/admin/:path*",   "destination": "/api/index" }
   ]
 }

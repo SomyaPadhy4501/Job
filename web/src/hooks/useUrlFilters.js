@@ -19,13 +19,22 @@ function normalizeLimit(n) {
 // status are unreachable for a candidate who needs visa sponsorship.
 const DEFAULT_RESTRICTION = 'hide';
 
+// 'YES' is the default: the owner wants to see only employers confirmed to
+// sponsor. "Any" needs its own value ('ANY'), not '' — an empty value would
+// read back as the default on reload and silently re-apply the YES filter.
+const DEFAULT_SPONSORSHIP = 'YES';
+
+// Grouped by company by default; 'list' is the flat one-row-per-job table.
+const DEFAULT_VIEW = 'grouped';
+
 export const INITIAL = {
   search: '',
   title: '',
-  sponsorship: '',
+  sponsorship: DEFAULT_SPONSORSHIP,
   role: '',
   level: '',
   restriction: DEFAULT_RESTRICTION,
+  view: DEFAULT_VIEW,
   page: 1,
   limit: DEFAULT_LIMIT,
 };
@@ -36,10 +45,11 @@ function readFromUrl() {
   return {
     search: p.get('q') || '',
     title: p.get('title') || '',
-    sponsorship: p.get('sponsorship') || '',
+    sponsorship: p.get('sponsorship') || DEFAULT_SPONSORSHIP,
     role: p.get('role') || '',
     level: p.get('level') || '',
     restriction: p.get('restriction') || DEFAULT_RESTRICTION,
+    view: p.get('view') === 'list' ? 'list' : DEFAULT_VIEW,
     page: Math.max(1, Number(p.get('page')) || 1),
     limit: normalizeLimit(p.get('per')),
   };
@@ -50,7 +60,9 @@ function writeToUrl(filters) {
   const p = new URLSearchParams();
   if (filters.search) p.set('q', filters.search);
   if (filters.title) p.set('title', filters.title);
-  if (filters.sponsorship) p.set('sponsorship', filters.sponsorship);
+  if (filters.sponsorship && filters.sponsorship !== DEFAULT_SPONSORSHIP) {
+    p.set('sponsorship', filters.sponsorship);
+  }
   if (filters.role) p.set('role', filters.role);
   if (filters.level) p.set('level', filters.level);
   // Inverted guard: the usual `if (filters.x)` idiom would drop a meaningful
@@ -58,6 +70,7 @@ function writeToUrl(filters) {
   if (filters.restriction && filters.restriction !== DEFAULT_RESTRICTION) {
     p.set('restriction', filters.restriction);
   }
+  if (filters.view !== DEFAULT_VIEW) p.set('view', filters.view);
   if (filters.page > 1) p.set('page', filters.page);
   if (filters.limit !== DEFAULT_LIMIT) p.set('per', filters.limit);
   const qs = p.toString();

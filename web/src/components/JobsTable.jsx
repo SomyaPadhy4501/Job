@@ -127,7 +127,64 @@ function RestrictionPill({ row }) {
   );
 }
 
-export default function JobsTable({ rows, isLoading, error }) {
+// One job as a table row. Shared by the flat list and the expanded company
+// groups; `hideCompany` drops the company cell inside a group, where the
+// company is already the group header.
+export function JobRow({ row: r, hideCompany = false }) {
+  return (
+    <tr>
+      {!hideCompany && (
+        <td>
+          <div className="company-name">{r.company_name}</div>
+        </td>
+      )}
+      <td>
+        <div className="role-cell">
+          <span className="role-title">{r.job_title}</span>
+          <LevelPill row={r} />
+        </div>
+      </td>
+      <td>
+        <span className="pill">{ROLE_LABEL[r.role_type] || r.role_type || '—'}</span>
+      </td>
+      <td>{r.location || '—'}</td>
+      <td>
+        <div className="sponsor-cell">
+          <span className={`badge badge-${r.sponsorship || 'UNKNOWN'}`}>
+            {r.sponsorship || 'UNKNOWN'}
+          </span>
+          <RestrictionPill row={r} />
+        </div>
+      </td>
+      <td className="muted nowrap"><PostedCell row={r} /></td>
+      <td>
+        <a className="apply-btn" href={r.apply_url} target="_blank" rel="noopener noreferrer">
+          Apply
+        </a>
+      </td>
+    </tr>
+  );
+}
+
+export function JobsHead({ hideCompany = false }) {
+  return (
+    <thead>
+      <tr>
+        {!hideCompany && <th>Company</th>}
+        <th>Role</th>
+        <th>Type</th>
+        <th>Location</th>
+        <th>Sponsorship</th>
+        <th>
+          Posted <span className="sort-indicator" title="Sorted newest first">↓</span>
+        </th>
+        <th>Apply</th>
+      </tr>
+    </thead>
+  );
+}
+
+export function TableState({ error, isLoading, empty, emptyText }) {
   if (error) {
     return (
       <div className="table-empty">
@@ -136,7 +193,6 @@ export default function JobsTable({ rows, isLoading, error }) {
       </div>
     );
   }
-
   if (isLoading) {
     return (
       <div className="table-empty">
@@ -146,63 +202,25 @@ export default function JobsTable({ rows, isLoading, error }) {
       </div>
     );
   }
+  if (empty) return <div className="table-empty muted">{emptyText}</div>;
+  return null;
+}
 
-  if (!rows.length) {
-    return <div className="table-empty muted">No jobs match these filters.</div>;
-  }
+export { PostedCell, LevelPill, RestrictionPill, ROLE_LABEL };
+
+export default function JobsTable({ rows, isLoading, error }) {
+  const state = (
+    <TableState error={error} isLoading={isLoading} empty={!rows.length} emptyText="No jobs match these filters." />
+  );
+  if (error || isLoading || !rows.length) return state;
 
   return (
     <div className="table-card">
       <table className="jobs-table">
-        <thead>
-          <tr>
-            <th>Company</th>
-            <th>Role</th>
-            <th>Type</th>
-            <th>Location</th>
-            <th>Sponsorship</th>
-            <th>
-              Posted <span className="sort-indicator" title="Sorted newest first">↓</span>
-            </th>
-            <th>Apply</th>
-          </tr>
-        </thead>
+        <JobsHead />
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <div className="company-name">{r.company_name}</div>
-              </td>
-              <td>
-                <div className="role-cell">
-                  <span className="role-title">{r.job_title}</span>
-                  <LevelPill row={r} />
-                </div>
-              </td>
-              <td>
-                <span className="pill">{ROLE_LABEL[r.role_type] || r.role_type || '—'}</span>
-              </td>
-              <td>{r.location || '—'}</td>
-              <td>
-                <div className="sponsor-cell">
-                  <span className={`badge badge-${r.sponsorship || 'UNKNOWN'}`}>
-                    {r.sponsorship || 'UNKNOWN'}
-                  </span>
-                  <RestrictionPill row={r} />
-                </div>
-              </td>
-              <td className="muted nowrap"><PostedCell row={r} /></td>
-              <td>
-                <a
-                  className="apply-btn"
-                  href={r.apply_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Apply
-                </a>
-              </td>
-            </tr>
+            <JobRow key={r.id} row={r} />
           ))}
         </tbody>
       </table>
