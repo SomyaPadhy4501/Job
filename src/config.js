@@ -41,12 +41,11 @@ const COMPANIES = [
   // ─── Greenhouse — YC US-hiring (discovered by scripts/probe-yc-ats.js, verified 2026-04-24) ───
   { source: 'greenhouse', slug: 'algolia', displayName: 'Algolia' }, // YC Winter 2014
   { source: 'greenhouse', slug: 'alpaca', displayName: 'Alpaca' }, // YC Winter 2019
-  { source: 'greenhouse', slug: 'amplitude', displayName: 'Amplitude' }, // YC Winter 2012
+  { source: 'ashby', slug: 'amplitude', displayName: 'Amplitude' }, // YC Winter 2012
   { source: 'greenhouse', slug: 'apolloio', displayName: 'Apollo.io' }, // YC W16
   { source: 'greenhouse', slug: 'assemblyai', displayName: 'AssemblyAI' }, // YC Summer 2017
   { source: 'greenhouse', slug: 'astranis', displayName: 'Astranis' }, // YC W16
   { source: 'greenhouse', slug: 'attain', displayName: 'Attain' }, // YC Winter 2022
-  { source: 'greenhouse', slug: 'attune', displayName: 'Attune' }, // YC Spring 2025
   { source: 'greenhouse', slug: 'axle', displayName: 'Axle' }, // YC Summer 2022
   { source: 'greenhouse', slug: 'billiontoone', displayName: 'BillionToOne' }, // YC Summer 2017
   { source: 'greenhouse', slug: 'bitmovin', displayName: 'Bitmovin' }, // YC S15
@@ -54,7 +53,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'coast', displayName: 'Coast' }, // YC Summer 2021
   { source: 'greenhouse', slug: 'daybreakhealth', displayName: 'Daybreak Health' }, // YC S20
   { source: 'greenhouse', slug: 'dots', displayName: 'Dots' }, // YC Summer 2021
-  { source: 'greenhouse', slug: 'embrace', displayName: 'Embrace' }, // YC S19
   { source: 'greenhouse', slug: 'extend', displayName: 'Extend' }, // YC W23
   { source: 'greenhouse', slug: 'faire', displayName: 'Faire' }, // YC Winter 2017
   { source: 'greenhouse', slug: 'flexport', displayName: 'Flexport' }, // YC Winter 2014
@@ -63,10 +61,8 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'gigs', displayName: 'Gigs' }, // YC Winter 2021
   { source: 'greenhouse', slug: 'ginkgobioworks', displayName: 'Ginkgo Bioworks' }, // YC S14
   { source: 'greenhouse', slug: 'givecampus', displayName: 'GiveCampus' }, // YC S15
-  { source: 'greenhouse', slug: 'goldbelly', displayName: 'Goldbelly' }, // YC W13
   { source: 'greenhouse', slug: 'gusto', displayName: 'Gusto' }, // YC Winter 2012
   { source: 'greenhouse', slug: 'hackerrank', displayName: 'HackerRank' }, // YC Summer 2011
-  { source: 'greenhouse', slug: 'hightouch', displayName: 'Hightouch' }, // YC S19
   { source: 'greenhouse', slug: 'humaninterest', displayName: 'Human Interest' }, // YC S15
   { source: 'greenhouse', slug: 'instawork', displayName: 'Instawork' }, // YC S15
   { source: 'greenhouse', slug: 'kalshi', displayName: 'Kalshi' }, // YC Winter 2019
@@ -79,10 +75,9 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'mixpanel', displayName: 'Mixpanel' }, // YC S09
   { source: 'greenhouse', slug: 'modernhealth', displayName: 'Modern Health' }, // YC W18
   { source: 'greenhouse', slug: 'momence', displayName: 'Momence' }, // YC S20
-  { source: 'greenhouse', slug: 'mutiny', displayName: 'Mutiny' }, // YC Summer 2018
+  { source: 'ashby', slug: 'mutiny', displayName: 'Mutiny' }, // YC Summer 2018
   { source: 'greenhouse', slug: 'nabis', displayName: 'Nabis' }, // YC Winter 2019
-  { source: 'greenhouse', slug: 'nanonets', displayName: 'NanoNets' }, // YC Winter 2017
-  { source: 'greenhouse', slug: 'navierai', displayName: 'Navier AI' }, // YC Winter 2024
+  { source: 'ashby', slug: 'nanonets', displayName: 'NanoNets' }, // YC Winter 2017
   { source: 'greenhouse', slug: 'usenourish', displayName: 'Nourish' }, // YC Winter 2021
   { source: 'greenhouse', slug: 'novacredit', displayName: 'Nova Credit' }, // YC S16
   { source: 'greenhouse', slug: 'odeko', displayName: 'Odeko' }, // YC S19
@@ -95,7 +90,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'qventus', displayName: 'Qventus' }, // YC Winter 2015
   { source: 'greenhouse', slug: 'reflex', displayName: 'Reflex' }, // YC Winter 2023
   { source: 'greenhouse', slug: 'regent', displayName: 'REGENT' }, // YC W21
-  { source: 'greenhouse', slug: 'seam', displayName: 'Seam' }, // YC Summer 2020
   { source: 'greenhouse', slug: 'sendbird', displayName: 'Sendbird' }, // YC W16
   { source: 'greenhouse', slug: 'smartasset', displayName: 'SmartAsset' }, // YC Summer 2012
   { source: 'greenhouse', slug: 'spaceium', displayName: 'Spaceium Inc' }, // YC S24
@@ -105,7 +99,7 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'treasuryprime', displayName: 'Treasury Prime' }, // YC Winter 2018
   { source: 'greenhouse', slug: 'upkeep', displayName: 'UpKeep' }, // YC Winter 2017
   { source: 'greenhouse', slug: 'verse', displayName: 'Verse' }, // YC W22
-  { source: 'greenhouse', slug: 'vitablehealth', displayName: 'Vitable Health' }, // YC Summer 2020
+  { source: 'ashby', slug: 'vitable', displayName: 'Vitable Health' }, // YC Summer 2020
   { source: 'greenhouse', slug: 'weave', displayName: 'Weave' }, // YC Winter 2025
   { source: 'greenhouse', slug: 'webflow', displayName: 'Webflow' }, // YC Summer 2013
   { source: 'greenhouse', slug: 'yuma', displayName: 'Yuma AI' }, // YC W23
@@ -113,7 +107,7 @@ const COMPANIES = [
   // ─── Greenhouse — topstartups.io (discovered by scripts/probe-topstartups.js, verified 2026-04-24) ───
   { source: 'greenhouse', slug: 'airtable', displayName: 'Airtable' },
   { source: 'greenhouse', slug: 'alloy', displayName: 'Alloy' },
-  { source: 'greenhouse', slug: 'appliedintuition', displayName: 'Applied Intuition' },
+  { source: 'ashby', slug: 'applied', displayName: 'Applied Intuition' },
   { source: 'greenhouse', slug: 'attentive', displayName: 'Attentive' },
   { source: 'greenhouse', slug: 'axonius', displayName: 'Axonius' },
   { source: 'greenhouse', slug: 'betterment', displayName: 'Betterment' },
@@ -124,11 +118,10 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'cameo', displayName: 'Cameo' },
   { source: 'greenhouse', slug: 'candid', displayName: 'Candid' },
   { source: 'greenhouse', slug: 'capitolis', displayName: 'Capitolis' },
-  { source: 'greenhouse', slug: 'carbon', displayName: 'Carbon' },
   { source: 'greenhouse', slug: 'carta', displayName: 'Carta' },
   { source: 'greenhouse', slug: 'celonis', displayName: 'Celonis' },
   { source: 'greenhouse', slug: 'chainguard', displayName: 'Chainguard' },
-  { source: 'greenhouse', slug: 'clickhouse', displayName: 'ClickHouse' },
+  { source: 'ashby', slug: 'clickhouse', displayName: 'ClickHouse' },
   { source: 'greenhouse', slug: 'cloverhealth', displayName: 'Clover Health' },
   { source: 'greenhouse', slug: 'cockroachlabs', displayName: 'Cockroach Labs' },
   { source: 'greenhouse', slug: 'collectivehealth', displayName: 'Collective Health' },
@@ -139,7 +132,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'descript', displayName: 'Descript' },
   { source: 'greenhouse', slug: 'devrev', displayName: 'DevRev' },
   { source: 'greenhouse', slug: 'dialpad', displayName: 'Dialpad' },
-  { source: 'greenhouse', slug: 'digitalai', displayName: 'Digital.ai' },
   { source: 'greenhouse', slug: 'disco', displayName: 'Disco' },
   { source: 'greenhouse', slug: 'dominodatalab', displayName: 'Domino Data Lab' },
   { source: 'greenhouse', slug: 'druva', displayName: 'Druva' },
@@ -149,25 +141,21 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'ethoslife', displayName: 'Ethos Life' },
   { source: 'greenhouse', slug: 'everlaw', displayName: 'Everlaw' },
   { source: 'greenhouse', slug: 'fireblocks', displayName: 'Fireblocks' },
-  { source: 'greenhouse', slug: 'fireworksai', displayName: 'Fireworks AI' },
+  { source: 'ashby', slug: 'fireworks', displayName: 'Fireworks AI' },
   { source: 'greenhouse', slug: 'fivetran', displayName: 'Fivetran' },
   { source: 'greenhouse', slug: 'flockhomes', displayName: 'Flock Homes' },
   { source: 'greenhouse', slug: 'formationbio', displayName: 'Formation Bio' },
   { source: 'greenhouse', slug: 'forter', displayName: 'Forter' },
   { source: 'greenhouse', slug: 'forwardnetworks', displayName: 'Forward Networks' },
   { source: 'greenhouse', slug: 'freenome', displayName: 'Freenome' },
-  { source: 'greenhouse', slug: 'glossgenius', displayName: 'GlossGenius' },
   { source: 'greenhouse', slug: 'glossier', displayName: 'Glossier' },
   { source: 'greenhouse', slug: 'gongio', displayName: 'Gong.io' },
-  { source: 'greenhouse', slug: 'harmonic', displayName: 'Harmonic' },
-  { source: 'greenhouse', slug: 'hebbia', displayName: 'Hebbia' },
+  { source: 'ashby', slug: 'harmonic', displayName: 'Harmonic' },
   { source: 'greenhouse', slug: 'heygen', displayName: 'HeyGen' },
   { source: 'greenhouse', slug: 'honor', displayName: 'Honor' },
   { source: 'greenhouse', slug: 'hudl', displayName: 'Hudl' },
   { source: 'greenhouse', slug: 'imply', displayName: 'Imply' },
-  { source: 'greenhouse', slug: 'instabase', displayName: 'Instabase' },
   { source: 'greenhouse', slug: 'intercom', displayName: 'Intercom' },
-  { source: 'greenhouse', slug: 'invoca', displayName: 'Invoca' },
   { source: 'greenhouse', slug: 'juno', displayName: 'Juno' },
   { source: 'greenhouse', slug: 'komodohealth', displayName: 'Komodo Health' },
   { source: 'greenhouse', slug: 'kymeratherapeutics', displayName: 'Kymera Therapeutics' },
@@ -175,8 +163,7 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'launchdarkly', displayName: 'LaunchDarkly' },
   { source: 'greenhouse', slug: 'leaflink', displayName: 'LeafLink' },
   { source: 'greenhouse', slug: 'legalist', displayName: 'Legalist' },
-  { source: 'greenhouse', slug: 'loyal', displayName: 'Loyal' },
-  { source: 'greenhouse', slug: 'maintainx', displayName: 'MaintainX' },
+  { source: 'ashby', slug: 'maintainx', displayName: 'MaintainX' },
   { source: 'greenhouse', slug: 'manychat', displayName: 'ManyChat' },
   { source: 'greenhouse', slug: 'marqvision', displayName: 'MarqVision' },
   { source: 'greenhouse', slug: 'matik', displayName: 'Matik' },
@@ -185,7 +172,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'melio', displayName: 'Melio' },
   { source: 'greenhouse', slug: 'misfitsmarket', displayName: 'Misfits Market' },
   { source: 'greenhouse', slug: 'modernanimal', displayName: 'Modern Animal' },
-  { source: 'greenhouse', slug: 'moveworks', displayName: 'Moveworks' },
   { source: 'greenhouse', slug: 'narvar', displayName: 'Narvar' },
   { source: 'greenhouse', slug: 'netlify', displayName: 'Netlify' },
   { source: 'greenhouse', slug: 'netskope', displayName: 'Netskope' },
@@ -201,7 +187,7 @@ const COMPANIES = [
   // moves again. See the `rippling` entries below.
   // { source: 'greenhouse', slug: 'opendoor', displayName: 'Opendoor' },
   { source: 'greenhouse', slug: 'ophelia', displayName: 'Ophelia' },
-  { source: 'greenhouse', slug: 'outschool', displayName: 'Outschool' },
+  { source: 'ashby', slug: 'outschool', displayName: 'Outschool' },
   { source: 'greenhouse', slug: 'pagerduty', displayName: 'PagerDuty' },
   { source: 'greenhouse', slug: 'patch', displayName: 'Patch' },
   { source: 'greenhouse', slug: 'peloton', displayName: 'Peloton' },
@@ -221,29 +207,26 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'sfox', displayName: 'SFOX' },
   { source: 'greenhouse', slug: 'shopmonkey', displayName: 'Shopmonkey' },
   { source: 'greenhouse', slug: 'singlestore', displayName: 'SingleStore' },
-  { source: 'greenhouse', slug: 'singularity6', displayName: 'Singularity 6' },
-  { source: 'greenhouse', slug: 'sisense', displayName: 'Sisense' },
+  { source: 'ashby', slug: 'sisense', displayName: 'Sisense' },
   { source: 'greenhouse', slug: 'smithrx', displayName: 'SmithRx' },
-  { source: 'greenhouse', slug: 'snackpass', displayName: 'Snackpass' },
+  { source: 'ashby', slug: 'snackpass', displayName: 'Snackpass' },
   { source: 'greenhouse', slug: 'sumologic', displayName: 'Sumo Logic' },
   { source: 'greenhouse', slug: 'syndio', displayName: 'Syndio' },
   { source: 'greenhouse', slug: 'thanx', displayName: 'Thanx' },
-  { source: 'greenhouse', slug: 'thumbtack', displayName: 'Thumbtack' },
+  { source: 'ashby', slug: 'thumbtack', displayName: 'Thumbtack' },
   { source: 'greenhouse', slug: 'toast', displayName: 'Toast' },
   { source: 'greenhouse', slug: 'torq', displayName: 'Torq' },
-  { source: 'greenhouse', slug: 'truework', displayName: 'Truework' },
   { source: 'greenhouse', slug: 'turing', displayName: 'Turing' },
   { source: 'greenhouse', slug: 'ujet', displayName: 'UJET' },
   { source: 'greenhouse', slug: 'upstart', displayName: 'Upstart' },
   { source: 'greenhouse', slug: 'vercel', displayName: 'Vercel' },
   { source: 'greenhouse', slug: 'verkada', displayName: 'Verkada' },
-  { source: 'greenhouse', slug: 'vicarioussurgical', displayName: 'Vicarious Surgical' },
   { source: 'greenhouse', slug: 'virtru', displayName: 'Virtru' },
   { source: 'greenhouse', slug: 'vivodyne', displayName: 'Vivodyne' },
   { source: 'greenhouse', slug: 'wonderschool', displayName: 'Wonderschool' },
   { source: 'greenhouse', slug: 'workboard', displayName: 'Workboard' },
   { source: 'greenhouse', slug: 'workstream', displayName: 'Workstream' },
-  { source: 'greenhouse', slug: 'worldlabs', displayName: 'World Labs' },
+  { source: 'ashby', slug: 'worldlabs', displayName: 'World Labs' },
   { source: 'greenhouse', slug: 'xai', displayName: 'xAI' },
   { source: 'greenhouse', slug: 'yotpo', displayName: 'Yotpo' },
   { source: 'greenhouse', slug: 'zenbusiness', displayName: 'ZenBusiness' },
@@ -282,7 +265,6 @@ const COMPANIES = [
   { source: 'lever', slug: 'skyways', displayName: 'Skyways' }, // YC Summer 2017
   { source: 'lever', slug: 'smartcuts', displayName: 'Smartcuts' }, // YC Winter 2021
   { source: 'lever', slug: 'snappr', displayName: 'Snappr' }, // YC Winter 2017
-  { source: 'lever', slug: 'suger', displayName: 'Suger' }, // YC W23
   { source: 'lever', slug: 'synapticure', displayName: 'Synapticure' }, // YC S20
   { source: 'lever', slug: 'teleo', displayName: 'Teleo' }, // YC Winter 2020
   { source: 'lever', slug: 'thunkable', displayName: 'Thunkable' }, // YC W16
@@ -298,11 +280,9 @@ const COMPANIES = [
   { source: 'lever', slug: 'anchorage', displayName: 'Anchorage' },
   { source: 'lever', slug: 'anyscale', displayName: 'Anyscale' },
   { source: 'lever', slug: 'basis', displayName: 'Basis' },
-  { source: 'lever', slug: 'belong', displayName: 'Belong' },
   { source: 'lever', slug: 'cents', displayName: 'Cents' },
   { source: 'lever', slug: 'clari', displayName: 'Clari' },
   { source: 'lever', slug: 'cobaltrobotics', displayName: 'Cobalt Robotics' },
-  { source: 'lever', slug: 'conduktor', displayName: 'Conduktor' },
   { source: 'lever', slug: 'dollskill', displayName: 'Dolls Kill' },
   { source: 'lever', slug: 'doxel', displayName: 'Doxel' },
   { source: 'lever', slug: 'dronedeploy', displayName: 'DroneDeploy' },
@@ -321,10 +301,9 @@ const COMPANIES = [
   { source: 'lever', slug: 'lightship', displayName: 'Lightship' },
   { source: 'lever', slug: 'luxurypresence', displayName: 'Luxury Presence' },
   { source: 'lever', slug: 'osaro', displayName: 'Osaro' },
-  { source: 'lever', slug: 'plaid', displayName: 'Plaid' },
+  { source: 'ashby', slug: 'plaid', displayName: 'Plaid' },
   { source: 'lever', slug: 'playbook', displayName: 'Playbook' },
   { source: 'lever', slug: 'pyka', displayName: 'Pyka' },
-  { source: 'lever', slug: 'quantumcircuits', displayName: 'Quantum Circuits' },
   { source: 'lever', slug: 'quartzy', displayName: 'Quartzy' },
   { source: 'lever', slug: 'restaurant365', displayName: 'Restaurant365' },
   { source: 'lever', slug: 'rigetti', displayName: 'Rigetti Computing' },
@@ -382,15 +361,12 @@ const COMPANIES = [
   { source: 'ashby', slug: 'aurelian', displayName: 'Aurelian' }, // YC Summer 2022
   { source: 'ashby', slug: 'authzed', displayName: 'authzed' }, // YC Winter 2021
   { source: 'ashby', slug: 'automat', displayName: 'Automat' }, // YC W23
-  { source: 'ashby', slug: 'aviator', displayName: 'Aviator' }, // YC Summer 2021
   { source: 'ashby', slug: 'axle-health', displayName: 'Axle Health' }, // YC Winter 2021
   { source: 'ashby', slug: 'bankjoy', displayName: 'Bankjoy' }, // YC Winter 2015
   { source: 'ashby', slug: 'benepass', displayName: 'Benepass' }, // YC Winter 2020
   { source: 'ashby', slug: 'bild-ai', displayName: 'Bild AI' }, // YC Winter 2025
   { source: 'ashby', slug: 'bland', displayName: 'Bland AI' }, // YC Summer 2023
-  { source: 'ashby', slug: 'blaxel', displayName: 'Blaxel' }, // YC Spring 2025
   { source: 'ashby', slug: 'blee', displayName: 'Blee' }, // YC Summer 2022
-  { source: 'ashby', slug: 'blink', displayName: 'Blink' }, // YC Winter 2022
   { source: 'ashby', slug: 'blissway', displayName: 'Blissway' }, // YC Summer 2020
   { source: 'ashby', slug: 'blueberrypediatrics', displayName: 'Blueberry Pediatrics' }, // YC W18
   { source: 'ashby', slug: 'boostly', displayName: 'Boostly' }, // YC S22
@@ -406,7 +382,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'capy', displayName: 'Capy' }, // YC Fall 2024
   { source: 'ashby', slug: 'casca', displayName: 'Casca' }, // YC Summer 2023
   { source: 'ashby', slug: 'castle', displayName: 'Castle' }, // YC W16
-  { source: 'ashby', slug: 'centralhq', displayName: 'Central' }, // YC Summer 2024
   { source: 'ashby', slug: 'charge-robotics', displayName: 'Charge Robotics' }, // YC Summer 2021
   { source: 'ashby', slug: 'chestnut', displayName: 'Chestnut' }, // YC Spring 2025
   { source: 'ashby', slug: 'cinder', displayName: 'Cinder' }, // YC Winter 2022
@@ -419,9 +394,7 @@ const COMPANIES = [
   { source: 'ashby', slug: 'conductor', displayName: 'Conductor' }, // YC Summer 2024
   { source: 'ashby', slug: 'conduit', displayName: 'Conduit' }, // YC Winter 2024
   { source: 'ashby', slug: 'confido', displayName: 'Confido' }, // YC Summer 2021
-  { source: 'ashby', slug: 'continue', displayName: 'Continue' }, // YC Summer 2023
   { source: 'ashby', slug: 'coperniq', displayName: 'Coperniq' }, // YC W23
-  { source: 'ashby', slug: 'corgi', displayName: 'Corgi' }, // YC S24
   { source: 'ashby', slug: 'corvus-robotics', displayName: 'Corvus Robotics' }, // YC S18
   { source: 'ashby', slug: 'cosine', displayName: 'Cosine' }, // YC W23
   { source: 'ashby', slug: 'credal', displayName: 'Credal.ai' }, // YC W23
@@ -430,7 +403,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'decodahealth', displayName: 'Decoda Health' }, // YC Summer 2023
   { source: 'ashby', slug: 'deel', displayName: 'Deel' }, // YC Winter 2019
   { source: 'ashby', slug: 'deepgram', displayName: 'Deepgram' }, // YC W16
-  { source: 'ashby', slug: 'delve', displayName: 'Delve' }, // YC W24
   { source: 'ashby', slug: 'dex', displayName: 'Dex' }, // YC S19
   { source: 'ashby', slug: 'diligencesquared', displayName: 'DiligenceSquared' }, // YC Fall 2025
   { source: 'ashby', slug: 'ditto', displayName: 'Ditto' }, // YC Winter 2020
@@ -443,12 +415,9 @@ const COMPANIES = [
   { source: 'ashby', slug: 'eventual', displayName: 'Eventual' }, // YC Winter 2022
   { source: 'ashby', slug: 'exa', displayName: 'Exa' }, // YC Summer 2021
   { source: 'ashby', slug: 'fathom', displayName: 'Fathom' }, // YC Winter 2021
-  { source: 'ashby', slug: 'buildwithfern', displayName: 'Fern' }, // YC W23
   { source: 'ashby', slug: 'fieldguide', displayName: 'Fieldguide' }, // YC Summer 2020
   { source: 'ashby', slug: 'finni-health', displayName: 'Finni Health' }, // YC W23
-  { source: 'ashby', slug: 'finvest', displayName: 'Finvest' }, // YC Winter 2023
   { source: 'ashby', slug: 'firecrawl', displayName: 'Firecrawl' }, // YC Summer 2022
-  { source: 'ashby', slug: 'firstbaseio', displayName: 'Firstbase.io' }, // YC Winter 2021
   { source: 'ashby', slug: 'fleek', displayName: 'Fleek' }, // YC W22
   { source: 'ashby', slug: 'fleetline', displayName: 'Fleetline' }, // YC Summer 2025
   { source: 'ashby', slug: 'fleetworks', displayName: 'FleetWorks' }, // YC Summer 2023
@@ -500,20 +469,17 @@ const COMPANIES = [
   { source: 'ashby', slug: 'mintlify', displayName: 'Mintlify' }, // YC Winter 2022
   { source: 'ashby', slug: 'moderntreasury', displayName: 'Modern Treasury' }, // YC Summer 2018
   { source: 'ashby', slug: 'mosaic', displayName: 'Mosaic' }, // YC Winter 2025
-  { source: 'ashby', slug: 'motion', displayName: 'Motion' }, // YC Winter 2020
   { source: 'ashby', slug: 'mux', displayName: 'Mux' }, // YC W16
   { source: 'ashby', slug: 'nabla', displayName: 'Nabla Bio' }, // YC S20
   { source: 'ashby', slug: 'nango', displayName: 'Nango' }, // YC W23
   { source: 'ashby', slug: 'nash', displayName: 'Nash' }, // YC Summer 2021
   { source: 'ashby', slug: 'new-story', displayName: 'New Story' }, // YC Summer 2015
-  { source: 'ashby', slug: 'newfront', displayName: 'Newfront' }, // YC W18
   { source: 'ashby', slug: 'notabene', displayName: 'Notabene' }, // YC Summer 2020
   { source: 'ashby', slug: 'novig', displayName: 'Novig' }, // YC Summer 2022
   { source: 'ashby', slug: 'nox-metals', displayName: 'Nox Metals' }, // YC Summer 2025
   { source: 'ashby', slug: 'numeral', displayName: 'Numeral' }, // YC W23
   { source: 'ashby', slug: 'odys-aviation', displayName: 'Odys Aviation' }, // YC Summer 2021
   { source: 'ashby', slug: 'offdeal', displayName: 'OffDeal' }, // YC W24
-  { source: 'ashby', slug: 'olive', displayName: 'Olive' }, // YC Winter 2025
   { source: 'ashby', slug: 'oneschema', displayName: 'OneSchema' }, // YC Summer 2021
   { source: 'ashby', slug: 'onyx', displayName: 'Onyx' }, // YC W24
   { source: 'ashby', slug: 'output', displayName: 'Output Biosciences' }, // YC Summer 2021
@@ -577,11 +543,9 @@ const COMPANIES = [
   { source: 'ashby', slug: 'stepful', displayName: 'Stepful' }, // YC Summer 2021
   { source: 'ashby', slug: 'stream', displayName: 'Stream' }, // YC Summer 2022
   { source: 'ashby', slug: 'substack', displayName: 'Substack' }, // YC W18
-  { source: 'ashby', slug: 'sully-ai', displayName: 'Sully.ai' }, // YC Summer 2021
   { source: 'ashby', slug: 'svix', displayName: 'Svix' }, // YC Winter 2021
   { source: 'ashby', slug: 'sweep', displayName: 'Sweep' }, // YC Summer 2023
   { source: 'ashby', slug: 'taktile', displayName: 'Taktile' }, // YC S20
-  { source: 'ashby', slug: 'tandem', displayName: 'Tandem' }, // YC S24
   { source: 'ashby', slug: 'tavus', displayName: 'Tavus' }, // YC Summer 2021
   { source: 'ashby', slug: 'tenjin', displayName: 'Tenjin' }, // YC Summer 2014
   { source: 'ashby', slug: 'tennr', displayName: 'Tennr' }, // YC W23
@@ -590,8 +554,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'toma', displayName: 'Toma' }, // YC W24
   { source: 'ashby', slug: 'topline-pro', displayName: 'Topline Pro' }, // YC Winter 2021
   { source: 'ashby', slug: 'trm-labs', displayName: 'TRM Labs' }, // YC S19
-  { source: 'ashby', slug: 'truthsystems', displayName: 'truthsystems' }, // YC Summer 2025
-  { source: 'ashby', slug: 'tuesday-lab', displayName: 'Tuesday Lab' }, // YC Winter 2024
   { source: 'ashby', slug: 'turion-space', displayName: 'Turion Space' }, // YC Summer 2021
   { source: 'ashby', slug: 'twenty', displayName: 'Twenty' }, // YC Summer 2023
   { source: 'ashby', slug: 'ultra', displayName: 'Ultra' }, // YC Summer 2024
@@ -599,14 +561,12 @@ const COMPANIES = [
   { source: 'ashby', slug: 'uplane', displayName: 'Uplane' }, // YC Fall 2025
   { source: 'ashby', slug: 'vanta', displayName: 'Vanta' }, // YC W18
   { source: 'ashby', slug: 'vapi', displayName: 'Vapi' }, // YC Winter 2021
-  { source: 'ashby', slug: 'vellum', displayName: 'Vellum' }, // YC Winter 2023
   { source: 'ashby', slug: 'versemedical', displayName: 'Verse Medical' }, // YC Summer 2018
   { source: 'ashby', slug: 'vetcove', displayName: 'Vetcove' }, // YC S16
   { source: 'ashby', slug: 'vitalize', displayName: 'Vitalize Care' }, // YC W23
   { source: 'ashby', slug: 'vooma', displayName: 'Vooma' }, // YC W23
   { source: 'ashby', slug: 'vori', displayName: 'Vori' }, // YC Winter 2020
   { source: 'ashby', slug: 'vorticity', displayName: 'Vorticity' }, // YC S19
-  { source: 'ashby', slug: 'whatnot', displayName: 'Whatnot' }, // YC Winter 2020
   { source: 'ashby', slug: 'zapier', displayName: 'Zapier' }, // YC Summer 2012
   { source: 'ashby', slug: 'zip', displayName: 'Zip' }, // YC Summer 2020
 
@@ -630,7 +590,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'charthop', displayName: 'ChartHop' },
   { source: 'ashby', slug: 'chief', displayName: 'Chief' },
   { source: 'ashby', slug: 'clickup', displayName: 'ClickUp' },
-  { source: 'ashby', slug: 'cloudtrucks', displayName: 'CloudTrucks' },
   { source: 'ashby', slug: 'cocodelivery', displayName: 'Coco' },
   { source: 'ashby', slug: 'coder', displayName: 'Coder' },
   { source: 'ashby', slug: 'cognition', displayName: 'Cognition' },
@@ -640,7 +599,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'electric', displayName: 'Electric.ai' },
   { source: 'ashby', slug: 'ema', displayName: 'Ema' },
   { source: 'ashby', slug: 'envoy', displayName: 'Envoy' },
-  { source: 'ashby', slug: 'foursquare', displayName: 'Foursquare' },
   { source: 'ashby', slug: 'fullstory', displayName: 'FullStory' },
   { source: 'ashby', slug: 'graphite', displayName: 'Graphite' },
   { source: 'ashby', slug: 'handshake', displayName: 'Handshake' },
@@ -686,8 +644,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'spoton', displayName: 'SpotOn' },
   { source: 'ashby', slug: 'sprig', displayName: 'Sprig' },
   { source: 'ashby', slug: 'sprinter-health', displayName: 'Sprinter Health' },
-  { source: 'ashby', slug: 'stainlessapi', displayName: 'Stainless' },
-  { source: 'ashby', slug: 'statsig', displayName: 'Statsig' },
   { source: 'ashby', slug: 'strava', displayName: 'Strava' },
   { source: 'ashby', slug: 'stytch', displayName: 'Stytch' },
   { source: 'ashby', slug: 'terminal', displayName: 'Terminal' },
