@@ -334,4 +334,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseWorkdaySites, detectAts, candidatesFor, buildCovered };
+module.exports = { parseWorkdaySites, detectAts, candidatesFor, buildCovered, probeWorkday, probeCareersPage };
