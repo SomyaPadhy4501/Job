@@ -19,15 +19,11 @@ const CHECK_MINUTES = 15;   // periodic re-check, catches wake-from-sleep
 const CLOSE_AFTER_MS = 3000; // after a tab's jobs are sent, in case a late batch follows
 const FALLBACK_CLOSE_MIN = 3; // closes whatever is left (pages that found nothing)
 
-const defaults = {
-  enabled: true,
-  portalUrl: 'https://job-two-xi.vercel.app',
-  token: '',
-  // H-1B sponsors whose job systems have no server-side collector (Oracle
-  // Candidate Experience, Phenom, Jibe), found by scripts/discover-sponsors.js.
-  // Each was loaded with these scripts on 2026-10-31 and captured jobs, except
-  // Tesla and Wayfair, which block automated browsers and are untested.
-  boards: [
+// Starter boards: H-1B sponsors whose job systems have no server-side
+// collector (Oracle Candidate Experience, Phenom, Jibe, Apple), found by
+// scripts/discover-sponsors.js and verified to capture in Chromium. Tesla and
+// Wayfair block automated browsers and were verified on a real run instead.
+const STARTER_BOARDS = [
     'https://www.tesla.com/careers/search/?country=US',
     'https://jobs.apple.com/en-us/search?location=united-states-USA&search=software%20engineer',
     'https://www.wayfair.com/careers/jobs',
@@ -50,7 +46,14 @@ const defaults = {
     'https://jobs.thermofisher.com/global/en/search-results?keywords=software%20engineer',
     'https://careers.corning.com/us/en/search-results?keywords=software%20engineer',
     'https://careers.bose.com/us/en/search-results?keywords=software%20engineer',
-  ],
+];
+
+const defaults = {
+  enabled: true,
+  portalUrl: 'https://job-two-xi.vercel.app',
+  token: '',
+  boards: null, // filled from STARTER_BOARDS
+  offeredBoards: [],
   autoOpen: true,
   autoEveryHours: 3,
   autoClose: true,
@@ -151,7 +154,7 @@ const isSensitiveUrl = (u) => {
 async function openBoards({ scheduled }) {
   const s = await getSettings();
   // Never open LinkedIn / Indeed / Glassdoor on a schedule (see extract.js).
-  const boards = s.boards.filter((u) => !isSensitiveUrl(u)).slice(0, MAX_BOARDS);
+  const boards = (s.boards || []).filter((u) => !isSensitiveUrl(u)).slice(0, MAX_BOARDS);
   if (!boards.length) return;
   if (scheduled) await chrome.storage.local.set({ lastRunAt: new Date().toISOString() });
 
@@ -220,9 +223,20 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-  // Write defaults for anything unset so the popup shows them.
+  // Write defaults for anything unset so the popup shows them, and merge in
+  // starter boards added since the user's last update. Defaults only apply to
+  // unset keys, so before this an existing install never got new ones (Apple
+  // was missing after the 1.6 update). A board the user deleted stays deleted:
+  // only boards never offered before are added.
   const s = await getSettings();
-  await chrome.storage.local.set(s);
+  const offered = new Set(s.offeredBoards || []);
+  const current = Array.isArray(s.boards) ? s.boards : [];
+  const added = STARTER_BOARDS.filter((u) => !offered.has(u) && !current.includes(u));
+  await chrome.storage.local.set({
+    ...s,
+    boards: [...current, ...added],
+    offeredBoards: [...new Set([...offered, ...STARTER_BOARDS, ...current])],
+  });
   await scheduleAlarms();
 });
 

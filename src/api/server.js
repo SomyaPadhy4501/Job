@@ -3,7 +3,7 @@
 const path = require('path');
 const express = require('express');
 const { CONFIG } = require('../config');
-const { queryJobs, queryCompanies, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
+const { queryJobs, queryCompanies, queryNewestJobs, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
 const { jobsCache } = require('./cache');
 const { collectAll } = require('../services/collect');
 const { normalizeJob } = require('../services/normalize');
@@ -122,14 +122,14 @@ function createApp() {
       return res.json(cached);
     }
     const { total, rows } = await queryCompanies({ ...filters, limit, offset });
-    // A company with one matching role renders that role inline — a dropdown
-    // for a single item is a click with nothing behind it. One extra query
-    // fetches all of them for the page.
-    const singles = rows.filter((r) => r.roles === 1).map((r) => r.company_name);
-    if (singles.length) {
-      const { rows: jobs } = await queryJobs({ ...filters, companies: singles, limit: singles.length, offset: 0 });
-      const byCompany = new Map(jobs.map((j) => [j.company_name, j]));
-      for (const r of rows) if (r.roles === 1) r.job = byCompany.get(r.company_name) || null;
+    // Every company row carries its newest matching job: a single-role
+    // company shows it as the row, and a group shows it in its header so the
+    // newest posting is visible without expanding. One extra query per page.
+    const newest = await queryNewestJobs(filters, rows.map((r) => r.company_name));
+    const byCompany = new Map(newest.map(({ rn, ...j }) => [j.company_name, j]));
+    for (const r of rows) {
+      r.newest = byCompany.get(r.company_name) || null;
+      if (r.roles === 1) r.job = r.newest; // kept for older clients
     }
     const body = {
       data: rows,

@@ -628,6 +628,27 @@ function queryCompanies(filters) {
   return { total, rows };
 }
 
+// See pg.js. SQLite has window functions since 3.25.
+function queryNewestJobs(filters, companies) {
+  if (!companies.length) return [];
+  const database = getDb();
+  const { where, params } = buildWhere({ ...filters, companies });
+  return database
+    .prepare(
+      `SELECT * FROM (
+         SELECT id, source, company_name, job_title, location, apply_url,
+                date_posted, sponsorship, role_type, category, restriction, yoe_min,
+                is_entry_level, is_mid_level, first_seen_at, last_seen_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY company_name
+                  ORDER BY date_posted IS NULL, date_posted DESC, first_seen_at DESC, id DESC
+                ) AS rn
+           FROM jobs ${where}
+       ) WHERE rn = 1`
+    )
+    .all(params);
+}
+
 module.exports = {
   getDb,
   upsertJob,
@@ -636,6 +657,7 @@ module.exports = {
   finishRun,
   queryJobs,
   queryCompanies,
+  queryNewestJobs,
   getJobById,
   statsSummary,
   pruneStaleJobs,

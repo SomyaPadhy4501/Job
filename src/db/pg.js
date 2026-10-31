@@ -329,6 +329,27 @@ async function queryCompanies(filters) {
   return { total: c, rows };
 }
 
+// The newest matching job for each of `companies`, under the same filters —
+// the grouped view shows it in the company's header row.
+async function queryNewestJobs(filters, companies) {
+  if (!companies.length) return [];
+  const { where, params } = buildWhere({ ...filters, companies });
+  const { rows } = await getPool().query(
+    `SELECT * FROM (
+       SELECT id, source, company_name, job_title, location, apply_url,
+              date_posted, sponsorship, role_type, category, restriction, yoe_min,
+              is_entry_level, is_mid_level, first_seen_at, last_seen_at,
+              ROW_NUMBER() OVER (
+                PARTITION BY company_name
+                ORDER BY date_posted DESC NULLS LAST, first_seen_at DESC, id DESC
+              ) AS rn
+         FROM jobs ${where}
+     ) t WHERE rn = 1`,
+    params,
+  );
+  return rows;
+}
+
 async function getJobById(id) {
   const { rows } = await getPool().query('SELECT * FROM jobs WHERE id = $1', [id]);
   return rows[0] || null;
@@ -373,6 +394,7 @@ module.exports = {
   finishRun,
   queryJobs,
   queryCompanies,
+  queryNewestJobs,
   getJobById,
   statsSummary,
   pruneStaleJobs,
