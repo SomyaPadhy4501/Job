@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --fg:#1f2328; --muted:#656d76; --bg:#fff; --line:#d0d7de; --ok:#1a7f37; --bad:#cf222e; --accent:#0969da; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e6edf3; --muted:#8d96a0; --bg:#0d1117; --line:#30363d; --ok:#3fb950; --bad:#f85149; --accent:#4493f8; } }
+  body { font: 13px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--bg); width: 340px; margin: 0; padding: 12px; }
+  h1 { font-size: 14px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+  label { display: block; color: var(--muted); margin: 8px 0 3px; }
+  input[type=text], input[type=password], textarea { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); font: inherit; }
+  textarea { height: 64px; resize: vertical; }
+  button { margin-top: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: flex; gap: 6px; }
+  .log { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 180px; overflow: auto; }
+  .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+  <h1>Job Board Capture <label style="margin:0"><input type="checkbox" id="enabled"> on</label></h1>
+
+  <label for="portalUrl">Portal URL</label>
+  <input type="text" id="portalUrl" placeholder="https://job-two-xi.vercel.app">
+  <label for="token">Collect token</label>
+  <input type="password" id="token" placeholder="COLLECT_TOKEN">
+  <label for="boards">My boards (one careers URL per line)</label>
+  <textarea id="boards" placeholder="https://www.tesla.com/careers/search/?country=US"></textarea>
+
+  <div class="row">
+    <button id="save">Save</button>
+    <button id="open" class="primary">Open my boards</button>
+  </div>
+
+  <div class="log" id="log"><span class="muted">No captures yet. Open a careers page.</span></div>
+  <script src="popup.js"></script>
+</body>
+</html>

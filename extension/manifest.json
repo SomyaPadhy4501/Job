@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Job Board Capture",
+  "version": "1.0.0",
+  "description": "Sends the job listings a careers page loads to your own job board. Personal use; load unpacked.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://*.vercel.app/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Job Board Capture" },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*/*career*",
+        "*://*/*Career*",
+        "*://*/*jobs*",
+        "*://*/*Jobs*",
+        "*://*/*job/*",
+        "*://*.myworkdayjobs.com/*",
+        "*://*.avature.net/*",
+        "*://*.eightfold.ai/*",
+        "*://*.oraclecloud.com/*",
+        "*://*.taleo.net/*",
+        "*://*.successfactors.com/*",
+        "*://*.icims.com/*"
+      ],
+      "js": ["hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://*/*career*",
+        "*://*/*Career*",
+        "*://*/*jobs*",
+        "*://*/*Jobs*",
+        "*://*/*job/*",
+        "*://*.myworkdayjobs.com/*",
+        "*://*.avature.net/*",
+        "*://*.eightfold.ai/*",
+        "*://*.oraclecloud.com/*",
+        "*://*.taleo.net/*",
+        "*://*.successfactors.com/*",
+        "*://*.icims.com/*"
+      ],
+      "js": ["extract.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}
