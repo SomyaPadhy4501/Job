@@ -3,7 +3,7 @@
 const { CONFIG } = require('../config');
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
-const { classifyRestriction } = require('./clearance');
+const { classifyRestriction, isDisqualifying } = require('./clearance');
 const { extractExperience, levelFromYears, exceedsMaxYoe } = require('./experience');
 
 function stripHtml(html) {
@@ -392,20 +392,6 @@ function buildDedupeKey(company, title, location) {
   return `${normCompany(company)}|${normTitle(title)}|${normLocation(location)}`;
 }
 
-// A config entry's `uscisNames` are the names its employer files H-1B petitions
-// under, where the display name isn't one of them: Cisco files as Cisco
-// Systems, Yahoo as Oath Holdings, AMD as Advanced Micro Devices. They join the
-// row's sponsor_company_fallbacks so the USCIS lookup can find the employer.
-// Matters most for Adzuna rows, whose descriptions are empty and so can only
-// be labelled by that lookup.
-function addSponsorNames(jobs, names) {
-  if (!names || !names.length) return jobs;
-  return jobs.map((j) => ({
-    ...j,
-    sponsor_company_fallbacks: [...(j.sponsor_company_fallbacks || []), ...names],
-  }));
-}
-
 // Main entry. Returns a DB-ready row or null if filtered out.
 function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, retentionDays } = {}) {
   const company_name = (raw.company_name || '').trim();
@@ -486,6 +472,13 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   // Classified against the full description, before the 20k truncation below.
   const restriction = classifyRestriction(`${job_title}\n${description}`);
 
+  // The board is for candidates on OPT who will need H-1B sponsorship, so a
+  // posting that rules them out isn't stored at all: sponsorship NO (refuses
+  // sponsorship, or wants authorization without it) or a restriction that bars
+  // a non-citizen (clearance, citizenship, U.S. person). Advisory and
+  // clearance-preferred labels don't bar anyone and stay.
+  if (sponsorship === 'NO' || isDisqualifying(restriction)) return null;
+
   return {
     dedupe_key: buildDedupeKey(company_name, job_title, location),
     source: raw.source,
@@ -508,7 +501,6 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
 module.exports = {
   normalizeJob,
-  addSponsorNames,
   isExcludedCompany,
   stripHtml,
   buildDedupeKey,

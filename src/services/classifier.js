@@ -103,6 +103,44 @@ function getH1bCache() {
   return _h1bCache;
 }
 
+// Employers whose H-1B petitions are filed under a different name from the one
+// job boards show, keyed by normSlug(board name) → h1b-sponsors.json key.
+// Without these, Capital One, Cisco, Oracle, JPMorgan Chase and Walmart read
+// UNKNOWN on every source despite thousands of approvals — ~1,600 recent rows
+// in the 2026-10-26 snapshot. Kept here rather than in refresh-h1b-data.js's
+// SYNONYMS so a data refresh can't drop them; a test checks every target
+// exists. SpaceX and RTX are left out on purpose: a handful of approvals, and
+// their roles are mostly ITAR-restricted.
+const EMPLOYER_ALIASES = {
+  'amd': 'advanced-micro-devices',
+  'barclays': 'barclays-services',
+  'bloomberg': 'bloomberg-lp',
+  'boeing': 'boeing-company',
+  'broadcom': 'broadcom-corporation',
+  'capital-one': 'capital-one-services',
+  'citadel': 'citadel-americas-services',
+  'citadel-securities': 'citadel-securities-americas-services',
+  'cisco': 'cisco-systems',
+  'cvs-health': 'caremark',
+  'expedia-group': 'expedia',
+  'fedex': 'fedex-corporate-services',
+  'hpe': 'hewlett-packard-enterprise-company',
+  'hpe-simplivity': 'hewlett-packard-enterprise-company',
+  'ibm': 'ibm-corporation',
+  'instana': 'ibm-corporation', // acquired by IBM; Getro still lists it by name
+  'jpmorgan-chase': 'jpmorgan',
+  'mastercard': 'mastercard-international-incorporated',
+  'openai': 'openai-lp',
+  'opower': 'oracle-america', // Oracle subsidiary
+  'oracle': 'oracle-america',
+  'state-street': 'state-street-bank-trust-company',
+  'tmobile': 'mobile-usa', // USCIS "T-Mobile USA"; normSlug drops the lone "t"
+  'usaa': 'united-services-automobile-association',
+  'verizon': 'verizon-data-services',
+  'walmart': 'wal-mart-associates',
+  'yahoo': 'oath-holdings',
+};
+
 // Mirrors normCompany() in normalize.js — must stay in sync.
 const STOPWORDS = new Set(['the', 'and', 'or', 'of', 'for', 'in', 'to', 'a', 'an', 'at']);
 function normSlug(s) {
@@ -145,7 +183,8 @@ function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   const cache = getH1bCache();
   for (const candidate of [companyName, ...fallbackCompanyNames]) {
     if (!candidate) continue;
-    const record = cache[normSlug(candidate)];
+    const slug = normSlug(candidate);
+    const record = cache[slug] || cache[EMPLOYER_ALIASES[slug]];
     if (record && record.approvals_last_2fy >= USCIS_THRESHOLD) {
       return 'YES';
     }
@@ -154,4 +193,4 @@ function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   return 'UNKNOWN';
 }
 
-module.exports = { classifySponsorship };
+module.exports = { classifySponsorship, EMPLOYER_ALIASES, USCIS_THRESHOLD };

@@ -121,17 +121,32 @@ test('an excluded employer is dropped whichever source lists it', () => {
   assert.ok(normalizeJob({ ...row, company_name: 'Shield AI' }, { filterUSOnly: true, filterSoftwareOnly: true }));
 });
 
-test('a config entry\'s H-1B filing names reach the sponsorship lookup', () => {
-  // Adzuna rows have no description, so "Cisco" only resolves through the name
-  // Cisco files under.
-  const { addSponsorNames } = require('../src/services/normalize');
+test('an employer filing H-1Bs under another name is still labelled', () => {
+  // Cisco files as Cisco Systems. Before EMPLOYER_ALIASES every Cisco row with
+  // no sponsorship wording in its text read UNKNOWN.
   const row = {
-    source: 'adzuna', company_name: 'Cisco', job_title: 'Software Engineer',
-    location: 'San Jose, CA', apply_url: 'https://www.adzuna.com/details/1', description: '',
+    source: 'ghlistings', company_name: 'Cisco', job_title: 'Software Engineer',
+    location: 'San Jose, CA', apply_url: 'https://jobs.cisco.com/1', description: '',
+  };
+  assert.strictEqual(normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true }).sponsorship, 'YES');
+});
+
+test('postings that rule out an OPT / H-1B candidate are dropped', () => {
+  const base = {
+    source: 'greenhouse', company_name: 'Acme', job_title: 'Software Engineer',
+    location: 'Austin, TX', apply_url: 'https://boards.greenhouse.io/acme/jobs/1',
   };
   const opts = { filterUSOnly: true, filterSoftwareOnly: true };
-  assert.strictEqual(normalizeJob(row, opts).sponsorship, 'UNKNOWN');
-  const [named] = addSponsorNames([row], ['Cisco Systems']);
-  assert.strictEqual(normalizeJob(named, opts).sponsorship, 'YES');
-  assert.deepStrictEqual(addSponsorNames([row], undefined), [row]);
+  const keep = (description) => normalizeJob({ ...base, description }, opts);
+
+  assert.ok(keep('Build distributed systems in Go.'));
+  // Sponsorship NO: an explicit refusal, or authorization required without it.
+  assert.strictEqual(keep('This position is not eligible for visa sponsorship.'), null);
+  assert.strictEqual(keep('Applicants must be authorized to work in the US without sponsorship.'), null);
+  // Barred outright: clearance, citizenship, U.S. person.
+  assert.strictEqual(keep('Must hold an active TS/SCI clearance.'), null);
+  assert.strictEqual(keep('U.S. citizenship is required for this role.'), null);
+  // Advisory export language bars no one.
+  const advisory = keep('This role may involve access to technology subject to U.S. export control laws.');
+  assert.ok(advisory, 'export-advisory postings stay');
 });

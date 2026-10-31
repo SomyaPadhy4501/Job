@@ -55,8 +55,10 @@ test('getro: enrichment overrides date with the precise postedAt and adds descri
   assert.strictEqual(row.date_posted, '2026-08-13T12:37:28.183Z');
   // The whole reason descriptions are fetched: restriction is classified from
   // description text only, so an un-enriched clearance role looks applicable.
-  const n = normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true, entryLevelMode: 'off' });
-  assert.strictEqual(n.restriction, 'CLEARANCE');
+  // A clearance role is dropped; the same row without that text is kept.
+  const opts = { filterUSOnly: true, filterSoftwareOnly: true, entryLevelMode: 'off' };
+  assert.strictEqual(normalizeJob(row, opts), null);
+  assert.ok(normalizeJob({ ...row, description: 'Build portfolio software.' }, opts));
 });
 
 test('getro: seniority maps only at the ends of the range', () => {
@@ -258,9 +260,12 @@ test('smartrecruiters: description concatenates the sections carrying auth langu
   // CITIZENSHIP / EXPORT_CONTROL fires depends on phrasing and is the
   // clearance classifier's business (see test/clearance.test.js). What matters
   // here is that text living in `qualifications` reaches the classifier at all.
-  const { isDisqualifying } = require('../src/services/clearance');
-  const n = normalizeJob({ ...row, job_title: 'Software Engineer' }, { filterUSOnly: true });
-  assert.ok(isDisqualifying(n.restriction), `expected a blocking restriction, got ${n.restriction}`);
+  const { classifyRestriction, isDisqualifying } = require('../src/services/clearance');
+  const { stripHtml } = require('../src/services/normalize');
+  const label = classifyRestriction(stripHtml(row.description));
+  assert.ok(isDisqualifying(label), `expected a blocking restriction, got ${label}`);
+  // ...and a blocking restriction keeps the row off the board.
+  assert.strictEqual(normalizeJob({ ...row, job_title: 'Software Engineer' }, { filterUSOnly: true }), null);
 });
 
 test('smartrecruiters: buildLocation falls back when fullLocation is absent', () => {
@@ -427,8 +432,10 @@ test('rippling: description joins every rich-text block, not just the role', () 
   assert.ok(row.description.includes('About Opendoor'));
   assert.ok(row.description.includes('build things'));
 
-  const n = normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true });
-  assert.strictEqual(n.restriction, 'CLEARANCE');
+  // The clearance line lives in `role`; reaching the classifier drops the row.
+  const opts = { filterUSOnly: true, filterSoftwareOnly: true };
+  assert.strictEqual(normalizeJob(row, opts), null);
+  assert.ok(normalizeJob({ ...row, description: '<p>You will build things.</p>' }, opts));
 });
 
 test('rippling: buildDescription tolerates a plain string or nothing', () => {
@@ -619,11 +626,10 @@ test('adzuna: a failed request is not retried', async () => {
   }
 });
 
-test('uscisNames all resolve to a sponsor in the USCIS data', () => {
-  // A misspelt filing name fails silently: the row just reads UNKNOWN.
-  for (const c of COMPANIES.filter((e) => e.uscisNames)) {
-    for (const name of c.uscisNames) {
-      assert.strictEqual(classifySponsorship('Software Engineer', '', [name]), 'YES', `${c.slug}: ${name}`);
-    }
+test('every Adzuna employer resolves to a sponsor in the USCIS data', () => {
+  // These rows have no description, so the USCIS lookup is the only label they
+  // get. An employer missing from it (or from EMPLOYER_ALIASES) reads UNKNOWN.
+  for (const c of COMPANIES.filter((e) => e.source === 'adzuna')) {
+    assert.strictEqual(classifySponsorship('Software Engineer', c.displayName), 'YES', c.displayName);
   }
 });

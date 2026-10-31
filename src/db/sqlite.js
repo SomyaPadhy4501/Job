@@ -455,6 +455,17 @@ function pruneOverExperienced(maxYoe) {
   return getDb().prepare('DELETE FROM jobs WHERE yoe_min > ?').run(maxYoe).changes;
 }
 
+// Delete rows that rule out an OPT / H-1B candidate: sponsorship 'NO' or one of
+// the `barred` restriction labels (DISQUALIFYING in src/services/clearance.js).
+// normalizeJob rejects these on the way in; this clears rows stored before it
+// did, including sampled sources that the last_seen sweep never reaches.
+function pruneIneligible(barred) {
+  const placeholders = barred.map(() => '?').join(', ');
+  return getDb()
+    .prepare(`DELETE FROM jobs WHERE sponsorship = 'NO' OR restriction IN (${placeholders})`)
+    .run(...barred).changes;
+}
+
 function startRun() {
   return getDb().prepare('INSERT INTO collection_runs DEFAULT VALUES').run().lastInsertRowid;
 }
@@ -609,4 +620,5 @@ module.exports = {
   pruneStaleJobs,
   pruneUnseenJobs,
   pruneOverExperienced,
+  pruneIneligible,
 };

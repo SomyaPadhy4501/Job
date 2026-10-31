@@ -138,3 +138,24 @@ const NEUTRAL = [
 test('text that names sponsorship without deciding it stays UNKNOWN', () => {
   for (const t of NEUTRAL) assert.strictEqual(fromText(t), 'UNKNOWN', t);
 });
+
+// ─── USCIS lookup aliases ─────────────────────────────────────────────────────
+
+test('every employer alias points at a sponsor in the USCIS data', () => {
+  // A wrong target fails silently — the employer just reads UNKNOWN again.
+  const { EMPLOYER_ALIASES, USCIS_THRESHOLD } = require('../src/services/classifier');
+  const data = require('../src/data/h1b-sponsors.json');
+  for (const [alias, key] of Object.entries(EMPLOYER_ALIASES)) {
+    assert.ok(data[key], `${alias} → ${key} is not in h1b-sponsors.json`);
+    assert.ok(data[key].approvals_last_2fy >= USCIS_THRESHOLD, `${alias} → ${key} is under the threshold`);
+  }
+});
+
+test('board names resolve through the aliases', () => {
+  // The names as job boards print them, 2026-10-26 snapshot.
+  for (const name of ['Capital One', 'Cisco', 'JPMorgan Chase', 'Oracle', 'Walmart', 'T-Mobile', 'HPE', 'Instana']) {
+    assert.strictEqual(classifySponsorship('Software Engineer', name), 'YES', name);
+  }
+  // Text still wins: a stated refusal beats the employer's filing history.
+  assert.strictEqual(classifySponsorship('We are unable to sponsor visas for this role.', 'Capital One'), 'NO');
+});

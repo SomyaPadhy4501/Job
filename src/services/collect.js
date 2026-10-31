@@ -2,13 +2,15 @@
 
 const { SCHEDULED_COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
-const { normalizeJob, addSponsorNames } = require('./normalize');
+const { normalizeJob } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
 const { MAX_YOE } = require('./experience');
 const { refreshedSources } = require('./freshness');
 const {
   bulkUpsert, startRun, finishRun, pruneStaleJobs, pruneUnseenJobs, pruneOverExperienced,
+  pruneIneligible,
 } = require('../db');
+const { DISQUALIFYING } = require('./clearance');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -65,7 +67,7 @@ async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
         slug: r.company.slug,
         count: r.jobs.length,
       });
-      rawJobs.push(...addSponsorNames(r.jobs, r.company.uscisNames));
+      rawJobs.push(...r.jobs);
     } else {
       companiesFail++;
       log.warn('collector.fail', {
@@ -118,6 +120,11 @@ async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
   // Experience-ceiling sweep: rows stored before the 0-2 year ceiling existed.
   const overYoe = await pruneOverExperienced(MAX_YOE);
   if (overYoe > 0) log.info('collection.pruned-yoe', { runId, pruned: overYoe, maxYoe: MAX_YOE });
+
+  // Eligibility sweep: rows stored before normalize dropped postings that rule
+  // out an OPT / H-1B candidate.
+  const ineligible = await pruneIneligible([...DISQUALIFYING]);
+  if (ineligible > 0) log.info('collection.pruned-ineligible', { runId, pruned: ineligible });
 
   await finishRun(runId, {
     companies_ok: companiesOk,

@@ -195,6 +195,15 @@ async function pruneOverExperienced(maxYoe) {
   return rowCount;
 }
 
+// See the note on pruneIneligible in sqlite.js.
+async function pruneIneligible(barred) {
+  const { rowCount } = await getPool().query(
+    "DELETE FROM jobs WHERE sponsorship = 'NO' OR restriction = ANY($1)",
+    [barred],
+  );
+  return rowCount;
+}
+
 async function startRun() {
   const { rows } = await getPool().query(
     `INSERT INTO collection_runs (started_at) VALUES ($1) RETURNING id`,
@@ -346,4 +355,5 @@ module.exports = {
   pruneStaleJobs,
   pruneUnseenJobs,
   pruneOverExperienced,
+  pruneIneligible,
 };
