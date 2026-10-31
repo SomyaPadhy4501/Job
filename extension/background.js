@@ -29,6 +29,7 @@ const defaults = {
   // Tesla and Wayfair, which block automated browsers and are untested.
   boards: [
     'https://www.tesla.com/careers/search/?country=US',
+    'https://jobs.apple.com/en-us/search?location=united-states-USA&search=software%20engineer',
     'https://www.wayfair.com/careers/jobs',
     'https://careers.americanexpress.com/en/sites/CX_1/jobs?keyword=software%20engineer',
     'https://jobs.nokia.com/en/sites/CX_1/jobs?keyword=software',
@@ -53,6 +54,7 @@ const defaults = {
   autoOpen: true,
   autoEveryHours: 3,
   autoClose: true,
+  allowSensitive: false,
   lastRunAt: '',
   log: [],
 };
@@ -140,12 +142,16 @@ async function handleJobs(msg, tabId) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isSensitiveUrl = (u) => {
+  try { return /(^|\.)(linkedin\.com|indeed\.com|glassdoor\.com)$/i.test(new URL(u).hostname); } catch { return false; }
+};
 
 // Opens the boards in their own unfocused window, one every few seconds, then
 // closes that window once the last page has had time to report.
 async function openBoards({ scheduled }) {
   const s = await getSettings();
-  const boards = s.boards.slice(0, MAX_BOARDS);
+  // Never open LinkedIn / Indeed / Glassdoor on a schedule (see extract.js).
+  const boards = s.boards.filter((u) => !isSensitiveUrl(u)).slice(0, MAX_BOARDS);
   if (!boards.length) return;
   if (scheduled) await chrome.storage.local.set({ lastRunAt: new Date().toISOString() });
 

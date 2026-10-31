@@ -138,3 +138,30 @@ test('candidateTemplates tries next to the search page first', () => {
     'https://www.tesla.com/careers/search/jobs/{id}',
   ]);
 });
+
+test('reads Apple search results: name+country locations and summaries', () => {
+  const json = { loaderData: { search: { searchResults: [1, 2, 3].map((i) => ({
+    id: `20067830${i}-0836`, positionId: `20067830${i}`, postingTitle: `Software Engineer ${i}`,
+    jobSummary: 'Build things at Apple.', postDateInGMT: '2026-10-31T05:22:24.836Z',
+    locations: [{ name: 'Cupertino', city: '', stateProvince: '', countryName: 'United States of America' }],
+  })) } } };
+  const [r] = X.extractFromJson(json, ctx('https://jobs.apple.com/en-us/search'));
+  assert.strictEqual(r.location, 'Cupertino, United States of America');
+  assert.strictEqual(r.description, 'Build things at Apple.');
+  assert.strictEqual(r.date_posted, '2026-10-31T05:22:24.836Z');
+});
+
+test('LinkedIn job cards: URN ids, {text} fields, view links', () => {
+  assert.strictEqual(X.idValue('urn:li:fsd_jobPosting:4012345678'), '4012345678');
+  assert.strictEqual(X.idValue({ text: 'Google' }), 'Google');
+  assert.ok(X.isSensitiveHost('www.linkedin.com'));
+  assert.ok(!X.isSensitiveHost('jobs.apple.com'));
+  const json = { included: [1, 2, 3].map((i) => ({
+    jobPostingTitle: `Software Engineer ${i}`, jobPostingUrn: `urn:li:fsd_jobPosting:40123456${i}`,
+    primaryDescription: { text: 'Stripe' }, secondaryDescription: { text: 'Seattle, WA (On-site)' },
+  })) };
+  const [r] = X.extractFromJson(json, ctx('https://www.linkedin.com/jobs/search/'));
+  assert.strictEqual(r.company_name, 'Stripe');
+  assert.strictEqual(r.location, 'Seattle, WA (On-site)');
+  assert.strictEqual(r.external_id, 'www.linkedin.com:401234561');
+});

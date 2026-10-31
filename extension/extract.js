@@ -16,12 +16,12 @@
 // the UMD-style export at the bottom.
 
 (function (root) {
-  const TITLE_KEYS = ['title', 'jobTitle', 'job_title', 'postingTitle', 'jobOpeningName', 'positionName', 'position', 'text', 'name', 't'];
-  const ID_KEYS = ['id', 'jobId', 'job_id', 'jobID', 'requisitionId', 'reqId', 'req_id', 'shortcode', 'guid', 'uuid', 'externalId', 'jobReqId', 'eid'];
+  const TITLE_KEYS = ['title', 'jobTitle', 'job_title', 'postingTitle', 'jobPostingTitle', 'jobOpeningName', 'positionName', 'position', 'text', 'name', 't'];
+  const ID_KEYS = ['id', 'jobId', 'job_id', 'jobID', 'positionId', 'jobPostingId', 'jobPostingUrn', 'requisitionId', 'reqId', 'req_id', 'shortcode', 'guid', 'uuid', 'externalId', 'jobReqId', 'eid'];
   const URL_KEYS = ['absolute_url', 'job_path', 'applyUrl', 'apply_url', 'hostedUrl', 'jobUrl', 'job_url', 'url', 'canonicalPositionUrl', 'postingUrl', 'detailUrl', 'link', 'href', 'externalPath', 'externalUrl', 'shortlink'];
-  const LOCATION_KEYS = ['location', 'locationName', 'primaryLocation', 'locations', 'cityState', 'multi_location', 'locationsText', 'jobLocation', 'primaryLocation', 'city', 'workLocation', 'atsLocation', 'fullLocation', 'l', 'loc'];
-  const DATE_KEYS = ['datePosted', 'date_posted', 'postedOn', 'postedDate', 'posted_at', 'publishedAt', 'published_at', 'published_on', 'first_published_at', 'releasedDate', 'createdAt', 'created_at', 'created', 'updated_at', 'updatedAt', 't_update', 't_create'];
-  const DESC_KEYS = ['description', 'descriptionHtml', 'content', 'jobDescription', 'job_description', 'body', 'summary'];
+  const LOCATION_KEYS = ['location', 'locationName', 'formattedLocation', 'primaryLocation', 'locations', 'cityState', 'multi_location', 'locationsText', 'jobLocation', 'primaryLocation', 'city', 'workLocation', 'atsLocation', 'fullLocation', 'l', 'loc'];
+  const DATE_KEYS = ['datePosted', 'date_posted', 'postDateInGMT', 'postingDate', 'listedAt', 'postedOn', 'postedDate', 'posted_at', 'publishedAt', 'published_at', 'published_on', 'first_published_at', 'releasedDate', 'createdAt', 'created_at', 'created', 'updated_at', 'updatedAt', 't_update', 't_create'];
+  const DESC_KEYS = ['description', 'descriptionHtml', 'content', 'jobDescription', 'job_description', 'body', 'summary', 'jobSummary'];
 
   const MIN_ITEMS = 3;
   const MIN_SCORE = 0.7;
@@ -57,9 +57,24 @@
     return o;
   }
 
+  // Also unwraps LinkedIn-style text objects: { text: "Google" }.
   function str(v) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.text === 'string') return v.text.trim();
     return typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
   }
+
+  // LinkedIn ids arrive as URNs: "urn:li:fsd_jobPosting:4012345678".
+  function idValue(v) {
+    const t = str(v);
+    const m = /^urn:li:[^:]+:\(?(\d{5,})/.exec(t);
+    return m ? m[1] : t;
+  }
+
+  // Sites whose terms ban automated collection and that restrict accounts
+  // for it. Captured only from pages the user opens, only when they opt in,
+  // never opened on a schedule and never sent extra detail requests.
+  const SENSITIVE_HOST = /(^|\.)(linkedin\.com|indeed\.com|glassdoor\.com)$/i;
+  const isSensitiveHost = (host) => SENSITIVE_HOST.test(String(host || ''));
 
   // Locations come as a string, a {city,state,country} object, an array of
   // either, or a nested {name}. Flatten to "City, State, Country".
@@ -77,7 +92,13 @@
       return us || parts[0] || '';
     }
     if (typeof v === 'object') {
-      if (typeof v.name === 'string' && v.name.trim() && !v.city) return v.name.trim();
+      if (typeof v.text === 'string' && v.text.trim()) return v.text.trim(); // LinkedIn { text }
+      if (typeof v.name === 'string' && v.name.trim() && !v.city) {
+        // Apple: { name: "Cupertino", stateProvince: "", countryName: "United States of America" }
+        const rest = [v.stateProvince || v.state || v.region, v.countryName || v.country]
+          .filter((x) => typeof x === 'string' && x.trim() && !v.name.includes(x));
+        return [v.name.trim(), ...rest].join(', ');
+      }
       if (v.address) return locationText(v.address, depth + 1); // JSON-LD Place
       const city = v.city || v.addressLocality;
       const region = v.state || v.region || v.province || v.addressRegion || v.stateName;
@@ -150,7 +171,7 @@
     const o = unwrap(raw);
     const job_title = str(pick(o, TITLE_KEYS));
     const lowerKeys = new Map(Object.keys(o).map((k) => [k.toLowerCase(), k]));
-    const ids = [...new Set(ID_KEYS.map((k) => str(o[k] ?? o[lowerKeys.get(k.toLowerCase())])).filter(Boolean))];
+    const ids = [...new Set(ID_KEYS.map((k) => idValue(o[k] ?? o[lowerKeys.get(k.toLowerCase())])).filter(Boolean))];
     const id = ids[0] || '';
     const rawUrl = str(pick(o, URL_KEYS));
     let apply_url = '';
@@ -166,7 +187,11 @@
       apply_url = u.toString();
     }
     const desc = pick(o, DESC_KEYS);
-    const company = o.company?.name || o.companyName || o.company_name || o.hiringOrganization?.name || ctx.company;
+    // LinkedIn job cards carry the employer as primaryDescription and the
+    // location as secondaryDescription; elsewhere those names mean other things.
+    const li = isSensitiveHost(new URL(ctx.pageUrl).hostname);
+    const company = o.company?.name || o.companyName || o.company_name || o.hiringOrganization?.name ||
+      (li ? str(o.primaryDescription) : '') || ctx.company;
     return {
       external_id: `${new URL(ctx.pageUrl).hostname}:${id || apply_url}`,
       company_name: str(company) || ctx.company || '',
@@ -185,7 +210,8 @@
   //  - a bare city ("Torrance") when the item also carries state / country
   //    fields (Jibe/iCIMS), which the server's US check can't place alone.
   function resolveLocation(o, ctx) {
-    const raw = pick(o, LOCATION_KEYS);
+    const raw = pick(o, LOCATION_KEYS) ??
+      (isSensitiveHost(new URL(ctx.pageUrl).hostname) ? o.secondaryDescription : undefined);
     const asText = typeof raw === 'string' || typeof raw === 'number' ? String(raw).trim() : '';
     if (asText && /^[A-Za-z0-9_-]{1,12}$/.test(asText) && /^\d+$|^[A-Z0-9_-]+$/.test(asText) && ctx.lookups) {
       for (const [name, dict] of ctx.lookups) {
@@ -328,6 +354,7 @@
   // https://www.tesla.com/careers/search/job/274330 (2026-10-31).
   const KNOWN_TEMPLATES = {
     'www.tesla.com': 'https://www.tesla.com/careers/search/job/{id}',
+    'www.linkedin.com': 'https://www.linkedin.com/jobs/view/{id}/',
   };
 
   // Per-job detail sources tried before the job's own page. Tesla's job pages
@@ -423,7 +450,7 @@
 
   const api = { extractFromJson, extractFromJsonLd, usable, companyFromHost, companyFromUrl, cleanSiteName, locationText, dateText, scoreArray,
     KNOWN_TEMPLATES, isPlaceholder, rowId, slugify, fillTemplate, learnTemplate, candidateTemplates,
-    KNOWN_DETAIL, descriptionFromJson, descriptionFromHtml, worthDetail };
+    KNOWN_DETAIL, descriptionFromJson, descriptionFromHtml, worthDetail, isSensitiveHost, idValue };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JobExtract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

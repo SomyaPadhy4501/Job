@@ -51,14 +51,34 @@ those boards. **Tesla and Wayfair are untested**, because both block every
 automated client, including the one used for these tests. If the badge shows
 nothing on Tesla, the response shape needs a small adapter in `extract.js`.
 
-Not yet supported: Apple (listings render without a JSON payload), SAP
+Not yet supported: SAP
 SuccessFactors and Taleo boards (plain HTML), IBM.
 
-## Daily run
+## Where it runs
 
-At 10:00 (configurable), or on the first Chrome start after it if the
-computer was off, the extension opens "My boards" once in a background window
-— one tab every 4 s, max 25 — and closes the window about a minute after the last one.
+The manifest matches every page, but a gate in `hook.js` / `content.js`
+switches the scripts off immediately unless the host looks like a careers
+site (`careers.`, `jobs.`, a known ATS) or the path mentions careers, jobs,
+search results or openings. Chrome's match patterns can't express "host
+starts with careers.", which is why this isn't done in the manifest.
+
+## LinkedIn, Indeed, Glassdoor
+
+Off by default ("Capture LinkedIn / Indeed / Glassdoor pages I browse" in the
+popup). Their terms ban automated collection and they restrict accounts for
+it, so even when enabled the extension only reads job lists on pages you open
+yourself: they can't be scheduled boards, and they never get link probes or
+description requests.
+
+## Scheduled run
+
+Every 3 hours (configurable), or on the first check after the computer wakes
+if a run was missed, the extension opens "My boards" in a background window —
+one tab every 4 s, max 25. Each tab closes itself a few seconds after its jobs
+are sent, and a 3-minute alarm closes anything left. For new jobs that will
+plausibly be kept it also fetches the job's own page (≤ 25 per board per run,
+1.2 s apart, 10 s timeout, never the same job twice) so the board can tag
+years of experience and ITAR/clearance wording.
 Chrome has to be running for this; on a Mac, add Chrome to System Settings →
 General → Login Items so it starts with the machine.
 

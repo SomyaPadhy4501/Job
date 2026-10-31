@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "description": "Sends the job listings a careers page loads to your own job board. Personal use; load unpacked.",
   "permissions": [
     "storage",
@@ -22,30 +22,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*/*career*",
-        "*://*/*Career*",
-        "*://*/*jobs*",
-        "*://*/*Jobs*",
-        "*://*/*job/*",
-        "*://*.myworkdayjobs.com/*",
-        "*://*.avature.net/*",
-        "*://*.eightfold.ai/*",
-        "*://*.oraclecloud.com/*",
-        "*://*.taleo.net/*",
-        "*://*.successfactors.com/*",
-        "*://*.icims.com/*",
-        "*://*.ashbyhq.com/*",
-        "*://*.greenhouse.io/*",
-        "*://*.lever.co/*",
-        "*://apply.workable.com/*",
-        "*://*.smartrecruiters.com/*",
-        "*://*.recruitee.com/*",
-        "*://*.pinpointhq.com/*",
-        "*://*.bamboohr.com/*",
-        "*://jobs.gem.com/*",
-        "*://ats.rippling.com/*",
-        "*://*.jobvite.com/*",
-        "*://*.phenompeople.com/*"
+        "<all_urls>"
       ],
       "js": [
         "hook.js"
@@ -56,30 +33,7 @@
     },
     {
       "matches": [
-        "*://*/*career*",
-        "*://*/*Career*",
-        "*://*/*jobs*",
-        "*://*/*Jobs*",
-        "*://*/*job/*",
-        "*://*.myworkdayjobs.com/*",
-        "*://*.avature.net/*",
-        "*://*.eightfold.ai/*",
-        "*://*.oraclecloud.com/*",
-        "*://*.taleo.net/*",
-        "*://*.successfactors.com/*",
-        "*://*.icims.com/*",
-        "*://*.ashbyhq.com/*",
-        "*://*.greenhouse.io/*",
-        "*://*.lever.co/*",
-        "*://apply.workable.com/*",
-        "*://*.smartrecruiters.com/*",
-        "*://*.recruitee.com/*",
-        "*://*.pinpointhq.com/*",
-        "*://*.bamboohr.com/*",
-        "*://jobs.gem.com/*",
-        "*://ats.rippling.com/*",
-        "*://*.jobvite.com/*",
-        "*://*.phenompeople.com/*"
+        "<all_urls>"
       ],
       "js": [
         "extract.js",

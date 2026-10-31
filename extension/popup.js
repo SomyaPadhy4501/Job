@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const defaults = { enabled: true, portalUrl: '', token: '', boards: [], autoOpen: true, autoEveryHours: 3, autoClose: true, lastRunAt: '', log: [] };
+const defaults = { enabled: true, portalUrl: '', token: '', boards: [], autoOpen: true, autoEveryHours: 3, autoClose: true, allowSensitive: false, lastRunAt: '', log: [] };
 
 function renderLog(log) {
   if (!log.length) return;
@@ -27,6 +27,7 @@ chrome.storage.local.get(defaults).then((s) => {
   $('autoOpen').checked = s.autoOpen;
   $('autoEveryHours').value = s.autoEveryHours;
   $('autoClose').checked = s.autoClose;
+  $('allowSensitive').checked = s.allowSensitive;
   $('lastRun').textContent = s.lastRunAt
     ? `Last automatic run: ${new Date(s.lastRunAt).toLocaleString()}`
     : 'Automatic run has not happened yet.';
@@ -37,7 +38,9 @@ chrome.storage.local.get(defaults).then((s) => {
 $('enabled').addEventListener('change', () => chrome.storage.local.set({ enabled: $('enabled').checked }));
 
 $('save').addEventListener('click', async () => {
-  const boards = $('boards').value.split('\n').map((x) => x.trim()).filter((x) => /^https?:\/\//.test(x));
+  // LinkedIn / Indeed / Glassdoor can't be scheduled boards — see extract.js.
+  const boards = $('boards').value.split('\n').map((x) => x.trim())
+    .filter((x) => /^https?:\/\//.test(x) && !/(linkedin|indeed|glassdoor)\.com/i.test(x));
   await chrome.storage.local.set({
     portalUrl: $('portalUrl').value.trim().replace(/\/+$/, ''),
     token: $('token').value.trim(),
@@ -45,6 +48,7 @@ $('save').addEventListener('click', async () => {
     autoOpen: $('autoOpen').checked,
     autoEveryHours: Math.min(24, Math.max(1, Number($('autoEveryHours').value) || 3)),
     autoClose: $('autoClose').checked,
+    allowSensitive: $('allowSensitive').checked,
   });
   $('save').textContent = 'Saved';
   setTimeout(() => ($('save').textContent = 'Save'), 1200);

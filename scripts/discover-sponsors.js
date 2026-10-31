@@ -24,6 +24,7 @@
 //
 //   node scripts/discover-sponsors.js                  # sponsors with ≥ 50 approvals
 //   node scripts/discover-sponsors.js 20               # ≥ 20 approvals (~3.7k employers, slow)
+//   node scripts/discover-sponsors.js 20 50            # one tier: 20-49 approvals
 //   node scripts/discover-sponsors.js 50 > scripts/sponsors-discovered.txt
 //
 // Review before merging. Tenant guesses can collide (a "visa" tenant need not
@@ -39,7 +40,8 @@ const UA = 'job-aggregator (+https://github.com/SomyaPadhy4501/Job)';
 const TIMEOUT_MS = 9_000;
 const MAX_HTML = 2_000_000;
 const WD_SHARDS = ['1', '3', '5', '12', '10', '2', '103', '108'];
-const CONCURRENCY = 10;
+// Workday rate-limits by IP across tenants; 6 keeps a long run under it.
+const CONCURRENCY = 6;
 
 // ─── HTTP ────────────────────────────────────────────────────────────────────
 
@@ -252,12 +254,14 @@ function display(core) {
 
 async function main() {
   const minApprovals = Number(process.argv[2]) || 50;
+  // Optional upper bound, to probe one tier at a time: `… 20 50` = 20-49.
+  const maxApprovals = Number(process.argv[3]) || Infinity;
   const isCovered = buildCovered();
   const knownTenants = new Set(COMPANIES.filter((c) => c.source === 'workday').map((c) => c.tenant));
 
   const gap = Object.entries(SPONSORS)
     .map(([key, v]) => ({ key, approvals: v.approvals_last_2fy || 0 }))
-    .filter((s) => s.approvals >= minApprovals && !isCovered(s.key))
+    .filter((s) => s.approvals >= minApprovals && s.approvals < maxApprovals && !isCovered(s.key))
     .sort((a, b) => b.approvals - a.approvals);
 
   process.stderr.write(`${gap.length} uncovered sponsors with ≥ ${minApprovals} approvals — probing…\n`);
