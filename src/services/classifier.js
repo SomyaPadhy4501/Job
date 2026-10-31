@@ -62,6 +62,37 @@ function getH1bCache() {
   return _h1bCache;
 }
 
+// USCIS records the legal petitioner, which is usually the brand plus more
+// words: "capital-one-services", "american-express-travel-related-services-
+// company", "state-street-bank-trust-company". A posting says "Capital One".
+// Exact lookup missed 582 rows at 93 such sponsors (2026-10-31), and with the
+// board defaulting to sponsorship = YES those rows were hidden.
+//
+// So also index every leading run of 2+ words of each USCIS key, keeping the
+// highest approval count among keys sharing it. Single words are deliberately
+// excluded: "united" would match United Healthcare for United Airlines.
+let _prefixCache = null;
+function getPrefixCache() {
+  if (_prefixCache) return _prefixCache;
+  _prefixCache = new Map();
+  for (const [key, rec] of Object.entries(getH1bCache())) {
+    const parts = key.split('-');
+    for (let i = 2; i < parts.length; i++) {
+      const p = parts.slice(0, i).join('-');
+      const n = rec.approvals_last_2fy || 0;
+      if (n > (_prefixCache.get(p) || 0)) _prefixCache.set(p, n);
+    }
+  }
+  return _prefixCache;
+}
+
+function approvalsFor(slug) {
+  if (!slug) return 0;
+  const exact = getH1bCache()[slug];
+  if (exact) return exact.approvals_last_2fy || 0;
+  return slug.includes('-') ? getPrefixCache().get(slug) || 0 : 0;
+}
+
 // Mirrors normCompany() in normalize.js — must stay in sync.
 const STOPWORDS = new Set(['the', 'and', 'or', 'of', 'for', 'in', 'to', 'a', 'an', 'at']);
 function normSlug(s) {
@@ -97,16 +128,12 @@ function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   }
   // 3. USCIS lookup — company_name drives the signal; description alone misses
   //    ~516 rows that have no description text (Workday, Microsoft, Goldman, etc.)
-  const cache = getH1bCache();
   for (const candidate of [companyName, ...fallbackCompanyNames]) {
     if (!candidate) continue;
-    const record = cache[normSlug(candidate)];
-    if (record && record.approvals_last_2fy >= USCIS_THRESHOLD) {
-      return 'YES';
-    }
+    if (approvalsFor(normSlug(candidate)) >= USCIS_THRESHOLD) return 'YES';
   }
   // 4. Fall through
   return 'UNKNOWN';
 }
 
-module.exports = { classifySponsorship };
+module.exports = { classifySponsorship, approvalsFor, normSlug };

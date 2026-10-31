@@ -133,7 +133,17 @@ test('title rules leave ordinary titles alone', () => {
   }
 });
 
-test('restricted employer blocks only when there is no description to judge', () => {
+test('defense employers block always; RTX only without a description', () => {
+  // Anduril with a description that omits the citizenship clause — the gap
+  // that kept 9 Anduril rows visible.
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'Software Engineer', company_name: 'Anduril Industries', description: LONG_NEUTRAL }),
+    'DEFENSE_EMPLOYER',
+  );
+  assert.strictEqual(
+    deriveRestriction({ job_title: 'Software Engineer', company_name: 'RTX' }),
+    'DEFENSE_EMPLOYER',
+  );
   assert.strictEqual(
     deriveRestriction({ job_title: 'Software Engineer', company_name: 'Northrop Grumman' }),
     'DEFENSE_EMPLOYER',
@@ -183,4 +193,23 @@ test('sponsorship NO needs an explicit refusal', () => {
     classifySponsorship('must be legally authorized to work in the united states', ''),
     'NO',
   );
+});
+
+test("owner's exclusion list hides Netflix, xAI and Capgemini from any source", () => {
+  for (const company_name of ['Netflix', 'xAI', 'X.ai', 'Capgemini', 'Capgemini America']) {
+    assert.strictEqual(
+      deriveRestriction({ job_title: 'Software Engineer', company_name, description: LONG_NEUTRAL, sponsorship: 'YES' }),
+      'EXCLUDED_EMPLOYER',
+      company_name,
+    );
+  }
+  assert.strictEqual(deriveRestriction({ job_title: 'Software Engineer', company_name: 'Netlify', description: LONG_NEUTRAL }), '');
+});
+
+test('USCIS lookup matches brand names that prefix the legal petitioner name', () => {
+  // "capital-one-services", "american-express-travel-related-services-company"
+  assert.strictEqual(classifySponsorship('software engineer', 'Capital One'), 'YES');
+  assert.strictEqual(classifySponsorship('software engineer', 'American Express'), 'YES');
+  // An explicit refusal still beats the lookup.
+  assert.strictEqual(classifySponsorship('we are unable to sponsor visas', 'Capital One'), 'NO');
 });

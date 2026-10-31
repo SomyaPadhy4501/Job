@@ -211,10 +211,15 @@ const TITLE_GOVERNMENT_EXCEPT = /\bgovernment (?:affairs|relations)\b/;
 // Employers whose engineering roles are effectively all US-person-only (ITAR
 // primes, cleared-work contractors, export-controlled space hardware).
 //
-// Applied ONLY when a row has no description to judge. Where text exists, the
-// description classifier stays authoritative — RTX, for one, does sponsor
-// specific roles ("The company will offer immigration sponsorship for this
-// role"), and those must stay visible.
+// Two tiers (owner's call, 2026-10-31: "be sure of the ones which sponsor"):
+//   - RESTRICTED_EMPLOYERS — blocked ALWAYS. Their roles are effectively all
+//     US-person-only, and descriptions that omit the clause are the gap, not
+//     evidence of an exception: 9 Anduril rows had descriptions with no
+//     citizenship wording and stayed visible under the old no-description-only
+//     rule.
+//   - RESTRICTED_UNLESS_DESCRIBED — blocked only when there is no description
+//     to judge. RTX does sponsor specific roles ("The company will offer
+//     immigration sponsorship for this role"), so its text stays authoritative.
 //
 // Evidence, from rows that did carry a description on 2026-10-31: Anduril
 // 376/423 restricted, SpaceX 147/147, True Anomaly 13/13, Varda 24/24,
@@ -231,12 +236,15 @@ const TITLE_GOVERNMENT_EXCEPT = /\bgovernment (?:affairs|relations)\b/;
 // Patterns run against normalizeForMatch(company_name), anchored at the start
 // so "BAE Systems, Inc." and "The Boeing Company" match but a company that
 // merely contains the word does not.
+const RESTRICTED_UNLESS_DESCRIBED = [
+  /^rtx\b/,
+  /^raytheon\b/,
+];
+
 const RESTRICTED_EMPLOYERS = [
   /^(?:the )?boeing\b/,
   /^lockheed\b/,
   /^northrop\b/,
-  /^rtx\b/,
-  /^raytheon\b/,
   /^l3 ?harris\b/,
   /^general dynamics\b/,
   /^gdit\b/,
@@ -278,27 +286,47 @@ const RESTRICTED_EMPLOYERS = [
 // string.
 const MIN_DESCRIPTION_CHARS = 200;
 
-function isRestrictedEmployer(companyName) {
+// Employers the owner chose not to see at all, whatever they sponsor.
+// Netflix and xAI, 2026-10-31. Capgemini, same day: its US postings are not
+// actually sponsored in practice, despite 4,555 USCIS approvals — the owner's
+// judgement overrides the H-1B lookup here. Add to this list rather than deleting a
+// collector's rows — it applies to every source (xAI arrives via Greenhouse
+// and as "X.ai" via Getro) and to rows already in the DB via the backfill.
+const EXCLUDED_EMPLOYERS = [
+  /^netflix\b/,
+  /^x\.?ai\b/,
+  /^capgemini\b/,
+];
+
+const matchesAny = (list, companyName) => {
   const name = normalizeForMatch(companyName);
-  return !!name && RESTRICTED_EMPLOYERS.some((p) => p.test(name));
+  return !!name && list.some((p) => p.test(name));
+};
+
+function isRestrictedEmployer(companyName) {
+  return matchesAny(RESTRICTED_EMPLOYERS, companyName);
 }
 
 // Full restriction verdict for a row. Precedence (first match wins):
-//   1. Source-supplied label (ghlistings "U.S. Citizenship is Required")
-//   2. Blocking verdict from the description           → CLEARANCE / EXPORT_CONTROL / CITIZENSHIP
-//   3. Clearance named in the title                    → CLEARANCE
-//   4. Government-programme title                      → GOVERNMENT
-//   5. Explicit "we won't sponsor" (sponsorship = NO)  → NO_SPONSORSHIP
-//   6. No description + restricted employer            → DEFENSE_EMPLOYER
-//   7. Advisory verdict from the description, or ''
+//   1. Owner's exclusion list                          → EXCLUDED_EMPLOYER
+//   2. Source-supplied label (ghlistings "U.S. Citizenship is Required")
+//   3. Blocking verdict from the description           → CLEARANCE / EXPORT_CONTROL / CITIZENSHIP
+//   4. Defense / ITAR employer                         → DEFENSE_EMPLOYER
+//   5. Clearance named in the title                    → CLEARANCE
+//   6. Government-programme title                      → GOVERNMENT
+//   7. Explicit "we won't sponsor" (sponsorship = NO)  → NO_SPONSORSHIP
+//   8. No description + RTX / Raytheon                 → DEFENSE_EMPLOYER
+//   9. Advisory verdict from the description, or ''
 //
 // Kept separate from classifyRestriction() so that function stays a pure
 // text → verdict mapping (and its regression tests stay meaningful).
 function deriveRestriction({ job_title, description, company_name, sponsorship, restriction_override } = {}) {
+  if (matchesAny(EXCLUDED_EMPLOYERS, company_name)) return 'EXCLUDED_EMPLOYER';
   if (restriction_override && DISQUALIFYING.has(restriction_override)) return restriction_override;
 
   const fromText = classifyRestriction(`${job_title || ''}\n${description || ''}`);
   if (DISQUALIFYING.has(fromText)) return fromText;
+  if (isRestrictedEmployer(company_name)) return 'DEFENSE_EMPLOYER';
 
   const title = normalizeForMatch(job_title);
   if (TITLE_CLEARANCE.test(title) && !TITLE_CLEARANCE_OPTIONAL.test(title)) return 'CLEARANCE';
@@ -307,7 +335,7 @@ function deriveRestriction({ job_title, description, company_name, sponsorship, 
   if (sponsorship === 'NO') return 'NO_SPONSORSHIP';
 
   const bodyChars = normalizeForMatch(description).length;
-  if (bodyChars < MIN_DESCRIPTION_CHARS && isRestrictedEmployer(company_name)) {
+  if (bodyChars < MIN_DESCRIPTION_CHARS && matchesAny(RESTRICTED_UNLESS_DESCRIBED, company_name)) {
     return 'DEFENSE_EMPLOYER';
   }
 
@@ -328,6 +356,7 @@ const DISQUALIFYING = new Set([
   'GOVERNMENT',
   'DEFENSE_EMPLOYER',
   'NO_SPONSORSHIP',
+  'EXCLUDED_EMPLOYER',
 ]);
 
 // SQL literal list for the `restriction IN (...)` filter. Built from the set so
