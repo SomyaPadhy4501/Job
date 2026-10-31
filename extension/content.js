@@ -5,6 +5,7 @@
   const {
     extractFromJson, extractFromJsonLd, usable, companyFromHost, companyFromUrl, cleanSiteName,
     KNOWN_TEMPLATES, isPlaceholder, rowId, fillTemplate, learnTemplate, candidateTemplates,
+    KNOWN_DETAIL, descriptionFromJson, descriptionFromHtml, worthDetail,
   } = globalThis.JobExtract;
 
   function pageCompany() {
@@ -57,7 +58,71 @@
     } catch {
       /* keep placeholders — a working Apply link to the search page beats none */
     }
+    try {
+      rows = await addDescriptions(rows);
+    } catch {
+      /* rows still go out; they just lack experience / restriction text */
+    }
     chrome.runtime.sendMessage({ type: 'jobs', pageUrl: location.href, rows });
+  }
+
+  // ─── Descriptions for list-only boards ──────────────────────────────────
+  //
+  // Tesla's list (and others) carries no description, so the server can't
+  // read "3+ years required", ITAR clauses or sponsorship lines. For rows that
+  // will plausibly be kept, fetch the job's own page once and cache the text
+  // in extension storage — every later run re-sends it, so an upsert never
+  // overwrites a known description with an empty one.
+  //
+  // Bounded on purpose: ≤ 25 new jobs per board per run, ~1.2 s apart, from
+  // the user's own tab, and never the same job twice.
+  const DETAIL_PER_RUN = 25;
+  const DETAIL_GAP_MS = 1200;
+  const DESC_CACHE_MAX = 1500;
+
+  async function addDescriptions(rows) {
+    const key = `desc:${location.hostname}`;
+    const cache = (await chrome.storage.local.get(key))[key] || {};
+    let fetched = 0;
+    for (const r of rows) {
+      if (r.description) continue;
+      if (cache[r.external_id] != null) { r.description = cache[r.external_id]; continue; }
+      if (fetched >= DETAIL_PER_RUN || !worthDetail(r)) continue;
+      // eslint-disable-next-line no-await-in-loop
+      if (fetched) await new Promise((res) => setTimeout(res, DETAIL_GAP_MS));
+      fetched++;
+      // eslint-disable-next-line no-await-in-loop
+      const text = await fetchDescription(r);
+      cache[r.external_id] = text; // '' too, so a page without one isn't retried daily
+      if (text) r.description = text;
+    }
+    const ids = Object.keys(cache);
+    if (ids.length > DESC_CACHE_MAX) for (const id of ids.slice(0, ids.length - DESC_CACHE_MAX)) delete cache[id];
+    if (fetched) await chrome.storage.local.set({ [key]: cache });
+    return rows;
+  }
+
+  async function fetchDescription(row) {
+    const urls = [];
+    if (KNOWN_DETAIL[location.hostname]) urls.push(fillTemplate(KNOWN_DETAIL[location.hostname], row));
+    if (!isPlaceholder(row)) urls.push(row.apply_url);
+    for (const url of urls) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const body = await res.text();
+        if (body.trimStart().startsWith('{')) {
+          const d = descriptionFromJson(JSON.parse(body));
+          if (d) return d;
+        } else {
+          const d = descriptionFromHtml(body);
+          if (d) return d;
+        }
+      } catch { /* try the next source */ }
+    }
+    return '';
   }
 
   // ─── Real links for id-only rows ────────────────────────────────────────

@@ -1,7 +1,8 @@
 'use strict';
 
-// Daily-run decision, kept pure so it can be tested in Node. Loaded into the
-// service worker with importScripts().
+// Run-schedule decisions, kept pure so they can be tested in Node. Loaded into
+// the service worker with importScripts(). The extension uses isDueEvery (every
+// N hours, owner's call 2026-10-31); isDue is the earlier once-a-day rule.
 //
 // Rule: run once per local calendar day, at or after the scheduled time. If
 // the computer or Chrome was off at that time, the first check after it comes
@@ -34,7 +35,18 @@
     return t;
   }
 
-  const api = { isDue, nextRun, localDay, parseTime };
+  // Interval mode: due when `hours` have passed since the last run (ISO
+  // string, or '' for never). A machine that was off or asleep past the
+  // interval runs on the first check after it wakes.
+  function isDueEvery(now, lastRunAt, hours) {
+    const h = Number(hours) > 0 ? Number(hours) : 3;
+    if (!lastRunAt) return true;
+    const last = new Date(lastRunAt).getTime();
+    if (!Number.isFinite(last)) return true;
+    return now.getTime() - last >= h * 3_600_000;
+  }
+
+  const api = { isDue, isDueEvery, nextRun, localDay, parseTime };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JobSchedule = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

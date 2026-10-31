@@ -330,6 +330,52 @@
     'www.tesla.com': 'https://www.tesla.com/careers/search/job/{id}',
   };
 
+  // Per-job detail sources tried before the job's own page. Tesla's job pages
+  // are client-rendered (no description in the HTML); its careers app reads
+  // this endpoint instead. Unverified from outside a browser — a response is
+  // only used if it holds a long text field (see descriptionFromJson).
+  const KNOWN_DETAIL = {
+    'www.tesla.com': 'https://www.tesla.com/cua-api/careers/job/{id}',
+  };
+
+  // Longest string anywhere in a JSON body, if it's long enough to be a job
+  // description rather than a title or label.
+  function descriptionFromJson(json, min = 300) {
+    let best = '';
+    const walk = (n, d) => {
+      if (d > 6 || n == null) return;
+      if (typeof n === 'string') { if (n.length > best.length) best = n; return; }
+      if (typeof n === 'object') for (const v of Object.values(n)) walk(v, d + 1);
+    };
+    walk(json, 0);
+    return best.length >= min ? best : '';
+  }
+
+  // A page's schema.org JobPosting description, from raw HTML text.
+  function descriptionFromHtml(html) {
+    const blocks = String(html || '').match(/<script[^>]+application\/ld\+json[^>]*>[\s\S]*?<\/script>/gi) || [];
+    for (const b of blocks) {
+      try {
+        const json = JSON.parse(b.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, ''));
+        const nodes = [].concat(json, json['@graph'] || []);
+        for (const n of nodes) {
+          if (n && [].concat(n['@type'] || []).includes('JobPosting') && typeof n.description === 'string') return n.description;
+        }
+      } catch { /* malformed block */ }
+    }
+    return '';
+  }
+
+  // Cheap client-side pre-filter so detail requests go only to rows the server
+  // will plausibly keep. The server's filters stay authoritative.
+  const LIKELY_SOFTWARE = /software|developer|engineer|scientist|\bml\b|machine learning|data|devops|sre|security|ios|android|frontend|backend|full[\s-]?stack|platform|infrastructure/i;
+  const LIKELY_SENIOR = /\b(senior|sr\.?|staff|principal|lead|manager|director|head|vp|architect|supervisor|intern(ship)?)\b/i;
+  const LIKELY_FOREIGN = /\b(india|china|germany|canada|united kingdom|uk|mexico|japan|netherlands|spain|poland|ireland|singapore|philippines|ontario|bangalore|bengaluru|hyderabad|chennai|pune|shanghai|berlin|london|barcelona)\b/i;
+  function worthDetail(row) {
+    return !row.description && LIKELY_SOFTWARE.test(row.job_title) && !LIKELY_SENIOR.test(row.job_title) &&
+      !LIKELY_FOREIGN.test(row.location || '');
+  }
+
   const PLACEHOLDER = '#job-';
   const isPlaceholder = (row) => String(row.apply_url || '').includes(PLACEHOLDER);
   const rowId = (row) => String(row.external_id || '').split(':').slice(1).join(':');
@@ -376,7 +422,8 @@
   }
 
   const api = { extractFromJson, extractFromJsonLd, usable, companyFromHost, companyFromUrl, cleanSiteName, locationText, dateText, scoreArray,
-    KNOWN_TEMPLATES, isPlaceholder, rowId, slugify, fillTemplate, learnTemplate, candidateTemplates };
+    KNOWN_TEMPLATES, isPlaceholder, rowId, slugify, fillTemplate, learnTemplate, candidateTemplates,
+    KNOWN_DETAIL, descriptionFromJson, descriptionFromHtml, worthDetail };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JobExtract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

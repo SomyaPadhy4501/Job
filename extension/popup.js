@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const defaults = { enabled: true, portalUrl: '', token: '', boards: [], autoOpen: true, autoTime: '10:00', autoClose: true, lastRunDay: '', log: [] };
+const defaults = { enabled: true, portalUrl: '', token: '', boards: [], autoOpen: true, autoEveryHours: 3, autoClose: true, lastRunAt: '', log: [] };
 
 function renderLog(log) {
   if (!log.length) return;
@@ -25,9 +25,11 @@ chrome.storage.local.get(defaults).then((s) => {
   $('token').value = s.token;
   $('boards').value = s.boards.join('\n');
   $('autoOpen').checked = s.autoOpen;
-  $('autoTime').value = s.autoTime;
+  $('autoEveryHours').value = s.autoEveryHours;
   $('autoClose').checked = s.autoClose;
-  $('lastRun').textContent = s.lastRunDay ? `Last daily run: ${s.lastRunDay}` : 'Daily run has not happened yet.';
+  $('lastRun').textContent = s.lastRunAt
+    ? `Last automatic run: ${new Date(s.lastRunAt).toLocaleString()}`
+    : 'Automatic run has not happened yet.';
   if (!s.token) $('lastRun').textContent = 'Add your collect token, then Save, to start the daily run.';
   renderLog(s.log);
 });
@@ -41,7 +43,7 @@ $('save').addEventListener('click', async () => {
     token: $('token').value.trim(),
     boards,
     autoOpen: $('autoOpen').checked,
-    autoTime: /^\d{1,2}:\d{2}$/.test($('autoTime').value.trim()) ? $('autoTime').value.trim() : '10:00',
+    autoEveryHours: Math.min(24, Math.max(1, Number($('autoEveryHours').value) || 3)),
     autoClose: $('autoClose').checked,
   });
   $('save').textContent = 'Saved';

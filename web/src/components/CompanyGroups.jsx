@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { JobRow, JobsHead, TableState, PostedCell, LevelPill, RestrictionPill } from './JobsTable.jsx';
+import { JobRow, JobsHead, TableState, PostedCell, LevelPill, RestrictionPill, ROLE_LABEL } from './JobsTable.jsx';
 import { useCompanyJobs } from '../hooks/useJobs.js';
 
 // Grouped view: one row per company. A company with several matching roles
@@ -40,6 +40,7 @@ function CompanyGroup({ group, filters }) {
           <span className="company-name">{j.company_name}</span>
           <span className="role-cell">
             <span className="role-title">{j.job_title}</span>
+            <span className="pill">{ROLE_LABEL[j.role_type] || j.role_type}</span>
             <LevelPill row={j} />
           </span>
           <span className="muted">{j.location || '—'}</span>

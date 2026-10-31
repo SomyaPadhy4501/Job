@@ -34,3 +34,13 @@ test('nextRun is today if the time is still ahead, else tomorrow', () => {
 test('malformed time falls back to 10:00', () => {
   assert.deepStrictEqual(S.parseTime('banana'), { h: 10, m: 0 });
 });
+
+test('every-N-hours: due when the interval has passed, or when never run', () => {
+  const now = new Date('2026-11-02T15:00:00Z');
+  assert.strictEqual(S.isDueEvery(now, '', 3), true);
+  assert.strictEqual(S.isDueEvery(now, '2026-11-02T13:00:00Z', 3), false);
+  assert.strictEqual(S.isDueEvery(now, '2026-11-02T12:00:00Z', 3), true);
+  // Laptop asleep overnight — one run on wake, not a backlog.
+  assert.strictEqual(S.isDueEvery(now, '2026-11-01T20:00:00Z', 3), true);
+  assert.strictEqual(S.isDueEvery(now, 'garbage', 3), true);
+});

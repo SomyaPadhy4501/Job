@@ -15,7 +15,9 @@ const LOG_MAX = 30;
 // pages or follows links; each page captures only what it loads by itself.
 const MAX_BOARDS = 25;      // one visit per site per day, not a crawl
 const STAGGER_MS = 4000;    // gap between opening each board
-const CHECK_MINUTES = 30;   // periodic re-check, catches wake-from-sleep
+const CHECK_MINUTES = 15;   // periodic re-check, catches wake-from-sleep
+const CLOSE_AFTER_MS = 3000; // after a tab's jobs are sent, in case a late batch follows
+const FALLBACK_CLOSE_MIN = 3; // closes whatever is left (pages that found nothing)
 
 const defaults = {
   enabled: true,
@@ -49,9 +51,9 @@ const defaults = {
     'https://careers.bose.com/us/en/search-results?keywords=software%20engineer',
   ],
   autoOpen: true,
-  autoTime: '10:00',
+  autoEveryHours: 3,
   autoClose: true,
-  lastRunDay: '',
+  lastRunAt: '',
   log: [],
 };
 const getSettings = () => chrome.storage.local.get(defaults);
@@ -145,55 +147,70 @@ async function openBoards({ scheduled }) {
   const s = await getSettings();
   const boards = s.boards.slice(0, MAX_BOARDS);
   if (!boards.length) return;
-  if (scheduled) await chrome.storage.local.set({ lastRunDay: JobSchedule.localDay(new Date()) });
+  if (scheduled) await chrome.storage.local.set({ lastRunAt: new Date().toISOString() });
 
   const win = await chrome.windows.create({ url: boards[0], focused: false, state: 'normal' });
+  await chrome.storage.local.set({ boardsWindowId: win.id, autoCloseRun: !!s.autoClose });
   for (const url of boards.slice(1)) {
     await sleep(STAGGER_MS);
     await chrome.tabs.create({ windowId: win.id, url, active: false }).catch(() => {});
   }
-  await addLog({ host: scheduled ? 'daily run' : 'manual run', found: boards.length, inserted: 0, updated: 0, rejected: 0, note: 'boards opened' });
+  await addLog({ host: scheduled ? 'scheduled run' : 'manual run', found: boards.length, inserted: 0, updated: 0, rejected: 0, note: 'boards opened' });
 
-  // Close via an alarm, not a timer. Chrome stops an idle service worker after
-  // ~30 s, so a 45 s setTimeout here died with the worker and the window never
-  // closed (seen on the first real run, 2026-10-31). Alarms survive that.
-  if (s.autoClose) {
-    await chrome.storage.local.set({ closeWindowId: win.id });
-    chrome.alarms.create('closeBoards', { delayInMinutes: 1 });
-  }
+  // Safety net for tabs that never report (no jobs found, page blocked).
+  // An alarm, not a timer: Chrome stops an idle service worker after ~30 s,
+  // and a setTimeout dies with it — the window used to stay open that way.
+  if (s.autoClose) chrome.alarms.create('closeBoards', { delayInMinutes: FALLBACK_CLOSE_MIN });
+}
+
+// Graceful close: a board's tab goes as soon as its jobs are sent, so the
+// window empties as captures finish, and Chrome closes it with the last tab.
+async function closeTabIfBoard(tabId) {
+  const { boardsWindowId, autoCloseRun } = await chrome.storage.local.get(['boardsWindowId', 'autoCloseRun']);
+  if (!autoCloseRun || boardsWindowId == null || tabId == null) return;
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || tab.windowId !== boardsWindowId) return; // a tab the user opened — leave it
+  await sleep(CLOSE_AFTER_MS);
+  await chrome.tabs.remove(tabId).catch(() => {});
 }
 
 async function closeBoardsWindow() {
-  const { closeWindowId } = await chrome.storage.local.get('closeWindowId');
-  if (closeWindowId == null) return;
-  await chrome.windows.remove(closeWindowId).catch(() => {}); // already closed by hand
-  await chrome.storage.local.remove('closeWindowId');
+  const { boardsWindowId } = await chrome.storage.local.get('boardsWindowId');
+  if (boardsWindowId == null) return;
+  await chrome.windows.remove(boardsWindowId).catch(() => {}); // already closed
+  await chrome.storage.local.remove(['boardsWindowId', 'autoCloseRun']);
 }
 
-// Called on startup, on install, and by both alarms. Runs at most once a day.
-async function checkDaily() {
+chrome.windows.onRemoved.addListener(async (id) => {
+  const { boardsWindowId } = await chrome.storage.local.get('boardsWindowId');
+  if (id === boardsWindowId) await chrome.storage.local.remove(['boardsWindowId', 'autoCloseRun']);
+});
+
+// Called on startup, on install, and by the periodic alarm. Runs when the
+// interval has passed — including straight after the machine wakes or Chrome
+// starts, if it was off when a run was due.
+async function checkSchedule() {
   const s = await getSettings();
   if (!s.enabled || !s.autoOpen || !s.token) return;
-  if (JobSchedule.isDue(new Date(), s.lastRunDay, s.autoTime)) await openBoards({ scheduled: true });
+  const { boardsWindowId } = await chrome.storage.local.get('boardsWindowId');
+  if (boardsWindowId != null) return; // a run is still in progress
+  if (JobSchedule.isDueEvery(new Date(), s.lastRunAt, s.autoEveryHours)) await openBoards({ scheduled: true });
 }
 
 async function scheduleAlarms() {
-  const s = await getSettings();
-  await chrome.alarms.clear('daily');
+  await chrome.alarms.clear('daily'); // pre-1.5 daily alarm
   await chrome.alarms.clear('check');
-  chrome.alarms.create('daily', { when: JobSchedule.nextRun(new Date(), s.autoTime).getTime() });
-  chrome.alarms.create('check', { periodInMinutes: CHECK_MINUTES });
+  chrome.alarms.create('check', { periodInMinutes: CHECK_MINUTES, delayInMinutes: 1 });
 }
 
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === 'closeBoards') return closeBoardsWindow();
-  if (a.name === 'daily') await scheduleAlarms(); // re-arm for tomorrow
-  await checkDaily();
+  return checkSchedule();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   await scheduleAlarms();
-  await checkDaily(); // "if I wasn't on at 10, do it the moment I turn on"
+  await checkSchedule();
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -203,11 +220,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   await scheduleAlarms();
 });
 
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.autoTime) scheduleAlarms();
-});
-
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg?.type === 'jobs') handleJobs(msg, sender.tab?.id);
+  if (msg?.type === 'jobs') handleJobs(msg, sender.tab?.id).finally(() => closeTabIfBoard(sender.tab?.id));
   if (msg?.type === 'openBoards') openBoards({ scheduled: false });
 });

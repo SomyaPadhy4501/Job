@@ -28,8 +28,8 @@
   <label for="boards">My boards (one careers URL per line)</label>
   <textarea id="boards" placeholder="https://www.tesla.com/careers/search/?country=US"></textarea>
 
-  <label><input type="checkbox" id="autoOpen"> Open my boards automatically every day at
-    <input type="text" id="autoTime" style="width:56px;display:inline" placeholder="10:00"></label>
+  <label><input type="checkbox" id="autoOpen"> Open my boards automatically every
+    <input type="number" id="autoEveryHours" min="1" max="24" style="width:56px;display:inline"> hours</label>
   <label><input type="checkbox" id="autoClose"> Close the window when done</label>
   <div class="muted" id="lastRun"></div>
 
