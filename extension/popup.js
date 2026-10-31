@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const defaults = { enabled: true, portalUrl: '', token: '', boards: [], log: [] };
+const defaults = { enabled: true, portalUrl: '', token: '', boards: [], autoOpen: true, autoTime: '10:00', autoClose: true, lastRunDay: '', log: [] };
 
 function renderLog(log) {
   if (!log.length) return;
@@ -7,7 +7,9 @@ function renderLog(log) {
     ...log.map((e) => {
       const d = document.createElement('div');
       const when = new Date(e.at).toLocaleString();
-      d.textContent = e.error
+      d.textContent = e.note
+        ? `${when} · ${e.host} · ${e.found} boards opened`
+        : e.error
         ? `${when} · ${e.host} · ${e.found} found · ${e.error}`
         : `${when} · ${e.host} · ${e.found} found → ${e.inserted} new, ${e.updated} updated, ${e.rejected} filtered`;
       d.className = e.error ? 'bad' : 'ok';
@@ -21,6 +23,11 @@ chrome.storage.local.get(defaults).then((s) => {
   $('portalUrl').value = s.portalUrl;
   $('token').value = s.token;
   $('boards').value = s.boards.join('\n');
+  $('autoOpen').checked = s.autoOpen;
+  $('autoTime').value = s.autoTime;
+  $('autoClose').checked = s.autoClose;
+  $('lastRun').textContent = s.lastRunDay ? `Last daily run: ${s.lastRunDay}` : 'Daily run has not happened yet.';
+  if (!s.token) $('lastRun').textContent = 'Add your collect token, then Save, to start the daily run.';
   renderLog(s.log);
 });
 
@@ -32,6 +39,9 @@ $('save').addEventListener('click', async () => {
     portalUrl: $('portalUrl').value.trim().replace(/\/+$/, ''),
     token: $('token').value.trim(),
     boards,
+    autoOpen: $('autoOpen').checked,
+    autoTime: /^\d{1,2}:\d{2}$/.test($('autoTime').value.trim()) ? $('autoTime').value.trim() : '10:00',
+    autoClose: $('autoClose').checked,
   });
   $('save').textContent = 'Saved';
   setTimeout(() => ($('save').textContent = 'Save'), 1200);

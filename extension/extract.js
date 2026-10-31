@@ -19,7 +19,7 @@
   const TITLE_KEYS = ['title', 'jobTitle', 'job_title', 'postingTitle', 'jobOpeningName', 'positionName', 'position', 'text', 'name', 't'];
   const ID_KEYS = ['id', 'jobId', 'job_id', 'jobID', 'requisitionId', 'reqId', 'req_id', 'shortcode', 'guid', 'uuid', 'externalId', 'jobReqId', 'eid'];
   const URL_KEYS = ['absolute_url', 'job_path', 'applyUrl', 'apply_url', 'hostedUrl', 'jobUrl', 'job_url', 'url', 'canonicalPositionUrl', 'postingUrl', 'detailUrl', 'link', 'href', 'externalPath', 'externalUrl', 'shortlink'];
-  const LOCATION_KEYS = ['location', 'locationName', 'locations', 'locationsText', 'jobLocation', 'primaryLocation', 'city', 'workLocation', 'atsLocation', 'fullLocation', 'l', 'loc'];
+  const LOCATION_KEYS = ['location', 'locationName', 'primaryLocation', 'locations', 'cityState', 'multi_location', 'locationsText', 'jobLocation', 'primaryLocation', 'city', 'workLocation', 'atsLocation', 'fullLocation', 'l', 'loc'];
   const DATE_KEYS = ['datePosted', 'date_posted', 'postedOn', 'postedDate', 'posted_at', 'publishedAt', 'published_at', 'published_on', 'first_published_at', 'releasedDate', 'createdAt', 'created_at', 'created', 'updated_at', 'updatedAt', 't_update', 't_create'];
   const DESC_KEYS = ['description', 'descriptionHtml', 'content', 'jobDescription', 'job_description', 'body', 'summary'];
 
@@ -27,11 +27,34 @@
   const MIN_SCORE = 0.7;
   const MAX_DEPTH = 9;
 
+  // Case-insensitive: Oracle Candidate Experience returns Title / Id /
+  // PostedDate / PrimaryLocation where every other ATS uses lower camelCase.
+  // Keys are tried in priority order and empty values are skipped — Oracle
+  // also carries `workLocation: []`, which used to win over PrimaryLocation
+  // and leave every row without a location.
+  const isEmpty = (v) =>
+    v == null || v === '' || (Array.isArray(v) && v.length === 0) ||
+    (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
   function pick(obj, keys) {
+    const lower = new Map(Object.keys(obj).map((k) => [k.toLowerCase(), k]));
     for (const k of keys) {
-      if (obj[k] != null && obj[k] !== '') return obj[k];
+      const v = obj[k] !== undefined ? obj[k] : obj[lower.get(k.toLowerCase())];
+      if (!isEmpty(v)) return v;
     }
     return undefined;
+  }
+
+  // Some APIs wrap each posting: Jibe/iCIMS returns [{ data: {title, …} }],
+  // GraphQL boards [{ node: {…} }]. Look one level inside those wrappers.
+  const WRAPPERS = ['data', 'job', 'node', 'posting', 'jobPosting', 'attributes', '_source'];
+  function unwrap(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return o;
+    if (str(pick(o, TITLE_KEYS))) return o;
+    for (const w of WRAPPERS) {
+      const inner = o[w];
+      if (inner && typeof inner === 'object' && !Array.isArray(inner) && str(pick(inner, TITLE_KEYS))) return inner;
+    }
+    return o;
   }
 
   function str(v) {
@@ -92,7 +115,8 @@
     }
   }
 
-  function looksLikeJob(o) {
+  function looksLikeJob(raw) {
+    const o = unwrap(raw);
     if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
     const title = str(pick(o, TITLE_KEYS));
     if (!title || title.length < 3 || title.length > 200) return false;
@@ -122,9 +146,11 @@
   // side recover a job's URL from the rendered page: when the JSON carries
   // only ids (Workable: id + shortcode), or only a path relative to some base
   // the page knows and we don't (Workday's externalPath omits the site name).
-  function mapItem(o, ctx) {
+  function mapItem(raw, ctx) {
+    const o = unwrap(raw);
     const job_title = str(pick(o, TITLE_KEYS));
-    const ids = ID_KEYS.map((k) => str(o[k])).filter(Boolean);
+    const lowerKeys = new Map(Object.keys(o).map((k) => [k.toLowerCase(), k]));
+    const ids = [...new Set(ID_KEYS.map((k) => str(o[k] ?? o[lowerKeys.get(k.toLowerCase())])).filter(Boolean))];
     const id = ids[0] || '';
     const rawUrl = str(pick(o, URL_KEYS));
     let apply_url = '';

@@ -1,16 +1,24 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Sends the job listings a careers page loads to your own job board. Personal use; load unpacked.",
-  "permissions": ["storage"],
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
   "host_permissions": [
     "https://*.vercel.app/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
-  "background": { "service_worker": "background.js" },
-  "action": { "default_popup": "popup.html", "default_title": "Job Board Capture" },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Job Board Capture"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -25,9 +33,23 @@
         "*://*.oraclecloud.com/*",
         "*://*.taleo.net/*",
         "*://*.successfactors.com/*",
-        "*://*.icims.com/*"
+        "*://*.icims.com/*",
+        "*://*.ashbyhq.com/*",
+        "*://*.greenhouse.io/*",
+        "*://*.lever.co/*",
+        "*://apply.workable.com/*",
+        "*://*.smartrecruiters.com/*",
+        "*://*.recruitee.com/*",
+        "*://*.pinpointhq.com/*",
+        "*://*.bamboohr.com/*",
+        "*://jobs.gem.com/*",
+        "*://ats.rippling.com/*",
+        "*://*.jobvite.com/*",
+        "*://*.phenompeople.com/*"
       ],
-      "js": ["hook.js"],
+      "js": [
+        "hook.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start",
       "all_frames": false
@@ -45,9 +67,24 @@
         "*://*.oraclecloud.com/*",
         "*://*.taleo.net/*",
         "*://*.successfactors.com/*",
-        "*://*.icims.com/*"
+        "*://*.icims.com/*",
+        "*://*.ashbyhq.com/*",
+        "*://*.greenhouse.io/*",
+        "*://*.lever.co/*",
+        "*://apply.workable.com/*",
+        "*://*.smartrecruiters.com/*",
+        "*://*.recruitee.com/*",
+        "*://*.pinpointhq.com/*",
+        "*://*.bamboohr.com/*",
+        "*://jobs.gem.com/*",
+        "*://ats.rippling.com/*",
+        "*://*.jobvite.com/*",
+        "*://*.phenompeople.com/*"
       ],
-      "js": ["extract.js", "content.js"],
+      "js": [
+        "extract.js",
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }

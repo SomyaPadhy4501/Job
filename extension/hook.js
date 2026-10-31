@@ -28,6 +28,28 @@
     return res;
   };
 
+  // Some job systems never fetch their listings — they embed them in a page
+  // global at render time. Phenom (Lowe's, Cigna, Chewy, Yelp, WBD…) puts the
+  // first page of results in phApp.ddo; Next.js / Nuxt / Redux apps use the
+  // others. Report whichever exist once the page has loaded.
+  const GLOBALS = [
+    () => window.phApp && window.phApp.ddo,
+    () => window.__INITIAL_STATE__,
+    () => window.__NUXT__,
+    () => window.__APOLLO_STATE__,
+    () => window.__PRELOADED_STATE__,
+  ];
+  window.addEventListener('load', () => {
+    for (const get of GLOBALS) {
+      try {
+        const v = get();
+        if (v && typeof v === 'object') post('global', JSON.stringify(v));
+      } catch {
+        /* circular or inaccessible — skip */
+      }
+    }
+  });
+
   const origOpen = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
     this.addEventListener('load', () => {

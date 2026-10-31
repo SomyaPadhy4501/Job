@@ -32,9 +32,10 @@ source.
 
 ## What it does and doesn't see
 
-- Activates only on URLs containing `career`, `jobs` or `job/`, and on the big
-  ATS hosts (Workday, Avature, Eightfold, Oracle, Taleo, SuccessFactors,
-  iCIMS). Nothing else you browse is inspected.
+- Activates only on URLs whose path contains `career`, `jobs` or `job/`, and on
+  the job-system hosts (Workday, Ashby, Greenhouse, Lever, Workable,
+  SmartRecruiters, Avature, Eightfold, Oracle, Taleo, SuccessFactors, iCIMS and
+  others — see `manifest.json`). Nothing else you browse is inspected.
 - Reads responses; never sends requests to the careers site itself.
 - Jobs without a location are dropped, since the server would otherwise keep
   them as "maybe US".
@@ -42,11 +43,24 @@ source.
   hosted boards, SmartRecruiters) give 0 rows. Those are covered by the
   server-side collectors anyway.
 
-Verified on 2026-10-31 against Workday (NVIDIA), Eightfold (Netflix),
-Workable, Amazon and Ashby (813 rows from one page load). **Tesla and Wayfair
-are untested**, because both block every automated client, including the one
-used for these tests. If the badge shows nothing on Tesla, the response shape
-needs a small adapter in `extract.js`.
+Verified on 2026-10-31 against Workday (NVIDIA), Eightfold, Workable, Amazon,
+Ashby (813 rows from one page load), Oracle Candidate Experience (American
+Express, Nokia, AutoZone, Navy Federal), Phenom (Chewy, Cigna, Truist, Fiserv
+and 11 more) and Jibe (Rivian). The starter board list in `background.js` is
+those boards. **Tesla and Wayfair are untested**, because both block every
+automated client, including the one used for these tests. If the badge shows
+nothing on Tesla, the response shape needs a small adapter in `extract.js`.
+
+Not yet supported: Apple (listings render without a JSON payload), SAP
+SuccessFactors and Taleo boards (plain HTML), IBM.
+
+## Daily run
+
+At 10:00 (configurable), or on the first Chrome start after it if the
+computer was off, the extension opens "My boards" once in a background window
+— one tab every 4 s, max 25 — and closes the window ~45 s after the last one.
+Chrome has to be running for this; on a Mac, add Chrome to System Settings →
+General → Login Items so it starts with the machine.
 
 ## Privacy
 
