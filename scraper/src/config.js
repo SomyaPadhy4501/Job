@@ -26,7 +26,9 @@ const CONFIG = {
   // Microsoft is handled by the main service now (it has a public /api/pcsx/search
   // endpoint that doesn't need a real browser). This scraper is only for the
   // genuinely-gated sites. Set SCRAPER_TARGETS=microsoft to force it here too.
-  targets: (process.env.SCRAPER_TARGETS || 'apple,meta,google,deloitte,phenom,builtin,wayfair')
+  // Apple is no longer here: src/collectors/apple.js reads its embedded page data
+  // over plain HTTP, so it needs neither Playwright nor this scraper.
+  targets: (process.env.SCRAPER_TARGETS || 'meta,google,deloitte,phenom,builtin,wayfair')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),

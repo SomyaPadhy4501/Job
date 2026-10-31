@@ -731,6 +731,9 @@ const COMPANIES = [
 
   // ─── Single-tenant collectors ────────────────────────────────────────────
   { source: 'amazon',       displayName: 'Amazon' },
+  // Apple: plain HTTP against jobs.apple.com's embedded page data
+  // (src/collectors/apple.js). Replaces the Playwright target, which got 0 rows.
+  { source: 'apple',        displayName: 'Apple' },
   { source: 'uber',         displayName: 'Uber' },
   // Microsoft: their new apply.careers.microsoft.com frontend fetches jobs
   // from a public /api/pcsx/search endpoint. No auth, no TLS workaround

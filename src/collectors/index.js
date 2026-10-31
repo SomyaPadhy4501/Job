@@ -10,6 +10,7 @@ const capgemini = require('./capgemini');
 const wipro = require('./wipro');
 const goldmanSachs = require('./goldman_sachs');
 const amazon = require('./amazon');
+const apple = require('./apple');
 const microsoft = require('./microsoft');
 const uber = require('./uber');
 const netflix = require('./netflix');
@@ -40,6 +41,7 @@ const REGISTRY = {
   [wipro.source]: wipro,
   [goldmanSachs.source]: goldmanSachs,
   [amazon.source]: amazon,
+  [apple.source]: apple,
   [microsoft.source]: microsoft,
   [uber.source]: uber,
   [netflix.source]: netflix,

@@ -17,6 +17,7 @@ const getro = require('../src/collectors/getro');
 const eightfold = require('../src/collectors/eightfold');
 const sr = require('../src/collectors/smartrecruiters');
 const workday = require('../src/collectors/workday');
+const apple = require('../src/collectors/apple');
 const { normalizeJob } = require('../src/services/normalize');
 
 // ─── Getro ────────────────────────────────────────────────────────────────────
@@ -399,4 +400,73 @@ test('workday: detail URL appends externalPath without a second /job', () => {
     workday.detailUrl(company, '/job/Central-Singapore-Singapore/Software-Engineer_R0137876'),
     'https://paypal.wd1.myworkdayjobs.com/wday/cxs/paypal/jobs/job/Central-Singapore-Singapore/Software-Engineer_R0137876'
   );
+});
+
+// ─── Apple ────────────────────────────────────────────────────────────────────
+
+// jobs.apple.com embeds its page data as JSON.parse("<json string>") — a JSON
+// string literal holding JSON, hence the double parse. Fixture shapes are
+// trimmed from real responses (2026-10-31).
+const appleBlob = (obj) =>
+  `<script>window.__staticRouterHydrationData = JSON.parse(${JSON.stringify(JSON.stringify(obj))});</script>`;
+
+const APPLE_RESULT = {
+  id: '200678303-0836',
+  positionId: '200678303',
+  postingTitle: 'AI/ML Engineer: System RF Data Ecosystem',
+  transformedPostingTitle: 'ai-ml-engineer-system-rf-data-ecosystem',
+  postDateInGMT: '2026-10-31T04:01:36.281Z',
+  jobSummary: 'Summary paragraph.',
+  locations: [
+    { name: 'Cupertino', city: '', stateProvince: '', countryName: 'United States of America' },
+  ],
+};
+
+test('apple: reads the double-encoded page data', () => {
+  const html = `<html>${appleBlob({ loaderData: { search: { searchResults: [APPLE_RESULT] } } })}</html>`;
+  const data = apple.extractHydration(html);
+  assert.strictEqual(data.loaderData.search.searchResults[0].id, '200678303-0836');
+  assert.strictEqual(apple.extractHydration('<html>no data</html>'), null);
+});
+
+test('apple: maps a search result without network access', () => {
+  const row = apple.mapPosting(APPLE_RESULT, null);
+  assert.strictEqual(row.source, 'apple');
+  assert.strictEqual(row.external_id, '200678303-0836');
+  assert.strictEqual(row.company_name, 'Apple');
+  assert.strictEqual(row.location, 'Cupertino, United States');
+  assert.strictEqual(
+    row.apply_url,
+    'https://jobs.apple.com/en-us/details/200678303-0836/ai-ml-engineer-system-rf-data-ecosystem'
+  );
+  // The real timestamp, not just the day.
+  assert.strictEqual(row.date_posted, '2026-10-31T04:01:36.281Z');
+  // No detail fetched: falls back to the summary rather than going empty.
+  assert.strictEqual(row.description, 'Summary paragraph.');
+});
+
+// The JD fields live in loaderData.jobDetails.jobsData. Reading jobDetails
+// itself found none of them, every row silently kept only the marketing summary,
+// and nothing errored — so experience, clearance and sponsorship wording in the
+// qualifications was never seen.
+test('apple: the detail description carries the qualifications from jobsData', () => {
+  const html = appleBlob({
+    loaderData: {
+      jobDetails: {
+        jobsData: {
+          jobSummary: 'Intro.',
+          description: 'Build things.',
+          minimumQualifications: "5+ years of experience. Visa sponsorship is not available.",
+          preferredQualifications: 'Swift.',
+        },
+        requestUrl: 'x',
+      },
+    },
+  });
+  const d = apple.jobsDataFrom(apple.extractHydration(html));
+  assert.ok(d, 'jobsData must be found');
+  const row = apple.mapPosting(APPLE_RESULT, d);
+  assert.match(row.description, /Minimum Qualifications\n5\+ years/);
+  assert.match(row.description, /Visa sponsorship is not available/);
+  assert.strictEqual(normalizeJob(row)?.sponsorship, 'NO');
 });
