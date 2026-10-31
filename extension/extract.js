@@ -171,14 +171,59 @@
       external_id: `${new URL(ctx.pageUrl).hostname}:${id || apply_url}`,
       company_name: str(company) || ctx.company || '',
       job_title,
-      location: locationText(pick(o, LOCATION_KEYS)),
+      location: resolveLocation(o, ctx),
       apply_url,
       description: typeof desc === 'string' ? desc : '',
       date_posted: dateText(pick(o, DATE_KEYS)),
     };
   }
 
+  // Location, with two repairs:
+  //  - an id into a lookup table elsewhere in the same response ("l": "402"
+  //    with lookup.locations["402"] = "Palo Alto, California"), resolved via
+  //    ctx.lookups;
+  //  - a bare city ("Torrance") when the item also carries state / country
+  //    fields (Jibe/iCIMS), which the server's US check can't place alone.
+  function resolveLocation(o, ctx) {
+    const raw = pick(o, LOCATION_KEYS);
+    const asText = typeof raw === 'string' || typeof raw === 'number' ? String(raw).trim() : '';
+    if (asText && /^[A-Za-z0-9_-]{1,12}$/.test(asText) && /^\d+$|^[A-Z0-9_-]+$/.test(asText) && ctx.lookups) {
+      for (const [name, dict] of ctx.lookups) {
+        if (!/loc|site|office|city/.test(name) || dict[asText] == null) continue;
+        const hit = locationText(dict[asText]);
+        if (hit) return hit;
+      }
+    }
+    let text = locationText(raw);
+    if (text && !text.includes(',')) {
+      const region = str(pick(o, ['state', 'stateCode', 'region', 'province', 'addressRegion']));
+      const country = str(pick(o, ['country', 'countryCode', 'countryName', 'addressCountry']));
+      const extra = [region, country].filter((x) => x && !text.toLowerCase().includes(x.toLowerCase()));
+      if (extra.length) text = [text, ...extra].join(', ');
+    }
+    return text;
+  }
+
+  // Id → label dictionaries anywhere in the response: objects whose values are
+  // mostly strings or {name}/{label} objects, keyed by their property name.
+  function collectLookups(node, depth, out, seen) {
+    if (!node || typeof node !== 'object' || depth > 5 || seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) return;
+    for (const [k, v] of Object.entries(node)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const vals = Object.values(v);
+        const labelish = vals.filter((x) => typeof x === 'string' || (x && typeof x === 'object' && (x.name || x.label || x.city)));
+        if (vals.length >= 3 && labelish.length / vals.length >= 0.8) out.push([k.toLowerCase(), v]);
+        collectLookups(v, depth + 1, out, seen);
+      }
+    }
+  }
+
   function extractFromJson(json, ctx) {
+    const lookups = [];
+    collectLookups(json, 0, lookups, new Set());
+    ctx = { ...ctx, lookups };
     const arrays = [];
     collectArrays(json, 0, arrays, new Set());
     const winners = arrays.filter((a) => scoreArray(a) >= MIN_SCORE);

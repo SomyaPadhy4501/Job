@@ -3,7 +3,10 @@
 // the saved boards once a day.
 importScripts('schedule.js');
 
-const BATCH = 500;          // Vercel caps request bodies at ~4.5 MB
+const BATCH = 500;          // rows per request, at most…
+const BATCH_BYTES = 2_500_000; // …and bytes: Vercel rejects bodies over ~4.5 MB
+                               // (HTTP 413 — Wayfair's 432 rows with full
+                               // descriptions did that in one batch)
 const SOURCE = 'extension'; // shows up as its own source in the board's filter
 const LOG_MAX = 30;
 
@@ -70,6 +73,25 @@ async function postBatch(portalUrl, token, jobs) {
   return body;
 }
 
+// Split by row count and by serialized size, whichever limit comes first.
+function batches(rows) {
+  const out = [];
+  let cur = [];
+  let bytes = 0;
+  for (const r of rows) {
+    const n = JSON.stringify(r).length;
+    if (cur.length && (cur.length >= BATCH || bytes + n > BATCH_BYTES)) {
+      out.push(cur);
+      cur = [];
+      bytes = 0;
+    }
+    cur.push(r);
+    bytes += n;
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
 async function addLog(entry) {
   const { log } = await chrome.storage.local.get({ log: [] });
   log.unshift({ at: new Date().toISOString(), ...entry });
@@ -90,14 +112,19 @@ async function handleJobs(msg, tabId) {
 
   let inserted = 0, updated = 0, rejected = 0;
   try {
-    for (let i = 0; i < fresh.length; i += BATCH) {
-      const r = await postBatch(s.portalUrl, s.token, fresh.slice(i, i + BATCH));
+    for (const batch of batches(fresh)) {
+      const r = await postBatch(s.portalUrl, s.token, batch);
       inserted += r.inserted || 0;
       updated += r.updated || 0;
       rejected += r.rejected || 0;
     }
     fresh.forEach((r) => sentIds.add(r.external_id));
-    await addLog({ host, found: fresh.length, inserted, updated, rejected });
+    // When nothing survived the server's filters, keep one example so the log
+    // shows WHY — a title or location the extractor got wrong is obvious here.
+    const sample = inserted + updated === 0 && fresh.length
+      ? `${fresh[0].job_title} | ${fresh[0].location}`
+      : undefined;
+    await addLog({ host, found: fresh.length, inserted, updated, rejected, sample });
     if (tabId != null) {
       chrome.action.setBadgeBackgroundColor({ color: '#1a7f37', tabId });
       chrome.action.setBadgeText({ text: String(inserted + updated), tabId });

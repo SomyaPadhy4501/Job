@@ -81,3 +81,23 @@ test('company naming: ATS path beats generic page metadata', () => {
   assert.strictEqual(X.cleanSiteName('Apply'), '');
   assert.strictEqual(X.companyFromHost('www.tesla.com'), 'Tesla');
 });
+
+test('resolves location ids through a lookup table in the same response', () => {
+  // Tesla-style: listings carry an id, the label lives in lookup.locations.
+  const json = {
+    lookup: { locations: { 402: 'Palo Alto, California', 17: 'Austin, Texas', 9: 'Shanghai, China' } },
+    listings: [
+      { id: 'a1', t: 'Software Engineer, Vehicle Firmware', l: '402' },
+      { id: 'a2', t: 'Data Engineer', l: '17' },
+      { id: 'a3', t: 'Backend Engineer', l: '9' },
+    ],
+  };
+  const rows = X.extractFromJson(json, ctx('https://www.tesla.com/careers/search'));
+  assert.deepStrictEqual(rows.map((r) => r.location), ['Palo Alto, California', 'Austin, Texas', 'Shanghai, China']);
+});
+
+test('completes a bare city with the state field the item carries', () => {
+  const json = { jobs: [1, 2, 3].map((i) => ({ data: { req_id: `R${i}`, title: `Software Engineer ${i}`, location_name: 'Torrance', city: 'Torrance', state: 'California', country: 'United States' } })) };
+  const [row] = X.extractFromJson(json, ctx('https://careers.rivian.com/careers-home/jobs'));
+  assert.strictEqual(row.location, 'Torrance, California, United States');
+});

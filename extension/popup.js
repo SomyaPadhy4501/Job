@@ -11,7 +11,8 @@ function renderLog(log) {
         ? `${when} · ${e.host} · ${e.found} boards opened`
         : e.error
         ? `${when} · ${e.host} · ${e.found} found · ${e.error}`
-        : `${when} · ${e.host} · ${e.found} found → ${e.inserted} new, ${e.updated} updated, ${e.rejected} filtered`;
+        : `${when} · ${e.host} · ${e.found} found → ${e.inserted} new, ${e.updated} updated, ${e.rejected} filtered` +
+          (e.sample ? ` (e.g. ${e.sample})` : '');
       d.className = e.error ? 'bad' : 'ok';
       return d;
     })
