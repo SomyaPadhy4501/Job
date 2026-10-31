@@ -38,10 +38,16 @@ function stripTags(s) {
 }
 
 // "3d" → ISO date, relative to `now`. Unknown formats → null (first-seen stamp).
+// Day-sized ages are truncated to the start of that UTC day: "0d" only says
+// "today", and stamping the collect run's exact time made these rows read as
+// posted minutes ago and sort above genuinely fresh postings.
 function ageToIso(age, now = Date.now()) {
   const m = String(age || '').trim().match(AGE);
   if (!m) return null;
-  return new Date(now - Number(m[1]) * AGE_MS[m[2].toLowerCase()]).toISOString();
+  const unit = m[2].toLowerCase();
+  const d = new Date(now - Number(m[1]) * AGE_MS[unit]);
+  if (unit !== 'h') d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
 function parseRow(line, now) {

@@ -78,7 +78,7 @@ test('pinpoint: builds location from city/province and joins body sections', () 
   assert.strictEqual(row.date_posted, null);
 });
 
-test('gem: reads office locations and prefers updated_at over first_published_at', () => {
+test('gem: reads office locations and the first-publish date', () => {
   const row = gem.mapPosting(
     {
       id: '4965519002',
@@ -94,7 +94,7 @@ test('gem: reads office locations and prefers updated_at over first_published_at
     { slug: 'gem', displayName: 'Gem' }
   );
   assert.strictEqual(row.location, 'San Francisco, United States');
-  assert.strictEqual(row.date_posted, '2026-10-29T21:20:54.077Z');
+  assert.strictEqual(row.date_posted, '2020-11-17T15:37:23.000Z');
 });
 
 test('bamboohr: uses detail description/date and falls back to the hosted URL', () => {

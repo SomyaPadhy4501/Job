@@ -17,7 +17,9 @@ async function fetchCompany({ slug, displayName }) {
     location: j.location?.name || '',
     apply_url: j.absolute_url || '',
     description: j.content || '',
-    date_posted: j.updated_at || j.first_published || null,
+    // first_published, not updated_at: any edit bumps updated_at, so a role
+    // posted Oct 7 and touched Oct 31 showed as brand new (Reddit, DoorDash).
+    date_posted: j.first_published || j.updated_at || null,
   }));
 }
 

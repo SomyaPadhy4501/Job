@@ -29,8 +29,8 @@ function mapPosting(o, { slug, displayName }) {
     // `requirements` is a separate block and is where work-authorization
     // language usually sits — dropping it would blind the restriction filter.
     description: [o.description, o.requirements].filter(Boolean).join('\n'),
-    // updated_at first, for the same evergreen-posting reason as gem.js.
-    date_posted: o.updated_at || o.published_at || o.created_at || null,
+    // Publish date — see gem.js on why not updated_at.
+    date_posted: o.published_at || o.created_at || o.updated_at || null,
   };
 }
 
