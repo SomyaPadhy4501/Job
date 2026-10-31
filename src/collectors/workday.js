@@ -4,7 +4,8 @@ const { fetchJson, runWithConcurrency } = require('./http');
 
 // Public Workday "CxS" JSON endpoints. Each company has a tenant + wd shard + site path:
 //   https://{tenant}.wd{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs   (POST list)
-//   https://{tenant}.wd{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/job{externalPath}  (GET detail)
+//   https://{tenant}.wd{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}{externalPath}  (GET detail)
+//   where externalPath is "/job/{location}/{title}_{req}" as the list returns it.
 //
 // The list returns bare postings; the detail endpoint has jobDescription HTML which we
 // need for sponsorship classification. We fetch detail only for postings that look
@@ -119,8 +120,19 @@ function resolveLocation(j) {
   return locationFromPath(j.externalPath) || text;
 }
 
+// `externalPath` already begins with "/job/" ("/job/Austin-Texas/Software-
+// Engineer_R0137"), so it is appended to the site root as-is. This used to
+// insert another "/job", which asked Workday for ".../job/job/..." and got
+// HTTP 406 from every tenant (checked live against PayPal and Nvidia). The
+// caller swallows detail errors, so every Workday row arrived with an empty
+// description and sponsorship came from USCIS history alone — PayPal's "Visa
+// Sponsorship ... is not available" line was never read.
+function detailUrl(company, externalPath) {
+  return `${baseUrl(company)}${externalPath}`;
+}
+
 async function fetchDetail(company, externalPath) {
-  const data = await fetchJson(`${baseUrl(company)}/job${externalPath}`, { retries: 1 });
+  const data = await fetchJson(detailUrl(company, externalPath), { retries: 1 });
   return data?.jobPostingInfo?.jobDescription || '';
 }
 
@@ -179,4 +191,4 @@ async function fetchCompany(company) {
   }));
 }
 
-module.exports = { fetchCompany, source: 'workday' };
+module.exports = { fetchCompany, detailUrl, source: 'workday' };

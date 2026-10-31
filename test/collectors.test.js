@@ -16,6 +16,7 @@ const assert = require('node:assert');
 const getro = require('../src/collectors/getro');
 const eightfold = require('../src/collectors/eightfold');
 const sr = require('../src/collectors/smartrecruiters');
+const workday = require('../src/collectors/workday');
 const { normalizeJob } = require('../src/services/normalize');
 
 // ─── Getro ────────────────────────────────────────────────────────────────────
@@ -381,4 +382,21 @@ test('rippling: falls back to the list workLocation and a derived apply_url', ()
   assert.strictEqual(row.location, 'San Francisco, CA');
   assert.strictEqual(row.company_name, 'Opendoor');
   assert.match(row.apply_url, /ats\.rippling\.com\/opendoor\/jobs\//);
+});
+
+// ─── Workday ──────────────────────────────────────────────────────────────────
+
+// The list returns externalPath as "/job/{location}/{title}_{req}". The detail
+// URL used to put another "/job" in front of it; Workday answered HTTP 406, the
+// collector swallowed the error, and every Workday row (PayPal, Nvidia, Adobe…)
+// shipped with an empty description. Sponsorship then came from USCIS history
+// alone, so PayPal roles stating "Visa Sponsorship … is not available" showed as
+// sponsored. Verified live 2026-10-31: the doubled path 406s, this one returns
+// the full description.
+test('workday: detail URL appends externalPath without a second /job', () => {
+  const company = { tenant: 'paypal', wd: '1', site: 'jobs' };
+  assert.strictEqual(
+    workday.detailUrl(company, '/job/Central-Singapore-Singapore/Software-Engineer_R0137876'),
+    'https://paypal.wd1.myworkdayjobs.com/wday/cxs/paypal/jobs/job/Central-Singapore-Singapore/Software-Engineer_R0137876'
+  );
 });
