@@ -3,9 +3,12 @@
 // Rule-based sponsorship classifier.
 // Precedence (first match wins):
 //   1. Explicit NO in description → NO.  Always strongest.
-//   2. Explicit YES in description → YES.
-//   3. Company in USCIS H-1B Employer Data Hub (≥ 3 approvals last 2 FY) → YES.
-//   4. Otherwise → UNKNOWN.
+//   2. A sentence that pairs "sponsor…" with a negation no pattern could parse
+//      → UNKNOWN.  The description is doubting sponsorship; neither the loose
+//      YES wording below nor the company's H-1B history may overrule it.
+//   3. Explicit YES in description → YES.
+//   4. Company in USCIS H-1B Employer Data Hub (≥ 3 approvals last 2 FY) → YES.
+//   5. Otherwise → UNKNOWN.
 //
 // No LLM / no API — pure regex + static JSON lookup.
 
@@ -29,20 +32,70 @@ const YES_PATTERNS = [
 // purpose: an H-1B or OPT holder IS authorized to work, and heavy sponsors put
 // that line in boilerplate. When the sentence goes on to say "...without
 // sponsorship", the `without … sponsorship` pattern below still catches it.
+//
+// SPONSORSHIP allows the qualifiers postings put in front of the noun ("visa",
+// "employment visa", "H-1B"). Spelling it as `(?:visa |immigration )?` missed
+// "do not provide employment visa sponsorship".
+const SPONSORSHIP = '(?:(?:employment|employment-based|work|visa|immigration|h-?1b)[ -]){0,2}sponsorship';
+
+// Words allowed between "sponsorship" and its verdict, as in PayPal's "Visa
+// Sponsorship through PayPal is not available for this position". Counted in
+// whole words, so it cannot cross a sentence or clause ("sponsorship is
+// available, but relocation is not available" stays out), and a word that is
+// itself a verdict ends the run ("sponsorship is available for roles that are
+// not available remotely").
+const QUALIFIER = "(?: (?!(?:available|offered|provided|considered)\\b)[a-z0-9&'’-]+){0,5}";
+
 const NO_PATTERNS = [
   /no (?:visa |immigration )?sponsorship/,
-  /unable to sponsor/,
+  new RegExp(`unable to (?:sponsor|(?:offer|provide) ${SPONSORSHIP})`),
   /cannot sponsor/,
-  /(?:will|do|does|are|can) not (?:currently )?sponsor/,
+  /(?:will|would|do|does|are|can) not (?:currently )?sponsor/,
   /won'?t sponsor/,
-  /do(?:es)? not (?:offer|provide) (?:visa |immigration )?sponsorship/,
-  /not (?:offering|providing) (?:visa |immigration )?sponsorship/,
+  new RegExp(`(?:will|would|do|does|is|are|can) not (?:currently )?(?:offer|provide) ${SPONSORSHIP}`),
+  new RegExp(`not (?:currently )?(?:offering|providing) ${SPONSORSHIP}`),
+  new RegExp(`not in a position to (?:sponsor|(?:offer|provide) ${SPONSORSHIP})`),
   /not (?:be )?(?:able|eligible) (?:to|for) (?:[a-z-]+ ){0,2}sponsor/,
-  /sponsorship (?:is |will )?not (?:be )?(?:available|offered|provided|considered)/,
+  new RegExp(
+    `${SPONSORSHIP}:?${QUALIFIER}` +
+      "(?: (?:is|are|will|would|can))? (?:not|never) (?:be )?(?:available|offered|provided|considered|possible)"
+  ),
+  // Structured fields: "Visa sponsorship: No", "Sponsorship available: none".
+  new RegExp(`${SPONSORSHIP}(?: (?:available|offered|provided))?: ?(?:no|none|n/a)\\b`),
+  new RegExp(`${SPONSORSHIP}${QUALIFIER} (?:is|are|will be) unavailable`),
+  new RegExp(`${SPONSORSHIP}${QUALIFIER} (?:isn|aren|won)['’]?t (?:be )?(?:available|offered|provided|considered|possible)`),
   /without (?:the need for |requiring |needing )?(?:any )?(?:current or future |now or in the future )?(?:employer |visa |company |immigration )?sponsorship/,
   /not (?:now or in the future )?require[^.]{0,40}sponsorship/,
   /unable to (?:consider|accept)[^.]{0,80}sponsorship/,
 ];
+
+// Reads the description the way a person skims it: find each sentence that
+// mentions sponsoring and ask whether anything near it says no. This catches
+// refusals phrased in ways NO_PATTERNS don't spell out ("PayPal cannot extend
+// visa sponsorship for this role"), without the false-NO risk a looser pattern
+// would carry — it only withholds a YES, it never hides the row.
+//
+// Everything is judged inside a window around the first "sponsor", because
+// stripped HTML turns a bullet list into one long run with no full stops.
+const IMMIGRATION_CONTEXT =
+  /visa|immigration|h-?1b|work (?:permit|authori[sz]ation|status)|employment[- ]based|green card|permanent resident|\bopt\b/;
+const NEGATION = /\b(?:not|no|never|cannot|unable|unavailable|ineligible|without)\b|n['’]t\b/;
+// The sentence is affirming sponsorship, so a stray "not" nearby is about
+// something else ("we sponsor visas for candidates who do not hold a permit").
+const AFFIRMATION =
+  /\b(?:will|can|may|able to|happy to|glad to|willing to) sponsor|\b(?:offer|offers|offering|provide|provides|providing) (?:\w+ ){0,2}sponsorship|sponsorship (?:is |may be |will be |can be )?(?:available|offered|provided)|\bsponsors? (?:visas?|h-?1b|work|employees|candidates)/;
+
+function doubtsSponsorship(t) {
+  for (const sentence of t.split(/[.;!?\n]/)) {
+    const at = sentence.indexOf('sponsor');
+    if (at < 0) continue;
+    const window = sentence.slice(Math.max(0, at - 60), at + 80);
+    if (NEGATION.test(window) && IMMIGRATION_CONTEXT.test(window) && !AFFIRMATION.test(window)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Threshold for USCIS YES signal: ≥ 3 approved H-1B petitions in last 2 FY.
 const USCIS_THRESHOLD = 3;
@@ -122,17 +175,21 @@ function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   for (const p of NO_PATTERNS) {
     if (p.test(t)) return 'NO';
   }
-  // 2. Explicit YES
+  // 2. The description doubts sponsorship in words the patterns can't name.
+  //    Must come before the YES check: "visa sponsorship" alone is a YES
+  //    pattern, so a refusal that merely mentions it would otherwise read as one.
+  if (doubtsSponsorship(t)) return 'UNKNOWN';
+  // 3. Explicit YES
   for (const p of YES_PATTERNS) {
     if (p.test(t)) return 'YES';
   }
-  // 3. USCIS lookup — company_name drives the signal; description alone misses
+  // 4. USCIS lookup — company_name drives the signal; description alone misses
   //    ~516 rows that have no description text (Workday, Microsoft, Goldman, etc.)
   for (const candidate of [companyName, ...fallbackCompanyNames]) {
     if (!candidate) continue;
     if (approvalsFor(normSlug(candidate)) >= USCIS_THRESHOLD) return 'YES';
   }
-  // 4. Fall through
+  // 5. Fall through
   return 'UNKNOWN';
 }
 

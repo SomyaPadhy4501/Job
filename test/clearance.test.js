@@ -195,6 +195,51 @@ test('sponsorship NO needs an explicit refusal', () => {
   );
 });
 
+// PayPal postings say "Visa Sponsorship through PayPal is not available for this
+// position now or any time in the future." The loose /visa sponsorship/ YES
+// pattern matched the words inside that refusal and the row landed YES — with no
+// company name at all, so USCIS was never the cause.
+test('a refusal that names the employer or role between "sponsorship" and "not available" is NO', () => {
+  for (const text of [
+    'Visa Sponsorship through PayPal is not available for this position now or any time in the future.',
+    'Employment visa sponsorship for this position is not available.',
+    'Visa sponsorship from the company is not offered.',
+    'We will not provide visa sponsorship for this role.',
+    'We do not provide employment visa sponsorship.',
+    'We are unable to provide sponsorship.',
+    'The company is not in a position to sponsor work visas.',
+    'Visa sponsorship is unavailable for this role.',
+    "Sponsorship isn't available for this role.",
+    'Visa sponsorship: No',
+  ]) {
+    for (const company of ['', 'PayPal']) {
+      assert.strictEqual(classifySponsorship(text.toLowerCase(), company), 'NO', `${company || '(none)'}: ${text}`);
+    }
+  }
+});
+
+test('an affirmed sponsorship is not turned into NO by a nearby unrelated negative', () => {
+  for (const text of [
+    'Visa sponsorship is available for qualified candidates.',
+    'Visa sponsorship is available, but relocation assistance is not available.',
+    'Sponsorship is available for roles that are not available remotely.',
+    'We sponsor visas for candidates who do not yet hold a US work permit.',
+    'Visa sponsorship is available. We do not offer remote work for this team.',
+  ]) {
+    assert.strictEqual(classifySponsorship(text.toLowerCase(), 'PayPal'), 'YES', text);
+  }
+});
+
+test('a refusal no pattern can parse is withheld from YES instead of trusted', () => {
+  for (const text of [
+    'PayPal cannot extend visa sponsorship for this role.',
+    'Sponsorship of work visas is something we have never done for this position.',
+  ]) {
+    // Even for a company with thousands of USCIS approvals.
+    assert.strictEqual(classifySponsorship(text.toLowerCase(), 'PayPal'), 'UNKNOWN', text);
+  }
+});
+
 test("owner's exclusion list hides Netflix, xAI and Capgemini from any source", () => {
   for (const company_name of ['Netflix', 'xAI', 'X.ai', 'Capgemini', 'Capgemini America']) {
     assert.strictEqual(
