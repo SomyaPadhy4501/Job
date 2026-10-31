@@ -15,7 +15,6 @@ const LOG_MAX = 30;
 // pages or follows links; each page captures only what it loads by itself.
 const MAX_BOARDS = 25;      // one visit per site per day, not a crawl
 const STAGGER_MS = 4000;    // gap between opening each board
-const SETTLE_MS = 45000;    // time to let the last page load and report
 const CHECK_MINUTES = 30;   // periodic re-check, catches wake-from-sleep
 
 const defaults = {
@@ -155,10 +154,20 @@ async function openBoards({ scheduled }) {
   }
   await addLog({ host: scheduled ? 'daily run' : 'manual run', found: boards.length, inserted: 0, updated: 0, rejected: 0, note: 'boards opened' });
 
+  // Close via an alarm, not a timer. Chrome stops an idle service worker after
+  // ~30 s, so a 45 s setTimeout here died with the worker and the window never
+  // closed (seen on the first real run, 2026-10-31). Alarms survive that.
   if (s.autoClose) {
-    await sleep(SETTLE_MS);
-    await chrome.windows.remove(win.id).catch(() => {}); // already closed by hand
+    await chrome.storage.local.set({ closeWindowId: win.id });
+    chrome.alarms.create('closeBoards', { delayInMinutes: 1 });
   }
+}
+
+async function closeBoardsWindow() {
+  const { closeWindowId } = await chrome.storage.local.get('closeWindowId');
+  if (closeWindowId == null) return;
+  await chrome.windows.remove(closeWindowId).catch(() => {}); // already closed by hand
+  await chrome.storage.local.remove('closeWindowId');
 }
 
 // Called on startup, on install, and by both alarms. Runs at most once a day.
@@ -170,12 +179,14 @@ async function checkDaily() {
 
 async function scheduleAlarms() {
   const s = await getSettings();
-  await chrome.alarms.clearAll();
+  await chrome.alarms.clear('daily');
+  await chrome.alarms.clear('check');
   chrome.alarms.create('daily', { when: JobSchedule.nextRun(new Date(), s.autoTime).getTime() });
   chrome.alarms.create('check', { periodInMinutes: CHECK_MINUTES });
 }
 
 chrome.alarms.onAlarm.addListener(async (a) => {
+  if (a.name === 'closeBoards') return closeBoardsWindow();
   if (a.name === 'daily') await scheduleAlarms(); // re-arm for tomorrow
   await checkDaily();
 });

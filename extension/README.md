@@ -58,7 +58,7 @@ SuccessFactors and Taleo boards (plain HTML), IBM.
 
 At 10:00 (configurable), or on the first Chrome start after it if the
 computer was off, the extension opens "My boards" once in a background window
-— one tab every 4 s, max 25 — and closes the window ~45 s after the last one.
+— one tab every 4 s, max 25 — and closes the window about a minute after the last one.
 Chrome has to be running for this; on a Mac, add Chrome to System Settings →
 General → Login Items so it starts with the machine.
 
