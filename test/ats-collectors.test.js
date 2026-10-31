@@ -78,7 +78,7 @@ test('pinpoint: builds location from city/province and joins body sections', () 
   assert.strictEqual(row.date_posted, null);
 });
 
-test('gem: reads office locations and first_published_at', () => {
+test('gem: reads office locations and prefers updated_at over first_published_at', () => {
   const row = gem.mapPosting(
     {
       id: '4965519002',
@@ -86,6 +86,7 @@ test('gem: reads office locations and first_published_at', () => {
       absolute_url: 'https://jobs.gem.com/gem/4965519002',
       content: '<h2>Role</h2>',
       first_published_at: '2020-11-17T15:37:23.000Z',
+      updated_at: '2026-10-29T21:20:54.077Z',
       location: { name: 'San Francisco, United States' },
       location_type: 'hybrid',
       offices: [{ name: 'San Francisco', location: { name: 'San Francisco, United States' } }],
@@ -93,7 +94,7 @@ test('gem: reads office locations and first_published_at', () => {
     { slug: 'gem', displayName: 'Gem' }
   );
   assert.strictEqual(row.location, 'San Francisco, United States');
-  assert.strictEqual(row.date_posted, '2020-11-17T15:37:23.000Z');
+  assert.strictEqual(row.date_posted, '2026-10-29T21:20:54.077Z');
 });
 
 test('bamboohr: uses detail description/date and falls back to the hosted URL', () => {

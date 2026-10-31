@@ -76,10 +76,17 @@ const SEARCHES = ['software engineer', 'software developer', 'machine learning',
 const SEARCH_CAP = 100;
 
 async function fetchList(company) {
-  const first = await fetchPages(company, '', DEFAULT_MAX_LIST);
-  if (first.total <= DEFAULT_MAX_LIST) return first.items;
+  // One page first to learn the total. Large tenants skip the unfiltered
+  // listing entirely — 25 requests of mostly non-software rows — and go
+  // straight to the searches.
+  const first = await fetchPages(company, '', 20);
+  if (first.total > DEFAULT_MAX_LIST) return fetchBySearch(company, first.items);
+  if (first.total <= first.items.length) return first.items;
+  return (await fetchPages(company, '', DEFAULT_MAX_LIST)).items;
+}
 
-  const byPath = new Map(first.items.map((j) => [j.externalPath, j]));
+async function fetchBySearch(company, seed) {
+  const byPath = new Map(seed.map((j) => [j.externalPath, j]));
   for (const q of company.searches || SEARCHES) {
     // eslint-disable-next-line no-await-in-loop
     const { items } = await fetchPages(company, q, SEARCH_CAP);

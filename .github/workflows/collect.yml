@@ -15,7 +15,9 @@ jobs:
     # throttled because its edge rate-limits by IP across all tenants at once.
     # Measured separately at ~4 min (existing) + ~5 min (new). 30 leaves room
     # for a slow upstream rather than losing the whole run to a mid-flight kill.
-    timeout-minutes: 30
+    # 45: the sponsor-discovery pass (2026-10-31) added ~50 Workday tenants,
+    # which run 6 at a time because Workday rate-limits by IP.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +37,8 @@ jobs:
           FILTER_US:         'true'
           FILTER_SOFTWARE:   'true'
           ENTRY_LEVEL_MODE:  'permissive'
-          RETENTION_DAYS:    '30'
+          RETENTION_DAYS:    '14'
+          VISIBLE_DAYS:      '7'
           # Adzuna (src/collectors/adzuna.js). Empty until the secrets exist,
           # in which case the collector logs a skip and returns nothing.
           ADZUNA_APP_ID:     ${{ secrets.ADZUNA_APP_ID }}

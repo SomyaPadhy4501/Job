@@ -31,7 +31,11 @@ function mapPosting(j, { slug, displayName }) {
     location: buildLocation(j),
     apply_url: j.absolute_url || '',
     description: j.content || j.content_plain || '',
-    date_posted: j.first_published_at || j.created_at || null,
+    // updated_at, not first_published_at: Gem keeps long-running requisitions
+    // under their original publish date (Retool's "Software Engineer" dates
+    // from 2022), so first_published_at put every live row outside the 30-day
+    // retention window. Same fix as the Eightfold t_update preference.
+    date_posted: j.updated_at || j.first_published_at || j.created_at || null,
   };
 }
 

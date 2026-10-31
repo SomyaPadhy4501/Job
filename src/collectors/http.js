@@ -94,7 +94,10 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
         throw err;
       }
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status} for ${url}`);
+        const err = new Error(`HTTP ${res.status} for ${url}`);
+        err.status = res.status;
+        err.retryAfter = Number(res.headers.get('retry-after')) || 0;
+        throw err;
       }
       return await res.json();
     } catch (err) {
@@ -102,7 +105,14 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
       lastErr = err;
       if (err.status === 404) throw err; // no point retrying 404
       if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        // A 429 needs seconds, not the half-second used for transient errors.
+        // Workday rate-limits by IP across every tenant at once, so with
+        // hundreds of tenants a too-short retry turns one 429 into a failed
+        // employer. Honour Retry-After when given (capped at 30 s).
+        const wait = err.status === 429
+          ? Math.min(30, err.retryAfter || 5 * (attempt + 1) ** 2) * 1000
+          : 500 * (attempt + 1);
+        await new Promise((r) => setTimeout(r, wait));
       }
     }
   }

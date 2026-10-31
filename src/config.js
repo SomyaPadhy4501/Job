@@ -245,7 +245,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'workboard', displayName: 'Workboard' },
   { source: 'greenhouse', slug: 'workstream', displayName: 'Workstream' },
   { source: 'greenhouse', slug: 'worldlabs', displayName: 'World Labs' },
-  { source: 'greenhouse', slug: 'xai', displayName: 'xAI' },
   { source: 'greenhouse', slug: 'yotpo', displayName: 'Yotpo' },
   { source: 'greenhouse', slug: 'zenbusiness', displayName: 'ZenBusiness' },
   { source: 'greenhouse', slug: 'zenoti', displayName: 'Zenoti' },
@@ -781,8 +780,8 @@ const COMPANIES = [
   // ─── PCSX (Phenom Cloud) — same API shape as Microsoft ──────────────────
   { source: 'pcsx', slug: 'qualcomm', displayName: 'Qualcomm', apiBase: 'https://careers.qualcomm.com/api/pcsx/search', domain: 'qualcomm.com', applyUrlBase: 'https://careers.qualcomm.com/careers' },
 
-  // ─── Capgemini (standalone job-stream API) ──────────────────────────────
-  { source: 'capgemini', slug: 'capgemini', displayName: 'Capgemini' },
+  // Capgemini (src/collectors/capgemini.js) is no longer collected — owner's
+  // call, 2026-10-31. See EXCLUDED_EMPLOYERS in clearance.js.
 
   // ─── Wipro (SAP SuccessFactors-backed in-house API) ─────────────────────
   { source: 'wipro', slug: 'wipro', displayName: 'Wipro' },
@@ -793,15 +792,14 @@ const COMPANIES = [
   // ─── Single-tenant collectors ────────────────────────────────────────────
   { source: 'amazon',       displayName: 'Amazon' },
   { source: 'uber',         displayName: 'Uber' },
-  { source: 'netflix',      displayName: 'Netflix' },
   // Microsoft: their new apply.careers.microsoft.com frontend fetches jobs
   // from a public /api/pcsx/search endpoint. No auth, no TLS workaround
   // needed — the earlier 404s were because we were targeting the wrong path.
   { source: 'microsoft',    displayName: 'Microsoft' },
 
   // ─── Eightfold AI tenants (see src/collectors/eightfold.js) ──────────────
-  // Netflix is also Eightfold but keeps its own `netflix` source entry above,
-  // because it needs the L-level title hook and sits on a vanity host.
+  // Netflix is also Eightfold (src/collectors/netflix.js) but is no longer
+  // collected — owner's call, 2026-10-31. See EXCLUDED_EMPLOYERS in clearance.js.
   //
   // Discovered 2026-08-13 by sweeping `{slug}.eightfold.ai` and vanity career
   // hosts. Most tenants are NOT reachable: Nutanix and Juniper 404, Micron,
@@ -809,7 +807,7 @@ const COMPANIES = [
   // browser user-agent does not help). Don't re-probe those.
   //
   // Keep this list short on purpose. Eightfold rate-limits by IP across every
-  // tenant at once, so each addition raises the odds of 403ing Netflix too —
+  // tenant at once, so each addition raises the odds of a 403 for all of them —
   // see the rate-limit note at the top of src/collectors/eightfold.js.
   //
   // NetApp: 273 H-1B approvals over the last 2 FY per the USCIS Data Hub, and
@@ -848,6 +846,148 @@ const COMPANIES = [
   //   atos-syntel, natsoftcorporation, nisum, irissoftware, teladochealth
   //   robertbosch            — a near-empty duplicate of BoschGroup above,
   //                            which is the real board (288 US postings)
+
+  // ─── H-1B sponsors found by scripts/discover-sponsors.js (2026-10-31) ─────
+  // From the 1,412 USCIS sponsors with >= 50 approvals that the board didn't
+  // cover. Workday tenants were found via their robots.txt site list; the
+  // rest from the ATS linked on the employer's careers page. Each entry below
+  // was collected once and produced at least one kept row. displayName is the
+  // USCIS petitioner name on purpose — it is what the sponsorship lookup keys
+  // on; a prettier name would turn these rows UNKNOWN.
+  { source: 'workday', slug: 'guidehouse-external', tenant: 'guidehouse', wd: '1', site: 'External', displayName: 'Guidehouse' },  // 47 kept on 2026-10-31, 68 H-1B approvals
+  { source: 'workday', slug: 'comcast-comcast_careers', tenant: 'comcast', wd: '115', site: 'Comcast_Careers', displayName: 'Comcast Cable Communications' },  // 19 kept on 2026-10-31, 948 H-1B approvals
+  { source: 'workday', slug: 'remitly-remitly_careers', tenant: 'remitly', wd: '5', site: 'Remitly_Careers', displayName: 'Remitly' },  // 17 kept on 2026-10-31, 57 H-1B approvals
+  { source: 'workday', slug: 'visa-visa', tenant: 'visa', wd: '5', site: 'Visa', displayName: 'Visa' },  // 11 kept on 2026-10-31, 526 H-1B approvals
+  { source: 'workday', slug: 'usbank-us_bank_careers', tenant: 'usbank', wd: '1', site: 'US_Bank_Careers', displayName: 'US Bank National Association' },  // 10 kept on 2026-10-31, 1007 H-1B approvals
+  { source: 'workday', slug: 'blackrock-blackrock_professional', tenant: 'blackrock', wd: '1', site: 'BlackRock_Professional', displayName: 'Blackrock Financial Management' },  // 9 kept on 2026-10-31, 487 H-1B approvals
+  { source: 'workday', slug: 'workday-workday', tenant: 'workday', wd: '5', site: 'Workday', displayName: 'Workday' },  // 15 kept on 2026-10-31, 581 H-1B approvals
+  { source: 'workday', slug: 'cigna-cignacareers', tenant: 'cigna', wd: '5', site: 'cignacareers', displayName: 'Express Scripts Services' },  // 7 kept on 2026-10-31, 75 H-1B approvals
+  { source: 'workday', slug: 'vizient-vizient_careers', tenant: 'vizient', wd: '1', site: 'Vizient_Careers', displayName: 'Vizient' },  // 6 kept on 2026-10-31, 73 H-1B approvals
+  { source: 'workday', slug: 'toyota-tmna', tenant: 'toyota', wd: '503', site: 'TMNA', displayName: 'Toyota' },  // 6 kept on 2026-10-31, 50 H-1B approvals
+  { source: 'workday', slug: 'humana-humana_external_career_site', tenant: 'humana', wd: '5', site: 'Humana_External_Career_Site', displayName: 'Humana' },  // 5 kept on 2026-10-31, 336 H-1B approvals
+  { source: 'workday', slug: 'fractal-careers', tenant: 'fractal', wd: '1', site: 'Careers', displayName: 'Fractal Analytics' },  // 5 kept on 2026-10-31, 95 H-1B approvals
+  { source: 'workday', slug: 'expedia-search', tenant: 'expedia', wd: '108', site: 'search', displayName: 'Expedia' },  // 4 kept on 2026-10-31, 784 H-1B approvals
+  { source: 'workday', slug: 'crowdstrike-crowdstrikecareers', tenant: 'crowdstrike', wd: '5', site: 'crowdstrikecareers', displayName: 'Crowdstrike' },  // 4 kept on 2026-10-31, 99 H-1B approvals
+  { source: 'workday', slug: 'verily-verily_careers', tenant: 'verily', wd: '1', site: 'Verily_Careers', displayName: 'Verily Life Sciences' },  // 4 kept on 2026-10-31, 97 H-1B approvals
+  { source: 'workday', slug: 'rockwellautomation-external_rockwell_automation', tenant: 'rockwellautomation', wd: '1', site: 'External_Rockwell_Automation', displayName: 'Rockwell Automation' },  // 4 kept on 2026-10-31, 90 H-1B approvals
+  { source: 'workday', slug: 'novartis-novartis_careers', tenant: 'novartis', wd: '3', site: 'Novartis_Careers', displayName: 'Novartis Pharmaceuticals' },  // 4 kept on 2026-10-31, 84 H-1B approvals
+  { source: 'workday', slug: 'genpact-campussite', tenant: 'genpact', wd: '108', site: 'campussite', displayName: 'Genpact' },  // 3 kept on 2026-10-31, 249 H-1B approvals
+  { source: 'workday', slug: 'gartner-ext', tenant: 'gartner', wd: '5', site: 'EXT', displayName: 'Gartner' },  // 3 kept on 2026-10-31, 90 H-1B approvals
+  { source: 'workday', slug: 'syneoshealth-syneos_health_external_site', tenant: 'syneoshealth', wd: '12', site: 'Syneos_Health_External_Site', displayName: 'Syneos Health' },  // 3 kept on 2026-10-31, 73 H-1B approvals
+  { source: 'workday', slug: 'blackstone-blackstone_careers', tenant: 'blackstone', wd: '1', site: 'Blackstone_Careers', displayName: 'Blackstone' },  // 3 kept on 2026-10-31, 68 H-1B approvals
+  { source: 'workday', slug: 'tapestry-tapestry_careers', tenant: 'tapestry', wd: '108', site: 'Tapestry_Careers', displayName: 'Tapestry' },  // 3 kept on 2026-10-31, 52 H-1B approvals
+  { source: 'workday', slug: 'copart-copart', tenant: 'copart', wd: '12', site: 'Copart', displayName: 'Copart' },  // 2 kept on 2026-10-31, 83 H-1B approvals
+  { source: 'greenhouse', slug: 'natera', displayName: 'Natera' },  // 2 kept on 2026-10-31, 81 H-1B approvals
+  { source: 'workday', slug: 'ptc-ptc', tenant: 'ptc', wd: '1', site: 'PTC', displayName: 'PTC' },  // 2 kept on 2026-10-31, 80 H-1B approvals
+  { source: 'workday', slug: 'costar-costar_campus', tenant: 'costar', wd: '1', site: 'Costar_Campus', displayName: 'Costar Realty Information' },  // 2 kept on 2026-10-31, 73 H-1B approvals
+  { source: 'workday', slug: 'servicetitan-servicetitan', tenant: 'servicetitan', wd: '1', site: 'ServiceTitan', displayName: 'Servicetitan' },  // 2 kept on 2026-10-31, 65 H-1B approvals
+  { source: 'workday', slug: 'synechron-synechroncareers', tenant: 'synechron', wd: '1', site: 'SynechronCareers', displayName: 'Synechron' },  // 1 kept on 2026-10-31, 755 H-1B approvals
+  { source: 'workday', slug: 'elevancehealth-ant', tenant: 'elevancehealth', wd: '1', site: 'ANT', displayName: 'Anthem' },  // 1 kept on 2026-10-31, 660 H-1B approvals
+  { source: 'workday', slug: 'teladoc-teladochealth_is_hiring', tenant: 'teladoc', wd: '503', site: 'teladochealth_is_hiring', displayName: 'Teladoc Health' },  // 1 kept on 2026-10-31, 209 H-1B approvals
+  { source: 'workday', slug: 'wk-external', tenant: 'wk', wd: '3', site: 'External', displayName: 'Wolters Kluwer United States' },  // 1 kept on 2026-10-31, 167 H-1B approvals
+  { source: 'workday', slug: 'quantiphi-careers_at_quantiphi', tenant: 'quantiphi', wd: '1', site: 'Careers_at_Quantiphi', displayName: 'Quantiphi' },  // 1 kept on 2026-10-31, 100 H-1B approvals
+  { source: 'workday', slug: 'westernunion-westernunionjobs', tenant: 'westernunion', wd: '5', site: 'WesternUnionJobs', displayName: 'Western Union' },  // 1 kept on 2026-10-31, 99 H-1B approvals
+  { source: 'workday', slug: 'capgroup-capitalgroupcareers', tenant: 'capgroup', wd: '1', site: 'capitalgroupcareers', displayName: 'Capital Group Companies Global' },  // 1 kept on 2026-10-31, 98 H-1B approvals
+  { source: 'workday', slug: 'smithnephew-external', tenant: 'smithnephew', wd: '5', site: 'External', displayName: 'Smith Nephew' },  // 1 kept on 2026-10-31, 77 H-1B approvals
+  { source: 'workday', slug: 'vizient-vizient_careers_insourcing_acquisition', tenant: 'vizient', wd: '1', site: 'vizient_careers_insourcing_acquisition', displayName: 'Vizient' },  // 1 kept on 2026-10-31, 73 H-1B approvals
+  { source: 'workday', slug: 'jabil-jabil_careers', tenant: 'jabil', wd: '5', site: 'Jabil_Careers', displayName: 'Jabil' },  // 1 kept on 2026-10-31, 69 H-1B approvals
+  { source: 'workday', slug: 'cdk-cdk', tenant: 'cdk', wd: '1', site: 'CDK', displayName: 'CDK Global' },  // 1 kept on 2026-10-31, 59 H-1B approvals
+  { source: 'workday', slug: 'micron-external', tenant: 'micron', wd: '1', site: 'External', displayName: 'Micron' },  // 6 kept on 2026-10-31, 489 H-1B approvals
+  { source: 'workday', slug: 'kla-annarbor', tenant: 'kla', wd: '1', site: 'AnnArbor', displayName: 'KLA' },  // 5 kept on 2026-10-31, 369 H-1B approvals
+  { source: 'workday', slug: 'vanguard-vanguard_external', tenant: 'vanguard', wd: '5', site: 'vanguard_external', displayName: 'Vanguard' },  // 17 kept on 2026-10-31, 369 H-1B approvals
+  { source: 'workday', slug: 'nxp-careers', tenant: 'nxp', wd: '3', site: 'careers', displayName: 'NXP' },  // 4 kept on 2026-10-31, 226 H-1B approvals
+  { source: 'workday', slug: 'mckesson-external_careers', tenant: 'mckesson', wd: '3', site: 'External_Careers', displayName: 'Mckesson' },  // 10 kept on 2026-10-31, 147 H-1B approvals
+  { source: 'workday', slug: 'zebra-zebra_careers', tenant: 'zebra', wd: '501', site: 'Zebra_careers', displayName: 'Zebra' },  // 8 kept on 2026-10-31, 126 H-1B approvals
+  { source: 'workday', slug: 'astrazeneca-careers', tenant: 'astrazeneca', wd: '3', site: 'Careers', displayName: 'Astrazeneca Pharmaceuticals' },  // 1 kept on 2026-10-31, 115 H-1B approvals
+  { source: 'workday', slug: 'agilent-agilent_careers', tenant: 'agilent', wd: '5', site: 'Agilent_Careers', displayName: 'Agilent' },  // 2 kept on 2026-10-31, 79 H-1B approvals
+  { source: 'workday', slug: 'myhrhome-onemaincareers', tenant: 'myhrhome', wd: '1', site: 'OneMainCareers', displayName: 'Onemain General Services' },  // 1 kept on 2026-10-31, 79 H-1B approvals
+  { source: 'workday', slug: 'philips-jobs-and-careers', tenant: 'philips', wd: '3', site: 'jobs-and-careers', displayName: 'Philips North' },  // 2 kept on 2026-10-31, 77 H-1B approvals
+  { source: 'workday', slug: 'valeo-valeo_jobs', tenant: 'valeo', wd: '3', site: 'valeo_jobs', displayName: 'Valeo North' },  // 1 kept on 2026-10-31, 72 H-1B approvals
+  { source: 'workday', slug: 'tempus-tempus_careers', tenant: 'tempus', wd: '5', site: 'Tempus_Careers', displayName: 'Tempus' },  // 5 kept on 2026-10-31, 59 H-1B approvals
+  { source: 'workday', slug: 'tempus-ambry_careers', tenant: 'tempus', wd: '5', site: 'Ambry_Careers', displayName: 'Tempus' },  // 1 kept on 2026-10-31, 59 H-1B approvals
+  { source: 'greenhouse', slug: 'galaxydigitalservices', displayName: 'Galaxy' },  // 1 kept on 2026-10-31, 56 H-1B approvals
+  { source: 'workday', slug: 'sailpoint-sailpoint', tenant: 'sailpoint', wd: '1', site: 'SailPoint', displayName: 'Sailpoint' },  // 1 kept on 2026-10-31, 54 H-1B approvals
+
+  { source: 'workday', slug: 'travelers-external', tenant: 'travelers', wd: '5', site: 'External', displayName: 'Travelers Indemnity' },  // 21 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'generalmotors-careers_gm', tenant: 'generalmotors', wd: '5', site: 'Careers_GM', displayName: 'General Motors' },  // 16 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'northeastern-careers', tenant: 'northeastern', wd: '1', site: 'careers', displayName: 'Northeastern University' },  // 11 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'ncr-ext_us', tenant: 'ncr', wd: '1', site: 'ext_us', displayName: 'NCR' },  // 10 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'abbott-abbottcareers', tenant: 'abbott', wd: '5', site: 'abbottcareers', displayName: 'Abbott Laboratories' },  // 10 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'abbott-abbottcareers2', tenant: 'abbott', wd: '5', site: 'abbottcareers2', displayName: 'Abbott Laboratories' },  // 10 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'trimble-trimblecareers', tenant: 'trimble', wd: '1', site: 'TrimbleCareers', displayName: 'Trimble' },  // 10 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'hitachi-hitachi', tenant: 'hitachi', wd: '1', site: 'hitachi', displayName: 'Hitachi Vantara' },  // 9 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'broadcom-external_career', tenant: 'broadcom', wd: '1', site: 'External_Career', displayName: 'Broadcom' },  // 9 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'allstate-allstate_careers', tenant: 'allstate', wd: '5', site: 'allstate_careers', displayName: 'Allstate Insurance' },  // 7 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'citi-2', tenant: 'citi', wd: '5', site: '2', displayName: 'Citigroup Global Markets' },  // 6 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'dxctechnology-dxcjobs', tenant: 'dxctechnology', wd: '1', site: 'DXCJobs', displayName: 'DXC Technology Services' },  // 6 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'lplfinancial-external', tenant: 'lplfinancial', wd: '1', site: 'External', displayName: 'LPL Financial' },  // 6 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'globalfoundries-external', tenant: 'globalfoundries', wd: '1', site: 'External', displayName: 'Globalfoundries' },  // 5 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'embryriddle-external', tenant: 'embryriddle', wd: '1', site: 'External', displayName: 'Embry Riddle Aeronautical University' },  // 5 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'massgeneralbrigham-mgbexternal', tenant: 'massgeneralbrigham', wd: '1', site: 'MGBExternal', displayName: 'Mass General Brigham Incorporated' },  // 5 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'amgen-careers', tenant: 'amgen', wd: '1', site: 'Careers', displayName: 'Amgen' },  // 4 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'cardinalhealth-ext', tenant: 'cardinalhealth', wd: '1', site: 'EXT', displayName: 'Cardinal Health' },  // 4 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'ntrs-northerntrust', tenant: 'ntrs', wd: '1', site: 'northerntrust', displayName: 'Northern Trust' },  // 4 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'nationwide-nationwide_career', tenant: 'nationwide', wd: '1', site: 'Nationwide_Career', displayName: 'Nationwide Insurance' },  // 4 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'medtronic-medtroniccareers', tenant: 'medtronic', wd: '1', site: 'MedtronicCareers', displayName: 'Medtronic' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'transunion-transunion', tenant: 'transunion', wd: '5', site: 'TransUnion', displayName: 'Transunion' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'zillow-zillow_group_external', tenant: 'zillow', wd: '5', site: 'Zillow_Group_External', displayName: 'Zillow' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'analogdevices-external', tenant: 'analogdevices', wd: '1', site: 'External', displayName: 'Analog Devices' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'jci-jci', tenant: 'jci', wd: '5', site: 'JCI', displayName: 'Johnson Controls' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'highmarkhealth-highmark', tenant: 'highmarkhealth', wd: '1', site: 'highmark', displayName: 'Highmark Health' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'jll-jllcareers', tenant: 'jll', wd: '1', site: 'jllcareers', displayName: 'Jones Lang Lasalle' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'invesco-ivz', tenant: 'invesco', wd: '1', site: 'IVZ', displayName: 'Invesco Group Services' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'brunswick-search', tenant: 'brunswick', wd: '1', site: 'search', displayName: 'Brunswick' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'etsy-etsy_careers', tenant: 'etsy', wd: '5', site: 'Etsy_Careers', displayName: 'Etsy' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'draftkings-draftkings', tenant: 'draftkings', wd: '1', site: 'DraftKings', displayName: 'Draftkings' },  // 3 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'cadence-external_careers', tenant: 'cadence', wd: '1', site: 'External_Careers', displayName: 'Cadence Design' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'cadence-univ_careers', tenant: 'cadence', wd: '1', site: 'Univ_Careers', displayName: 'Cadence Design' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'bristolmyerssquibb-bms', tenant: 'bristolmyerssquibb', wd: '5', site: 'BMS', displayName: 'Bristol Myers Squibb' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'broadridge-careers', tenant: 'broadridge', wd: '5', site: 'Careers', displayName: 'Broadridge Financial' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'modernatx-m_tx', tenant: 'modernatx', wd: '1', site: 'M_tx', displayName: 'Modernatx' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'catalent-external', tenant: 'catalent', wd: '1', site: 'External', displayName: 'Catalent Pharma' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'flextronics-careers', tenant: 'flextronics', wd: '1', site: 'Careers', displayName: 'Flextronics' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'dowjones-dow_jones_career', tenant: 'dowjones', wd: '1', site: 'Dow_Jones_Career', displayName: 'DOW Jones' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'jadeglobal-jade_careers', tenant: 'jadeglobal', wd: '5', site: 'Jade_Careers', displayName: 'Jade Global' },  // 2 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'target-targetcareers', tenant: 'target', wd: '5', site: 'targetcareers', displayName: 'Target Enterprise' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'marvell-marvellcareers', tenant: 'marvell', wd: '1', site: 'MarvellCareers', displayName: 'Marvell Semiconductor' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'ally-ally', tenant: 'ally', wd: '1', site: 'Ally', displayName: 'Ally Bank' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'danaher-danaherjobs', tenant: 'danaher', wd: '1', site: 'DanaherJobs', displayName: 'Cepheid' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'rsm-rsmcareers', tenant: 'rsm', wd: '1', site: 'RSMCareers', displayName: 'RSM' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'raymondjames-raymondjamescareers', tenant: 'raymondjames', wd: '1', site: 'RaymondJamesCareers', displayName: 'Raymond James' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'ameriprise-ameriprise', tenant: 'ameriprise', wd: '5', site: 'Ameriprise', displayName: 'Ameriprise Financial' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'arrow-ac', tenant: 'arrow', wd: '1', site: 'AC', displayName: 'Arrow Electronics' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'stryker-strykercareers', tenant: 'stryker', wd: '1', site: 'StrykerCareers', displayName: 'Stryker' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'zoetis-zoetis', tenant: 'zoetis', wd: '5', site: 'zoetis', displayName: 'Zoetis' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'ochsner-ochsner', tenant: 'ochsner', wd: '1', site: 'Ochsner', displayName: 'Ochsner Clinic Foundation' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'davita-dkc_external', tenant: 'davita', wd: '1', site: 'DKC_External', displayName: 'Davita' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+  { source: 'workday', slug: 'pitneybowes-pbcareers', tenant: 'pitneybowes', wd: '1', site: 'PBCareers', displayName: 'Pitney Bowes' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
+
+  // ─── Gem / Pinpoint / Recruitee (scripts/probe-ats.js, verified 2026-10-31) ───
+  // Kept only where the board's postings mention the company's own website
+  // (from the YC feed), or the slug is the exact multi-word YC name. Rejected:
+  // one-word slugs that collide (coast, atlas, legacy…), every big-sponsor hit
+  // on these platforms (an "infosys" BambooHR board is not Infosys), and boards
+  // for companies already collected elsewhere (Raindrop, Exa, PostHog… on Ashby).
+  { source: 'gem', slug: 'retool', displayName: 'Retool' },
+  { source: 'gem', slug: 'onesignal', displayName: 'OneSignal' },
+  { source: 'gem', slug: 'rootly', displayName: 'Rootly' },
+  { source: 'gem', slug: 'letter-ai', displayName: 'Letter AI' },
+  { source: 'gem', slug: 'paces', displayName: 'Paces' },
+  { source: 'gem', slug: 'gem', displayName: 'Gem' },
+  { source: 'gem', slug: 'converge', displayName: 'Converge' },
+  { source: 'gem', slug: 'rinsed', displayName: 'Rinsed' },
+  { source: 'gem', slug: 'hemut', displayName: 'Hemut' },
+  { source: 'gem', slug: 'roe-ai', displayName: 'Roe AI' },
+  { source: 'gem', slug: 'better-auth', displayName: 'Better Auth' },
+  { source: 'gem', slug: 'rovihealth', displayName: 'Rovi Health' },
+  { source: 'gem', slug: 'lunajoy', displayName: 'LunaJoy' },
+  { source: 'gem', slug: 'unsiloed-ai', displayName: 'Unsiloed AI' },
+  { source: 'gem', slug: 'informed-k12', displayName: 'Informed K12' },
+  { source: 'gem', slug: 'thunder-compute', displayName: 'Thunder Compute' },
+  { source: 'gem', slug: 'tank-payments', displayName: 'Tank Payments' },
+  { source: 'gem', slug: 'growthbook', displayName: 'GrowthBook' },
+  { source: 'pinpoint', slug: 'safetywing', displayName: 'SafetyWing' },
+  { source: 'recruitee', slug: 'snapmagic', displayName: 'SnapMagic' },
 
   // ─── Community-curated GitHub new-grad lists ─────────────────────────────
   // These give us broad FAANG + enterprise coverage (Google, Apple, Meta,
@@ -963,13 +1103,26 @@ const CONFIG = {
   // Retention: only keep jobs posted (or last seen) within the last N days.
   // Enforced at normalize time (dated rows older than window are rejected)
   // and again at the end of each collect run (post-upsert sweep).
-  retentionDays: Number(process.env.RETENTION_DAYS || 30),
+  // Owner's call, 2026-10-31: delete after 14 days (shown for the first 7 —
+  // see visibleDays).
+  retentionDays: Number(process.env.RETENTION_DAYS || 14),
+
+  // Display window: the board only SHOWS jobs posted (or, for undated sources,
+  // first seen) within the last N days. Owner's call, 2026-10-31: nothing
+  // older than a week. Shorter than retentionDays on purpose — undated
+  // postings (Workday, Microsoft, the GitHub lists) are stamped with their
+  // first-seen date, and deleting one lets the next collect re-insert it as
+  // brand new. Kept but hidden in between, a still-open posting resurfaces
+  // once per retention cycle rather than every week.
+  visibleDays: Number(process.env.VISIBLE_DAYS || 7),
 
   requestTimeoutMs: 20_000,
   fetchConcurrency: 4, // parallel companies per source per run (default)
   // Per-source overrides; see collectAll(). Workday tenants are separate hosts.
   // Getro and Eightfold rate-limit by IP across all their tenants.
-  sourceConcurrency: { workday: 8, getro: 2, eightfold: 1 },
+  // Workday rate-limits by IP across all tenants (HTTP 429), so it stays at 6
+  // even though each tenant is its own host.
+  sourceConcurrency: { workday: 6, getro: 2, eightfold: 1 },
 
   defaultPageSize: 50,
   maxPageSize: 200,
