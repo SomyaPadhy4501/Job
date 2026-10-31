@@ -94,3 +94,32 @@ test('bare remote is assumed US on a US-focused board', () => {
   // ...but not when a foreign marker is present.
   assert.strictEqual(looksUS('Remote - United Kingdom'), false);
 });
+
+// ─── Apply-link dedupe ────────────────────────────────────────────────────────
+
+const { stripTracking, canonicalUrl } = require('../src/services/normalize');
+const { dedupeBatch } = require('../src/services/dedupe');
+
+test('stripTracking drops tracking params but keeps ones that identify the job', () => {
+  assert.strictEqual(
+    stripTracking('https://careers.roblox.com/jobs/8259453?gh_jid=8259453&utm_source=simplify&gh_src=x'),
+    'https://careers.roblox.com/jobs/8259453?gh_jid=8259453',
+  );
+});
+
+test('canonicalUrl ignores scheme, www, trailing slash, tracking and param order', () => {
+  assert.strictEqual(
+    canonicalUrl('http://WWW.amazon.jobs/en/jobs/1/ds/?utm_source=x&b=2&a=1'),
+    canonicalUrl('https://amazon.jobs/en/jobs/1/ds?a=1&b=2'),
+  );
+  assert.notStrictEqual(canonicalUrl('https://x.com/job?jobId=1'), canonicalUrl('https://x.com/job?jobId=2'));
+});
+
+test('dedupeBatch keeps the direct, described copy of a job seen twice', () => {
+  const rows = [
+    { source: 'ghlistings', company_name: 'Amazon', job_title: 'Data Scientist 1', location: 'Seattle', apply_url: 'https://www.amazon.jobs/en/jobs/1/ds?utm_source=Simplify', description: '' },
+    { source: 'amazon', company_name: 'Amazon', job_title: 'Data Scientist I', location: 'Seattle, WA', apply_url: 'https://amazon.jobs/en/jobs/1/ds', description: 'Build models.' },
+    { source: 'amazon', company_name: 'Amazon', job_title: 'SDE I', location: 'Seattle, WA', apply_url: 'https://amazon.jobs/en/jobs/2/sde', description: 'x' },
+  ];
+  assert.deepStrictEqual(dedupeBatch(rows).map((r) => r.job_title), ['Data Scientist I', 'SDE I']);
+});

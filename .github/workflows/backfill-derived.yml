@@ -35,6 +35,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Remove duplicate apply links
+        run: |
+          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+            node src/scripts/dedupe-urls.js --apply
+          else
+            node src/scripts/dedupe-urls.js
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Backfill derived fields
         run: |
           if [ "${{ github.event.inputs.apply }}" = "true" ]; then

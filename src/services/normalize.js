@@ -21,6 +21,38 @@ function stripHtml(html) {
     .trim();
 }
 
+// ─── Apply-link canonicalisation ─────────────────────────────────────────────
+//
+// The same posting arrives under several URLs: one source appends
+// ?utm_source=…, another ?gh_src=…, a third drops the "www.". On 2026-10-31 the
+// live board held 97 duplicate rows this way, mostly the same job from two
+// sources (Amazon via its own collector and via the GitHub new-grad list).
+//
+// Only parameters that are purely tracking are stripped from the STORED link.
+// Others are load-bearing — gh_jid and jobId identify the posting on embedded
+// boards — so they stay.
+const TRACKING_PARAM = /^(?:utm_[a-z_]+|gh_src|_gl|_ga|fbclid|gclid|mc_cid|mc_eid|trk|ref|referer|referrer|lever-source|lever-origin)$/i;
+
+function stripTracking(url) {
+  const s = String(url || '').trim();
+  let u;
+  try { u = new URL(s); } catch { return s; }
+  for (const k of [...u.searchParams.keys()]) if (TRACKING_PARAM.test(k)) u.searchParams.delete(k);
+  return u.toString();
+}
+
+// Comparison key only — never stored or linked. Also ignores scheme, case of
+// the host, a leading "www.", a trailing slash, the fragment and parameter order.
+function canonicalUrl(url) {
+  let u;
+  try { u = new URL(stripTracking(url)); } catch { return String(url || '').trim().toLowerCase(); }
+  const host = u.hostname.toLowerCase().replace(/^www\./, '');
+  const path = u.pathname.replace(/\/+$/, '') || '/';
+  const params = [...u.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const q = params.length ? `?${new URLSearchParams(params).toString()}` : '';
+  return `${host}${path}${q}`;
+}
+
 function normalizeLocation(loc) {
   if (!loc) return '';
   return String(loc).replace(/\s+/g, ' ').trim();
@@ -386,7 +418,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   const company_name = (raw.company_name || '').trim();
   const job_title = (raw.job_title || '').trim();
   const location = normalizeLocation(raw.location);
-  const apply_url = (raw.apply_url || '').trim();
+  const apply_url = stripTracking(raw.apply_url);
   const description = stripHtml(raw.description || '');
   const date_posted = parseDateToIso(raw.date_posted);
 
@@ -485,6 +517,8 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
 module.exports = {
   normalizeJob,
+  stripTracking,
+  canonicalUrl,
   stripHtml,
   buildDedupeKey,
   looksUS,
