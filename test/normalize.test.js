@@ -123,3 +123,12 @@ test('dedupeBatch keeps the direct, described copy of a job seen twice', () => {
   ];
   assert.deepStrictEqual(dedupeBatch(rows).map((r) => r.job_title), ['Data Scientist I', 'SDE I']);
 });
+
+test('domain words do not reject a title whose head is an engineering role', () => {
+  const { classifyRole } = require('../src/services/normalize');
+  assert.strictEqual(classifyRole('Data Scientist (Marketing preferred)'), 'DS');
+  assert.strictEqual(classifyRole('Data Scientist - Marketing'), 'DS');
+  assert.strictEqual(classifyRole('Software Engineer, Finance Platform'), 'SWE');
+  assert.strictEqual(classifyRole('Product Manager, Machine Learning'), 'OTHER');
+  assert.strictEqual(classifyRole('Marketing Manager'), 'OTHER');
+});

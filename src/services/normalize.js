@@ -289,7 +289,12 @@ function classifyRole(title) {
   if (STARTS_NON_CS_DISCIPLINE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
   if (HARDWARE_CUE.test(t) && !HAS_SOFTWARE_CUE.test(t)) return 'OTHER';
   if (ADJACENT_NON_CS.test(t)) return 'OTHER';
-  if (NON_CS_OTHER.test(t)) return 'OTHER';
+  // Domain words ("marketing", "finance", "content") reject a title only when
+  // its head isn't itself an engineering role: "Data Scientist (Marketing
+  // preferred)" and "Data Scientist - Marketing" are data-science jobs, while
+  // "Product Manager, Machine Learning" stays rejected — its head is the
+  // product manager.
+  if (NON_CS_OTHER.test(t) && !CORE_ROLE_HEAD.test(t.split(/[,(|:–—]|\s-\s/)[0])) return 'OTHER';
 
   // Tighten SRE detection: `reliability engineer` alone is often hardware
   // (e.g. "Hardware Reliability Engineer"). Require "site reliability" or
@@ -315,6 +320,9 @@ function looksSoftware(title) {
 }
 
 // ─── Entry-level filter ────────────────────────────────────────────────────
+const CORE_ROLE_HEAD =
+  /\b(?:software\s+(?:engineer|developer)|data\s+(?:scientist|engineer)|machine\s+learning\s+engineer|ml\s+engineer|applied\s+scientist|(?:backend|frontend|full[\s-]?stack)\s+(?:engineer|developer)|site\s+reliability\s+engineer|devops\s+engineer)\b/i;
+
 // Interns are rejected outright — user wants full-time only.
 // "II", "III", "IV", "V" as standalone tokens mean mid+ — reject.
 // "Senior/Sr/Staff/Principal/Lead/Director/Manager/Head/VP" — reject.
