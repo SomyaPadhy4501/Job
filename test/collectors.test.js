@@ -158,7 +158,9 @@ const EF_POSITION = {
   canonicalPositionUrl: 'https://netapp.eightfold.ai/careers/job/41240606',
   job_description: '',
   t_create: 1721692800, // 2024-07-23 — genuinely old posting
-  t_update: 1786953600, // recent maintenance touch
+  // Recent maintenance touch. Relative to now: a fixed timestamp ages out of the
+  // 30-day retention window and fails the test a month after it is written.
+  t_update: Math.floor(Date.now() / 1000) - 2 * 86400,
 };
 
 test('eightfold: prefers t_update over t_create so long-lived postings survive retention', () => {
