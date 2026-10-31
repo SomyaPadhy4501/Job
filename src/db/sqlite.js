@@ -380,19 +380,21 @@ function upsertJob(job) {
   if (existing) {
     database
       .prepare(
+        // Keep derived fields when this fetch has no description but the stored
+        // row does — same rule as the Postgres upsert (see src/db/pg.js).
         `UPDATE jobs
          SET last_seen_at   = datetime('now'),
              apply_url      = @apply_url,
-             description    = @description,
+             description    = CASE WHEN COALESCE(@description,'') = '' THEN description ELSE @description END,
              location       = @location,
              date_posted    = COALESCE(@date_posted, date_posted),
-             sponsorship    = @sponsorship,
+             sponsorship    = CASE WHEN COALESCE(@description,'') = '' AND COALESCE(description,'') <> '' THEN sponsorship ELSE @sponsorship END,
              role_type      = @role_type,
              category       = @category,
-             is_entry_level = @is_entry_level,
-             is_mid_level   = @is_mid_level,
-             restriction    = @restriction,
-             yoe_min        = @yoe_min
+             is_entry_level = CASE WHEN COALESCE(@description,'') = '' AND COALESCE(description,'') <> '' THEN is_entry_level ELSE @is_entry_level END,
+             is_mid_level   = CASE WHEN COALESCE(@description,'') = '' AND COALESCE(description,'') <> '' THEN is_mid_level ELSE @is_mid_level END,
+             restriction    = CASE WHEN COALESCE(@description,'') = '' AND COALESCE(description,'') <> '' THEN restriction ELSE @restriction END,
+             yoe_min        = CASE WHEN COALESCE(@description,'') = '' AND COALESCE(description,'') <> '' THEN yoe_min ELSE @yoe_min END
          WHERE id = @id`
       )
       .run({ ...job, id: existing.id });

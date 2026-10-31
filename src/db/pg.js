@@ -70,20 +70,26 @@ async function upsertJob(job, client) {
   }
 
   if (existing) {
+    // A re-fetch that comes back without a description (a rate-limited detail
+    // request, a row past a collector's per-run cap) must not erase the one
+    // already stored: sponsorship, restriction, level and experience were derived
+    // from that text, and recomputing them from nothing turns a stored "will not
+    // sponsor" back into a USCIS-driven YES. Keep the stored values only when the
+    // stored row actually has text; rows that never had any still update freely.
     await db.query(
       `UPDATE jobs
          SET last_seen_at   = $1,
              apply_url      = $2,
-             description    = $3,
+             description    = CASE WHEN COALESCE($3::text,'') = '' THEN description ELSE $3::text END,
              location       = $4,
              date_posted    = COALESCE($5, date_posted),
-             sponsorship    = $6,
+             sponsorship    = CASE WHEN COALESCE($3::text,'') = '' AND COALESCE(description,'') <> '' THEN sponsorship ELSE $6 END,
              role_type      = $7,
              category       = $8,
-             is_entry_level = $9,
-             is_mid_level   = $10,
-             restriction    = $11,
-             yoe_min        = $12
+             is_entry_level = CASE WHEN COALESCE($3::text,'') = '' AND COALESCE(description,'') <> '' THEN is_entry_level ELSE $9 END,
+             is_mid_level   = CASE WHEN COALESCE($3::text,'') = '' AND COALESCE(description,'') <> '' THEN is_mid_level ELSE $10 END,
+             restriction    = CASE WHEN COALESCE($3::text,'') = '' AND COALESCE(description,'') <> '' THEN restriction ELSE $11 END,
+             yoe_min        = CASE WHEN COALESCE($3::text,'') = '' AND COALESCE(description,'') <> '' THEN yoe_min ELSE $12 END
        WHERE id = $13`,
       [
         now(),
