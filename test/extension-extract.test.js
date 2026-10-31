@@ -103,3 +103,38 @@ test('completes a bare city with the state field the item carries', () => {
   const [row] = X.extractFromJson(json, ctx('https://careers.rivian.com/careers-home/jobs'));
   assert.strictEqual(row.location, 'Torrance, California, United States');
 });
+
+// ─── Job-link templates ───────────────────────────────────────────────────────
+
+const row = (id, title, url) => ({ external_id: `www.example.com:${id}`, job_title: title, apply_url: url });
+
+test('learnTemplate infers id and slug positions from linked rows', () => {
+  const rows = [
+    row('101', 'Software Engineer', 'https://x.com/careers/job/software-engineer-101'),
+    row('102', 'Data Engineer, Platform', 'https://x.com/careers/job/data-engineer-platform-102?src=list'),
+    row('103', 'ML Engineer', 'https://x.com/careers/search/?site=US#job-103'),
+  ];
+  assert.strictEqual(X.learnTemplate(rows), 'https://x.com/careers/job/{slug}-{id}');
+  assert.strictEqual(
+    X.fillTemplate('https://x.com/careers/job/{slug}-{id}', rows[2]),
+    'https://x.com/careers/job/ml-engineer-103',
+  );
+});
+
+test('learnTemplate refuses to generalise from a single link', () => {
+  assert.strictEqual(X.learnTemplate([row('101', 'SWE', 'https://x.com/job/101')]), null);
+});
+
+test('Tesla placeholders map to the confirmed job-page format', () => {
+  const tpl = X.KNOWN_TEMPLATES['www.tesla.com'];
+  const r = { external_id: 'www.tesla.com:222387', job_title: 'Software Engineer', apply_url: 'https://www.tesla.com/careers/search/?site=US#job-222387' };
+  assert.ok(X.isPlaceholder(r));
+  assert.strictEqual(X.fillTemplate(tpl, r), 'https://www.tesla.com/careers/search/job/222387');
+});
+
+test('candidateTemplates tries next to the search page first', () => {
+  assert.deepStrictEqual(X.candidateTemplates('https://www.tesla.com/careers/search/?site=US').slice(0, 2), [
+    'https://www.tesla.com/careers/search/job/{id}',
+    'https://www.tesla.com/careers/search/jobs/{id}',
+  ]);
+});

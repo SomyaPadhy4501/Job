@@ -312,7 +312,71 @@
     return core ? core.charAt(0).toUpperCase() + core.slice(1) : '';
   }
 
-  const api = { extractFromJson, extractFromJsonLd, usable, companyFromHost, companyFromUrl, cleanSiteName, locationText, dateText, scoreArray };
+  // ─── Job-link templates ─────────────────────────────────────────────────
+  //
+  // Some boards hand over ids but no links (Tesla's list has 8,000+ jobs with
+  // an id each, while the page only renders links for the few on screen).
+  // Rows like that get a placeholder "<search page>#job-<id>". These helpers
+  // work out the real link pattern so the placeholder can be replaced:
+  //   learnTemplate  — from rows the page DID link: where the id sits, and
+  //                    whether the title appears as a slug;
+  //   candidateTemplates — common conventions, verified by content.js with a
+  //                    single request before use;
+  //   KNOWN_TEMPLATES — formats confirmed from real data.
+
+  // Confirmed from SimplifyJobs' new-grad list, whose Tesla rows link
+  // https://www.tesla.com/careers/search/job/274330 (2026-10-31).
+  const KNOWN_TEMPLATES = {
+    'www.tesla.com': 'https://www.tesla.com/careers/search/job/{id}',
+  };
+
+  const PLACEHOLDER = '#job-';
+  const isPlaceholder = (row) => String(row.apply_url || '').includes(PLACEHOLDER);
+  const rowId = (row) => String(row.external_id || '').split(':').slice(1).join(':');
+
+  function slugify(title) {
+    return String(title || '')
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function fillTemplate(tpl, row) {
+    return tpl.replace('{id}', encodeURIComponent(rowId(row))).replace('{slug}', slugify(row.job_title));
+  }
+
+  // Needs at least two linked rows agreeing on one shape, so a single stray
+  // anchor can't set the pattern for thousands of jobs.
+  function learnTemplate(rows) {
+    const counts = new Map();
+    for (const r of rows) {
+      if (isPlaceholder(r)) continue;
+      const id = rowId(r);
+      if (!id || id.length < 3 || !r.apply_url.includes(id)) continue;
+      let tpl = r.apply_url.split('#')[0].replace(id, '{id}');
+      const slug = slugify(r.job_title);
+      if (slug && tpl.includes(slug)) tpl = tpl.replace(slug, '{slug}');
+      tpl = tpl.replace(/\?.*$/, '');
+      counts.set(tpl, (counts.get(tpl) || 0) + 1);
+    }
+    let best = null;
+    for (const [tpl, n] of counts) if (n >= 2 && (!best || n > best.n)) best = { tpl, n };
+    return best ? best.tpl : null;
+  }
+
+  // Conventions to try, most specific first: next to the search page, then
+  // at the site root.
+  function candidateTemplates(pageUrl) {
+    const u = new URL(pageUrl);
+    const dir = u.pathname.replace(/\/+$/, '');
+    const out = [`${u.origin}${dir}/job/{id}`, `${u.origin}${dir}/jobs/{id}`, `${u.origin}/job/{id}`, `${u.origin}/jobs/{id}`];
+    return [...new Set(out)];
+  }
+
+  const api = { extractFromJson, extractFromJsonLd, usable, companyFromHost, companyFromUrl, cleanSiteName, locationText, dateText, scoreArray,
+    KNOWN_TEMPLATES, isPlaceholder, rowId, slugify, fillTemplate, learnTemplate, candidateTemplates };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JobExtract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
