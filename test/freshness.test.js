@@ -48,3 +48,9 @@ test('sources are judged independently and listed once', () => {
   const results = [ok('lever', 5), fail('getro'), ok('lever', 7), ok('ashby', 3), ok('uber', 0)];
   assert.deepStrictEqual(refreshedSources(results).sort(), ['ashby', 'lever']);
 });
+
+test('sampled sources are never refreshed', () => {
+  // Adzuna returns the 50 newest matches per search and JSearch the last 3
+  // days; a job outside that sample is still open and must not be pruned.
+  assert.deepStrictEqual(refreshedSources([ok('adzuna', 50), ok('jsearch', 9), ok('lever', 2)]), ['lever']);
+});

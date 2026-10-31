@@ -13,9 +13,17 @@
 // ashby and lever slugs 404 every run) are a minority of their source and
 // don't block it; their rows stop being refreshed and age out like any other
 // delisted job.
+//
+// Some sources return a sample, not an employer's full listing: Adzuna gives
+// the 50 newest matches per search and JSearch the last 3 days. A job that
+// falls out of the sample is still open, so these never count as refreshed and
+// their rows leave by the retention window instead.
+const SAMPLED_SOURCES = new Set(['adzuna', 'jsearch']);
+
 function refreshedSources(results) {
   const bySource = new Map();
   for (const r of results) {
+    if (SAMPLED_SOURCES.has(r.company.source)) continue;
     const s = bySource.get(r.company.source) || { ok: 0, fail: 0, rows: 0 };
     if (r.ok) {
       s.ok++;
