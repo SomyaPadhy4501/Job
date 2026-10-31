@@ -55,7 +55,12 @@ function stripTracking(url) {
 }
 
 // Comparison key only — never stored or linked. Also ignores scheme, case of
-// the host, a leading "www.", a trailing slash, the fragment and parameter order.
+// the host, a leading "www." , a trailing slash and parameter order.
+//
+// The fragment is KEPT. Hash-routed boards put the job in it ("#/job/123"),
+// and the browser extension stores id-only postings as "<search page>#job-<id>".
+// Dropping it made all 150 Tesla rows one "duplicate" on 2026-10-31, and the
+// cleanup deleted 149 of them.
 function canonicalUrl(url) {
   let u;
   try { u = new URL(stripTracking(url)); } catch { return String(url || '').trim().toLowerCase(); }
@@ -63,7 +68,7 @@ function canonicalUrl(url) {
   const path = u.pathname.replace(/\/+$/, '') || '/';
   const params = [...u.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
   const q = params.length ? `?${new URLSearchParams(params).toString()}` : '';
-  return `${host}${path}${q}`;
+  return `${host}${path}${q}${u.hash || ''}`;
 }
 
 function normalizeLocation(loc) {

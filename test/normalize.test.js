@@ -113,6 +113,11 @@ test('canonicalUrl ignores scheme, www, trailing slash, tracking and param order
     canonicalUrl('https://amazon.jobs/en/jobs/1/ds?a=1&b=2'),
   );
   assert.notStrictEqual(canonicalUrl('https://x.com/job?jobId=1'), canonicalUrl('https://x.com/job?jobId=2'));
+  // Fragments identify jobs on hash-routed boards and extension placeholders.
+  assert.notStrictEqual(
+    canonicalUrl('https://www.tesla.com/careers/search/?site=US#job-1'),
+    canonicalUrl('https://www.tesla.com/careers/search/?site=US#job-2'),
+  );
 });
 
 test('dedupeBatch keeps the direct, described copy of a job seen twice', () => {
