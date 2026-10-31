@@ -667,7 +667,6 @@ const COMPANIES = [
   { source: 'workday', slug: 'paypal',     tenant: 'paypal',     wd: '1',  site: 'jobs',                    displayName: 'PayPal' },
   { source: 'workday', slug: 'salesforce', tenant: 'salesforce', wd: '12', site: 'External_Career_Site',    displayName: 'Salesforce' },
   { source: 'workday', slug: 'intel',      tenant: 'intel',      wd: '1',  site: 'External',                displayName: 'Intel' },
-  { source: 'workday', slug: 'walmart',    tenant: 'walmart',    wd: '5',  site: 'WalmartExternal',         displayName: 'Walmart' },
   { source: 'workday', slug: 'accenture',  tenant: 'accenture',  wd: '103', site: 'AccentureCareers',       displayName: 'Accenture' },
   { source: 'workday', slug: 'boeing',     tenant: 'boeing',     wd: '1',   site: 'EXTERNAL_CAREERS',       displayName: 'Boeing' },
   { source: 'workday', slug: 'capitalone', tenant: 'capitalone', wd: '12',  site: 'Capital_One',            displayName: 'Capital One' },

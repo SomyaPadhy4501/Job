@@ -66,6 +66,15 @@ function requestInsecureJson(url, { method = 'GET', headers = {}, body } = {}) {
   });
 }
 
+// Retry-After as milliseconds: delta-seconds or an HTTP date, capped so one
+// header can't stall a run. Null when absent or unreadable.
+const MAX_RETRY_AFTER_MS = 30_000;
+function parseRetryAfter(value) {
+  if (!value) return null;
+  const ms = /^\d+$/.test(value.trim()) ? Number(value) * 1000 : Date.parse(value) - Date.now();
+  return Number.isFinite(ms) ? Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS) : null;
+}
+
 // Shared fetch wrapper with timeout + basic retries.
 async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body } = {}) {
   let lastErr;
@@ -94,7 +103,10 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
         throw err;
       }
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status} for ${url}`);
+        const err = new Error(`HTTP ${res.status} for ${url}`);
+        err.status = res.status;
+        if (res.status === 429) err.retryAfterMs = parseRetryAfter(res.headers?.get('retry-after'));
+        throw err;
       }
       return await res.json();
     } catch (err) {
@@ -102,7 +114,13 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
       lastErr = err;
       if (err.status === 404) throw err; // no point retrying 404
       if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        // A 429 asks us to slow down. The half-second retry meant for flaky
+        // connections lands inside the same limit, so a rate-limited source
+        // failed outright: 6 of 16 Getro networks, every run, on 2026-10-31.
+        const wait = err.status === 429
+          ? err.retryAfterMs ?? 2000 * 2 ** attempt
+          : 500 * (attempt + 1);
+        await new Promise((r) => setTimeout(r, wait));
       }
     }
   }
@@ -127,4 +145,4 @@ async function runWithConcurrency(items, limit, worker) {
   return out;
 }
 
-module.exports = { fetchJson, runWithConcurrency };
+module.exports = { fetchJson, runWithConcurrency, parseRetryAfter };

@@ -47,6 +47,14 @@ const PAGE_SIZE = 20;
 // under-collection that looks like "the source has nothing new".
 const DEFAULT_MAX_PAGES = 250;
 
+// Pacing for the search API, which rate-limits across networks. On 2026-10-31
+// General Catalyst paged 201 times and Accel 176 back-to-back, both ended on a
+// 429, and six networks that started meanwhile got a 429 on page 0 and
+// collected nothing. A short gap per page, plus fetchJson's 429 backoff, trades
+// about a minute on the busiest networks for every network collecting.
+const PAGE_DELAY_MS = 250;
+const PAGE_RETRIES = 3;
+
 // Cap on description fetches per network per run. Descriptions come from the
 // board's own job page (one request each), so this is the expensive half of the
 // collector — see enrichDescription below for why we pay it at all. The title
@@ -75,7 +83,7 @@ const SENIORITY_MID = new Set(['mid_senior']);
 async function fetchPage(networkId, page) {
   return fetchJson(`${API_BASE}/${networkId}/search/jobs`, {
     method: 'POST',
-    retries: 1,
+    retries: PAGE_RETRIES,
     headers: { accept: 'application/json' },
     body: {
       hitsPerPage: PAGE_SIZE,
@@ -142,6 +150,7 @@ async function fetchCompany({ networkId, boardHost, slug, displayName, maxPages,
   // Collect candidates newest-first, stopping at the retention boundary.
   const byId = new Map();
   for (let page = 0; page < pageCap; page++) {
+    if (page > 0) await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
     let data;
     try {
       data = await fetchPage(networkId, page);
