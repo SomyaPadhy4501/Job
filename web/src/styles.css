@@ -424,40 +424,6 @@ a { color: inherit; }
 .skeleton-row { height: 44px; margin: 8px 0; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-/* ─── New-jobs toast ─────────────────────────────────────────────────────── */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 11px 20px;
-  border-radius: var(--radius-pill);
-  background: var(--panel);
-  color: var(--text);
-  font-weight: 600;
-  font-size: 13px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  box-shadow: var(--shadow-lg);
-  animation: rise 240ms cubic-bezier(0.22, 1, 0.36, 1);
-  z-index: 10;
-}
-.toast:hover { border-color: var(--accent); color: var(--accent-fg); }
-.toast-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-@keyframes rise {
-  from { opacity: 0; transform: translate(-50%, 10px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
-}
-
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .group-row { grid-template-columns: 18px 1fr auto; }

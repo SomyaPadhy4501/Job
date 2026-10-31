@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import TopBar from './components/TopBar.jsx';
 import Filters from './components/Filters.jsx';
 import JobsTable from './components/JobsTable.jsx';
 import CompanyGroups from './components/CompanyGroups.jsx';
 import Pager from './components/Pager.jsx';
-import NewJobsToast from './components/NewJobsToast.jsx';
 import { useJobs, useCompanies } from './hooks/useJobs.js';
 import useUrlFilters from './hooks/useUrlFilters.js';
 
@@ -26,22 +24,11 @@ export default function App() {
   const { isLoading, error } = active;
   const isFetching = jobsQuery.isFetching || (grouped && companiesQuery.isFetching);
 
-  // Detect new jobs on background refetch. `lastSeenTotal` is the total we
-  // last *rendered* to the user, not the most recent server reading —
-  // otherwise the toast would dismiss itself on the tick that fetches new
-  // data. We update it only when the user explicitly reloads.
-  const [lastSeenTotal, setLastSeenTotal] = useState(null);
+  // New jobs simply appear: both queries poll every 60 s (see useJobs) and
+  // swap fresh rows in without a flash. There used to be a "N new jobs ·
+  // click to add" toast on top of that, which asked for a click to show what
+  // had already arrived; removed at the owner's request.
   const total = data?.pagination?.total;
-
-  useEffect(() => {
-    if (total == null) return;
-    if (lastSeenTotal == null) setLastSeenTotal(total);
-  }, [total, lastSeenTotal]);
-
-  const newJobs = useMemo(() => {
-    if (lastSeenTotal == null || total == null) return 0;
-    return Math.max(0, total - lastSeenTotal);
-  }, [total, lastSeenTotal]);
 
   // Clamp page if filter change narrows totalPages below current page.
   const totalPages = active.data?.pagination?.totalPages ?? 1;
@@ -55,17 +42,7 @@ export default function App() {
     }
   }, [totalPages, filters.page]);
 
-  const qc = useQueryClient();
-  const handleReloadToApplyNew = () => {
-    setLastSeenTotal(total);
-    // Invalidate instead of a hard refetch so any matching query (page 1,
-    // page 2, …) gets refreshed consistently.
-    qc.invalidateQueries({ queryKey: ['jobs'] });
-    qc.invalidateQueries({ queryKey: ['companies'] });
-  };
-
   const handleManualRefresh = () => {
-    setLastSeenTotal(null);
     refetch();
     if (grouped) companiesQuery.refetch();
   };
@@ -96,7 +73,6 @@ export default function App() {
           onLimit={(n) => dispatch({ type: 'setLimit', value: n })}
         />
       </main>
-      {newJobs > 0 && <NewJobsToast count={newJobs} onClick={handleReloadToApplyNew} />}
     </div>
   );
 }

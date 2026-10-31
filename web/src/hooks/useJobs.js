@@ -35,6 +35,8 @@ export function useCompanyJobs(filters, company, { enabled }) {
   return useQuery({
     queryKey: ['jobs', { ...filters, company, page: 1, limit: 200 }],
     queryFn: () => fetchJobs({ ...filters, company, page: 1, limit: 200 }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000, // an open group picks up new roles on its own
     enabled,
   });
 }
