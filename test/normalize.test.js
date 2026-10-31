@@ -94,3 +94,29 @@ test('bare remote is assumed US on a US-focused board', () => {
   // ...but not when a foreign marker is present.
   assert.strictEqual(looksUS('Remote - United Kingdom'), false);
 });
+
+// ─── Excluded employers ───────────────────────────────────────────────────────
+
+const { isExcludedCompany, normalizeJob } = require('../src/services/normalize');
+
+test('excluded employers are matched on the whole name or its leading words', () => {
+  for (const name of ['Anduril Industries', 'Anduril', 'Netflix', 'Netflix, Inc.', 'Capgemini Government Solutions']) {
+    assert.strictEqual(isExcludedCompany(name), true, name);
+  }
+  // A shared prefix that isn't a whole word is a different company.
+  for (const name of ['Netflixer Labs', 'Stripe', '']) {
+    assert.strictEqual(isExcludedCompany(name), false, name);
+  }
+});
+
+test('an excluded employer is dropped whichever source lists it', () => {
+  // The curated GitHub lists carried Anduril and Netflix rows of their own, so
+  // removing the Greenhouse and Netflix collectors alone didn't clear them.
+  const row = {
+    source: 'ghlistings', company_name: 'Anduril Industries', job_title: 'Software Engineer',
+    location: 'Costa Mesa, CA', apply_url: 'https://boards.greenhouse.io/andurilindustries/jobs/1',
+    description: '', date_posted: null,
+  };
+  assert.strictEqual(normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true }), null);
+  assert.ok(normalizeJob({ ...row, company_name: 'Shield AI' }, { filterUSOnly: true, filterSoftwareOnly: true }));
+});

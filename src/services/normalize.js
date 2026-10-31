@@ -1,5 +1,6 @@
 'use strict';
 
+const { CONFIG } = require('../config');
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
 const { classifyRestriction } = require('./clearance');
@@ -366,6 +367,12 @@ function normCompany(s) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
+const EXCLUDED_COMPANIES = CONFIG.excludedCompanies.map(normCompany);
+function isExcludedCompany(name) {
+  const key = normCompany(name);
+  return EXCLUDED_COMPANIES.some((x) => key === x || key.startsWith(`${x}-`));
+}
+
 function normTitle(s) {
   return String(s || '')
     .toLowerCase()
@@ -395,6 +402,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   const date_posted = parseDateToIso(raw.date_posted);
 
   if (!company_name || !job_title || !apply_url) return null;
+  if (isExcludedCompany(company_name)) return null;
 
   // Retention: reject rows we already know are older than the window.
   // Null-dated rows fall through here — the DB sweep prunes them later via
@@ -486,6 +494,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
 module.exports = {
   normalizeJob,
+  isExcludedCompany,
   stripHtml,
   buildDedupeKey,
   looksUS,

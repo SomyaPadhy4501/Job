@@ -113,7 +113,6 @@ const COMPANIES = [
   // ─── Greenhouse — topstartups.io (discovered by scripts/probe-topstartups.js, verified 2026-04-24) ───
   { source: 'greenhouse', slug: 'airtable', displayName: 'Airtable' },
   { source: 'greenhouse', slug: 'alloy', displayName: 'Alloy' },
-  { source: 'greenhouse', slug: 'andurilindustries', displayName: 'Anduril Industries' },
   { source: 'greenhouse', slug: 'appliedintuition', displayName: 'Applied Intuition' },
   { source: 'greenhouse', slug: 'attentive', displayName: 'Attentive' },
   { source: 'greenhouse', slug: 'axonius', displayName: 'Axonius' },
@@ -804,23 +803,19 @@ const COMPANIES = [
   // ─── Single-tenant collectors ────────────────────────────────────────────
   { source: 'amazon',       displayName: 'Amazon' },
   { source: 'uber',         displayName: 'Uber' },
-  { source: 'netflix',      displayName: 'Netflix' },
   // Microsoft: their new apply.careers.microsoft.com frontend fetches jobs
   // from a public /api/pcsx/search endpoint. No auth, no TLS workaround
   // needed — the earlier 404s were because we were targeting the wrong path.
   { source: 'microsoft',    displayName: 'Microsoft' },
 
   // ─── Eightfold AI tenants (see src/collectors/eightfold.js) ──────────────
-  // Netflix is also Eightfold but keeps its own `netflix` source entry above,
-  // because it needs the L-level title hook and sits on a vanity host.
-  //
   // Discovered 2026-08-13 by sweeping `{slug}.eightfold.ai` and vanity career
   // hosts. Most tenants are NOT reachable: Nutanix and Juniper 404, Micron,
   // Dolby and Vodafone return 403 (the tenant disabled anonymous API access — a
   // browser user-agent does not help). Don't re-probe those.
   //
   // Keep this list short on purpose. Eightfold rate-limits by IP across every
-  // tenant at once, so each addition raises the odds of 403ing Netflix too —
+  // tenant at once, so each addition raises the odds of 403ing the others too —
   // see the rate-limit note at the top of src/collectors/eightfold.js.
   //
   // NetApp: 273 H-1B approvals over the last 2 FY per the USCIS Data Hub, and
@@ -984,7 +979,15 @@ const CONFIG = {
   // rows are delisted like any job its source stopped returning: gone once
   // they're staleAfterDays past their last sighting.
   //   capgemini – removed 2026-10-26.
-  retiredSources: ['capgemini'],
+  //   netflix   – removed 2026-10-31.
+  retiredSources: ['capgemini', 'netflix'],
+
+  // Employers kept off the board whichever source lists them — removing a
+  // config entry alone leaves the curated lists, Getro and JSearch free to
+  // bring them back. Matched on normCompany(), whole name or leading words, so
+  // "anduril" covers "Anduril Industries". A row that stops passing normalize
+  // stops being refreshed and is swept by pruneUnseenJobs like a delisting.
+  excludedCompanies: ['anduril', 'capgemini', 'netflix'],
 
   requestTimeoutMs: 20_000,
   fetchConcurrency: 4, // parallel companies per run

@@ -191,19 +191,16 @@ test('eightfold: t_update is still used when t_create is absent', () => {
   assert.strictEqual(row.date_posted, EF_POSITION.t_update);
 });
 
-test('eightfold: netflix L-level hook flows into the level overrides', async () => {
-  const netflix = require('../src/collectors/netflix');
-  // L6+ is rejected inside fetchEightfold; here we pin that the hook's output
+test('eightfold: a level hook flows into the level overrides', () => {
+  // Rejection happens inside fetchEightfold; here we pin that the hook's output
   // reaches the row, which is what the mapping is responsible for.
   const row = eightfold.mapPosition(EF_POSITION, {
-    source: 'netflix',
-    displayName: 'Netflix',
-    title: 'Software Engineer L3 - Playback',
+    source: 'eightfold',
+    displayName: 'NetApp',
+    title: 'Software Engineer',
     lvl: { reject: false, entry: 1 },
   });
   assert.strictEqual(row.entry_level_override, 1);
-  assert.strictEqual(row.source, 'netflix', 'netflix rows keep their own source');
-  assert.strictEqual(typeof netflix.fetchCompany, 'function');
 });
 
 // ─── SmartRecruiters ──────────────────────────────────────────────────────────
