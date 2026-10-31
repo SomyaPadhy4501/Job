@@ -1,6 +1,7 @@
 'use strict';
 
 const { fetchJson } = require('./http');
+const { addDescriptions } = require('./pcsx');
 
 // Microsoft's apply.careers.microsoft.com fetches from a public PCSX API:
 //   GET /api/pcsx/search?domain=microsoft.com&query=…&start=…&sort_by=…
@@ -80,10 +81,12 @@ async function fetchCompany({ displayName }) {
       apply_url: p.positionUrl
         ? `https://apply.careers.microsoft.com${p.positionUrl}`
         : `https://apply.careers.microsoft.com/careers/job/${id}`,
-      description: '', // detail body requires a separate /api/pcsx/position_details call
+      description: '', // filled below by addDescriptions (one /position_details call per kept job)
       date_posted: p.postedTs || p.creationTs || null, // Unix seconds; normalize handles it
     });
   }
+  // Same API as every PCSX tenant, so the shared fetcher serves Microsoft too.
+  await addDescriptions(out, { apiBase: BASE, domain: 'microsoft.com' });
   return out;
 }
 

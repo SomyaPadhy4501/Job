@@ -1,6 +1,8 @@
 'use strict';
 
 const { fetchJson, runWithConcurrency } = require('./http');
+const { CONFIG } = require('../config');
+const { looksSoftware, passesLevel } = require('../services/normalize');
 
 // Public Workday "CxS" JSON endpoints. Each company has a tenant + wd shard + site path:
 //   https://{tenant}.wd{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs   (POST list)
@@ -150,6 +152,37 @@ function parsePostedOn(s) {
   return d.toISOString();
 }
 
+// Which postings get a detail request. Beyond the title + US filters, apply the
+// same software and level gates normalize applies, so none of the per-run budget
+// is spent on a "Director" or "Senior Manager" posting that is dropped right
+// after (a third of Capital One's candidates were). Newest first, so when the cap
+// bites it is the oldest rows that go without — and those keep the description
+// they got when they were new (see upsertJob).
+function pickCandidates(list) {
+  return list
+    .filter(
+      (j) =>
+        looksRelevantTitle(j.title) &&
+        looksUSLocation(j.locationsText) &&
+        (!CONFIG.filterSoftwareOnly || looksSoftware(j.title)) &&
+        passesLevel(j.title, CONFIG.entryLevelMode || 'permissive')
+    )
+    .sort((a, b) => postedAgeDays(a.postedOn) - postedAgeDays(b.postedOn));
+}
+
+// Workday words recency as "Posted Today", "Posted Yesterday", "Posted 5 Days
+// Ago" and "Posted 30+ Days Ago". parsePostedOn() only reads the "N … ago" forms,
+// so sorting on it would have ranked the newest postings as the oldest.
+function postedAgeDays(s) {
+  const t = String(s || '').toLowerCase();
+  if (/today|just posted/.test(t)) return 0;
+  if (/yesterday/.test(t)) return 1;
+  const m = /(\d+)\+?\s+(hour|day|week|month)/.exec(t);
+  if (!m) return 9999;
+  const n = Number(m[1]);
+  return m[2] === 'hour' ? 0 : m[2] === 'day' ? n : m[2] === 'week' ? n * 7 : n * 30;
+}
+
 async function fetchCompany(company) {
   const { slug, displayName, tenant, wd, site } = company;
   if (!tenant || !wd || !site) {
@@ -158,10 +191,7 @@ async function fetchCompany(company) {
 
   const list = await fetchList(company);
 
-  // Pre-filter by title + location so we only burn detail requests on US SWE/ML/DS roles.
-  const candidates = list.filter(
-    (j) => looksRelevantTitle(j.title) && looksUSLocation(j.locationsText)
-  );
+  const candidates = pickCandidates(list);
   const enrichTargets = candidates.slice(0, DEFAULT_ENRICH_MAX);
 
   const descByPath = new Map();
@@ -191,4 +221,4 @@ async function fetchCompany(company) {
   }));
 }
 
-module.exports = { fetchCompany, detailUrl, source: 'workday' };
+module.exports = { fetchCompany, detailUrl, pickCandidates, postedAgeDays, source: 'workday' };

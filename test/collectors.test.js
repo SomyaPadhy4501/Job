@@ -470,3 +470,90 @@ test('apple: the detail description carries the qualifications from jobsData', (
   assert.match(row.description, /Visa sponsorship is not available/);
   assert.strictEqual(normalizeJob(row)?.sponsorship, 'NO');
 });
+
+// ─── PCSX (Microsoft, Qualcomm) descriptions ─────────────────────────────────
+
+// Search rows carry no body, so every Microsoft and Qualcomm row used to go
+// through the classifiers on its title alone — sponsorship came purely from
+// USCIS history. Verified live 2026-10-31: position_details returns the JD.
+test('pcsx: detail URL is derived from the search URL', () => {
+  const { detailBase } = require('../src/collectors/pcsx');
+  assert.strictEqual(
+    detailBase('https://apply.careers.microsoft.com/api/pcsx/search'),
+    'https://apply.careers.microsoft.com/api/pcsx/position_details'
+  );
+  assert.strictEqual(
+    detailBase('https://careers.qualcomm.com/api/pcsx/search'),
+    'https://careers.qualcomm.com/api/pcsx/position_details'
+  );
+});
+
+test('pcsx: spends detail requests only on rows the pipeline would keep, newest first', () => {
+  const { pickForDetail } = require('../src/collectors/pcsx');
+  const row = (id, title, location, ts) => ({ external_id: id, job_title: title, location, date_posted: ts });
+  const picked = pickForDetail([
+    row('1', 'Software Engineer II', 'Redmond, WA, US', 100),
+    row('2', 'Principal Software Engineer', 'Redmond, WA, US', 900), // senior: rejected later anyway
+    row('3', 'Software Engineer', 'Bangalore, India', 800), // not US
+    row('4', 'Software Engineer', 'Seattle, WA, US', 300),
+    row('5', 'Office Manager', 'Redmond, WA, US', 700), // not a software role
+  ]);
+  assert.deepStrictEqual(picked.map((r) => r.external_id), ['4', '1']);
+});
+
+test('pcsx: descriptions are filled in place and one failure does not lose the rest', async () => {
+  const { addDescriptions } = require('../src/collectors/pcsx');
+  const rows = [
+    { external_id: 'a', job_title: 'Software Engineer', location: 'Redmond, WA, US', date_posted: 2, description: '' },
+    { external_id: 'b', job_title: 'Software Engineer', location: 'Redmond, WA, US', date_posted: 1, description: '' },
+  ];
+  const calls = [];
+  await addDescriptions(
+    rows,
+    { apiBase: 'https://apply.careers.microsoft.com/api/pcsx/search', domain: 'microsoft.com' },
+    async (base, domain, id) => {
+      calls.push([base, domain, id]);
+      if (id === 'b') throw new Error('HTTP 429');
+      return 'Visa sponsorship is not available.';
+    }
+  );
+  assert.strictEqual(rows[0].description, 'Visa sponsorship is not available.');
+  assert.strictEqual(rows[1].description, '', 'failed row stays empty');
+  assert.strictEqual(calls[0][0], 'https://apply.careers.microsoft.com/api/pcsx/position_details');
+});
+
+// Workday spends at most 80 detail requests per company per run. Spending them
+// on postings the pipeline rejects right after (Director, Senior Manager, …) left
+// real candidates without a JD — Capital One had 92 candidates for 80 slots, a
+// third of them doomed — and rows without one fall back to USCIS history alone.
+test('workday: detail requests go to rows normalize would keep, newest first', () => {
+  const posting = (title, postedOn, locationsText = 'Austin, Texas, United States of America') => ({
+    title,
+    postedOn,
+    locationsText,
+  });
+  const picked = workday.pickCandidates([
+    posting('Software Engineer', 'Posted 9 Days Ago'),
+    posting('Director - AI Engineering', 'Posted 1 Day Ago'), // rejected by the level gate
+    posting('Machine Learning Engineer 5 (Senior Manager, IC)', 'Posted 2 Days Ago'),
+    posting('Software Engineer', 'Posted 1 Day Ago', 'Bengaluru, India'), // not US
+    posting('Data Engineer 4', 'Posted 5 Days Ago'),
+  ]);
+  assert.deepStrictEqual(
+    picked.map((j) => j.title),
+    ['Machine Learning Engineer 5 (Senior Manager, IC)', 'Data Engineer 4', 'Software Engineer']
+  );
+});
+
+// "Posted Today" / "Posted Yesterday" carry no number, so a parser that only
+// reads "N days ago" ranks the newest postings as the oldest — the first to lose
+// their JD when the cap bites.
+test('workday: "Posted Today" and "Posted Yesterday" rank as newest', () => {
+  assert.strictEqual(workday.postedAgeDays('Posted Today'), 0);
+  assert.strictEqual(workday.postedAgeDays('Posted Yesterday'), 1);
+  assert.strictEqual(workday.postedAgeDays('Posted 5 Days Ago'), 5);
+  assert.strictEqual(workday.postedAgeDays('Posted 30+ Days Ago'), 30);
+  const order = ['Posted 30+ Days Ago', 'Posted Yesterday', 'Posted Today', 'Posted 3 Days Ago']
+    .sort((a, b) => workday.postedAgeDays(a) - workday.postedAgeDays(b));
+  assert.deepStrictEqual(order, ['Posted Today', 'Posted Yesterday', 'Posted 3 Days Ago', 'Posted 30+ Days Ago']);
+});
