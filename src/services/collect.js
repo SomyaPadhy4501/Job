@@ -2,9 +2,9 @@
 
 const { COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
-const { normalizeJob } = require('./normalize');
+const { normalizeJob, parseDateToIso, stripTracking } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
-const { bulkUpsert, startRun, finishRun, pruneStaleJobs } = require('../db');
+const { bulkUpsert, startRun, finishRun, pruneStaleJobs, deleteByApplyUrls } = require('../db');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -84,9 +84,20 @@ async function collectAll({ companies = COMPANIES } = {}) {
     }
   }
 
-  // Normalize + filter.
+  // Normalize + filter. Jobs a source now dates past the retention window are
+  // also collected for deletion: normalize skips them, but a row stored
+  // earlier under a newer-looking date would otherwise stay on the board.
+  // (Greenhouse used to send updated_at, so a role first published in May
+  // could read as posted today; once its real date arrived it was skipped
+  // and the misleading row lingered.)
   const normalized = [];
+  const expiredUrls = [];
+  const cutoff = Date.now() - CONFIG.retentionDays * 86_400_000;
   for (const raw of rawJobs) {
+    const posted = parseDateToIso(raw.date_posted);
+    if (posted && new Date(posted).getTime() < cutoff && raw.apply_url) {
+      expiredUrls.push(stripTracking(raw.apply_url));
+    }
     const n = normalizeJob(raw, {
       filterUSOnly: CONFIG.filterUSOnly,
       filterSoftwareOnly: CONFIG.filterSoftwareOnly,
@@ -105,6 +116,8 @@ async function collectAll({ companies = COMPANIES } = {}) {
   // dated rows that slipped past normalize (e.g. curated lists that re-publish
   // stale items) and null-dated rows whose last_seen_at has aged out (source
   // stopped listing them — role filled or pulled).
+  const expired = expiredUrls.length ? await deleteByApplyUrls(expiredUrls) : 0;
+  if (expired > 0) log.info('collection.expired', { runId, expired });
   const pruned = pruneStaleJobs(CONFIG.retentionDays);
   if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
 

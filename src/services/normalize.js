@@ -570,6 +570,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
 module.exports = {
   normalizeJob,
+  parseDateToIso,
   cleanCompanyName,
   stripTracking,
   canonicalUrl,

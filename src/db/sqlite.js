@@ -649,6 +649,14 @@ function queryNewestJobs(filters, companies) {
     .all(params);
 }
 
+// See pg.js.
+function deleteByApplyUrls(urls) {
+  const stmt = getDb().prepare('DELETE FROM jobs WHERE apply_url = ?');
+  let n = 0;
+  getDb().transaction((list) => { for (const u of list) n += stmt.run(u).changes; })(urls);
+  return n;
+}
+
 module.exports = {
   getDb,
   upsertJob,
@@ -661,4 +669,5 @@ module.exports = {
   getJobById,
   statsSummary,
   pruneStaleJobs,
+  deleteByApplyUrls,
 };

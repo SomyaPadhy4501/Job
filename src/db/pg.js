@@ -179,6 +179,17 @@ async function pruneStaleJobs(days) {
   return rowCount;
 }
 
+// Delete rows by apply link (see the expiry note in collect.js). Chunked so a
+// big catalogue doesn't build one enormous parameter array.
+async function deleteByApplyUrls(urls) {
+  let n = 0;
+  for (let i = 0; i < urls.length; i += 1000) {
+    const { rowCount } = await getPool().query('DELETE FROM jobs WHERE apply_url = ANY($1)', [urls.slice(i, i + 1000)]);
+    n += rowCount;
+  }
+  return n;
+}
+
 async function startRun() {
   const { rows } = await getPool().query(
     `INSERT INTO collection_runs (started_at) VALUES ($1) RETURNING id`,
@@ -398,4 +409,5 @@ module.exports = {
   getJobById,
   statsSummary,
   pruneStaleJobs,
+  deleteByApplyUrls,
 };
