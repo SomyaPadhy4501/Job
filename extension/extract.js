@@ -289,13 +289,15 @@
     return '';
   }
 
-  // "Careers at Netflix" → "Netflix"; generic labels → '' so a better source wins.
+  // "Careers at Netflix" / "Build your Career at Tesla" → the company; generic
+  // labels and long headlines → '' so the host name wins instead.
   function cleanSiteName(name) {
     const n = String(name || '').trim()
-      .replace(/^(?:careers|jobs|work|life)\s+(?:at|with|@)\s+/i, '')
+      .replace(/^.*\b(?:careers?|jobs?|work|life|opportunities)\s+(?:at|with|@)\s+/i, '')
       .replace(/\s*[|\-–—]\s*(?:careers|jobs).*$/i, '')
       .replace(/\s+(?:careers|jobs)$/i, '')
       .trim();
+    if (n.split(/\s+/).length > 4) return '';
     return /^(?:apply|jobs?|careers?|home|job board|search)$/i.test(n) ? '' : n;
   }
 

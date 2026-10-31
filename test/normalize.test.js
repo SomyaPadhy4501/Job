@@ -132,3 +132,20 @@ test('domain words do not reject a title whose head is an engineering role', () 
   assert.strictEqual(classifyRole('Product Manager, Machine Learning'), 'OTHER');
   assert.strictEqual(classifyRole('Marketing Manager'), 'OTHER');
 });
+
+test('a trailing province or country rejects a location even after a US city name', () => {
+  const { looksUS } = require('../src/services/normalize');
+  assert.strictEqual(looksUS('Richmond Hill, Ontario'), false);
+  assert.strictEqual(looksUS('Vancouver, British Columbia'), false);
+  assert.strictEqual(looksUS('Richmond, VA'), true);
+  assert.strictEqual(looksUS('Austin, TX'), true);
+  assert.strictEqual(looksUS('Fremont, California'), true);
+});
+
+test('cleanCompanyName turns a careers-page headline into the employer', () => {
+  const { cleanCompanyName } = require('../src/services/normalize');
+  assert.strictEqual(cleanCompanyName('Build your Career at Tesla'), 'Tesla');
+  assert.strictEqual(cleanCompanyName('Careers at Netflix'), 'Netflix');
+  assert.strictEqual(cleanCompanyName('Capital One'), 'Capital One');
+  assert.strictEqual(cleanCompanyName('Jobs at'), 'Jobs at');
+});

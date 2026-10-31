@@ -21,6 +21,19 @@ function stripHtml(html) {
     .trim();
 }
 
+// ─── Company names ───────────────────────────────────────────────────────────
+//
+// Some sources hand us a page headline instead of an employer: the browser
+// extension read Tesla's careers page as "Build your Career at Tesla". The
+// USCIS lookup can't resolve that, so all 150 Tesla rows landed UNKNOWN.
+const HEADLINE_COMPANY = /\b(?:careers?|jobs?|work|life|opportunities)\s+(?:at|with|@)\s+(.+)$/i;
+
+function cleanCompanyName(name) {
+  const n = String(name || '').trim();
+  const m = n.match(HEADLINE_COMPANY);
+  return m && m[1].trim().split(/\s+/).length <= 4 ? m[1].trim() : n;
+}
+
 // ─── Apply-link canonicalisation ─────────────────────────────────────────────
 //
 // The same posting arrives under several URLs: one source appends
@@ -146,6 +159,9 @@ function endsWithForeignIso3(l) {
 // override the "bare remote → US" heuristic and the US_STATES `ca` fallback
 // (which would otherwise match both California and Canada). Kept broad: it's
 // cheaper to let a few borderline US rows through than to leak foreign ones.
+const FOREIGN_TRAILING =
+  /^(?:ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland(?: and labrador)?|prince edward island|on|bc|qc|ab|canada|mexico|india|china|japan|germany|france|spain|ireland|united kingdom|uk|england|netherlands|poland|israel|singapore|philippines|brazil|australia|south korea|korea|taiwan)$/;
+
 const FOREIGN_MARKERS =
   /\b(worldwide|global|anywhere|emea|apac|latam|eu|europe|european|asia|asian|india|uk|united kingdom|ireland|scotland|wales|germany|deutschland|france|spain|portugal|netherlands|belgium|poland|czech|romania|hungary|denmark|norway|sweden|finland|switzerland|austria|canada|canadian|ontario|toronto|montreal|quebec|vancouver|calgary|british columbia|alberta|manitoba|brazil|mexico|argentina|chile|colombia|peru|australia|japan|singapore|israel|nigeria|egypt|china|turkey|dubai|uae|united arab emirates|saudi|qatar|bahrain|new zealand|south africa|thailand|vietnam|philippines|indonesia|malaysia|pakistan|bangladesh|berlin|london|paris|amsterdam|sydney|melbourne|bangalore|bengaluru|hyderabad|delhi|mumbai|chennai|pune|tokyo|seoul|tel aviv|bogota|santiago|buenos aires|taipei|hong kong|madrid|rome|athens|oslo|stockholm|copenhagen|helsinki|zurich|geneva|brussels|prague|budapest|warsaw|bucharest|lisbon|istanbul)\b/i;
 
@@ -165,6 +181,16 @@ function looksUS(location) {
   // pass. Only the last token is considered — some codes collide with ordinary
   // words.
   if (endsWithForeignIso3(l)) return false;
+
+  // Same reasoning for a trailing province or country name: "Richmond Hill,
+  // Ontario" and "Vancouver, British Columbia" otherwise pass on the US city
+  // names Richmond and Vancouver below (both arrived that way from Tesla's
+  // board, 2026-10-31). Last segment only, so a multi-office "Austin, TX or
+  // Toronto" listing that ends in a US place is unaffected.
+  // Checked per office: "Dallas, Texas; …; Vancouver, Canada" lists US
+  // offices too, so it's only foreign when every office ends abroad.
+  const offices = l.split(/;|\s+or\s+|\|/).map((x) => x.trim()).filter(Boolean);
+  if (offices.length && offices.every((o) => FOREIGN_TRAILING.test(o.split(',').pop().trim()))) return false;
 
   // A named US city outranks a foreign marker. This must run BEFORE
   // FOREIGN_MARKERS: postings like "San Francisco or Remote (North America,
@@ -423,7 +449,7 @@ function buildDedupeKey(company, title, location) {
 
 // Main entry. Returns a DB-ready row or null if filtered out.
 function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, retentionDays } = {}) {
-  const company_name = (raw.company_name || '').trim();
+  const company_name = cleanCompanyName(raw.company_name);
   const job_title = (raw.job_title || '').trim();
   const location = normalizeLocation(raw.location);
   const apply_url = stripTracking(raw.apply_url);
@@ -525,6 +551,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
 module.exports = {
   normalizeJob,
+  cleanCompanyName,
   stripTracking,
   canonicalUrl,
   stripHtml,

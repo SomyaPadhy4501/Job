@@ -27,7 +27,7 @@ const { deriveRestriction, DISQUALIFYING } = require('../services/clearance');
 const { classifySponsorship } = require('../services/classifier');
 const { employerFromApplyUrl } = require('../collectors/getro');
 const { extractExperience, levelFromYears } = require('../services/experience');
-const { stripHtml } = require('../services/normalize');
+const { stripHtml, cleanCompanyName } = require('../services/normalize');
 
 const APPLY = process.argv.includes('--apply');
 const USE_PG = !!process.env.DATABASE_URL;
@@ -51,6 +51,11 @@ function derive(row) {
   const text = textFor(row);
   const years = extractExperience(text);
   const lvl = levelFromYears(years);
+  // A headline stored as the employer ("Build your Career at Tesla") is fixed
+  // here too: upserts match existing rows but never rewrite company_name, so a
+  // re-capture alone can't repair it.
+  const company_name = cleanCompanyName(row.company_name);
+  row = { ...row, company_name };
   const curated = CURATED_SPONSORSHIP_SOURCES.includes(row.source);
   // Getro rows need the apply-URL employer as a second USCIS key, exactly as
   // the collector supplies it (see employerFromApplyUrl) — without it the dry
@@ -60,6 +65,7 @@ function derive(row) {
     ? row.sponsorship
     : classifySponsorship(text, row.company_name, fallbacks);
   return {
+    company_name,
     sponsorship,
     restriction: deriveRestriction({
       job_title: row.job_title,
@@ -77,6 +83,7 @@ function derive(row) {
 
 function changed(row, next) {
   return (
+    next.company_name !== row.company_name ||
     next.sponsorship !== row.sponsorship ||
     next.restriction !== (row.restriction || '') ||
     next.yoe_min !== row.yoe_min ||
@@ -169,9 +176,10 @@ async function runPg() {
         await client.query(
           `UPDATE jobs
               SET restriction = $1, yoe_min = $2,
-                  is_entry_level = $3, is_mid_level = $4, sponsorship = $5
-            WHERE id = $6`,
-          [u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.next.sponsorship, u.id],
+                  is_entry_level = $3, is_mid_level = $4, sponsorship = $5,
+                  company_name = $6
+            WHERE id = $7`,
+          [u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.next.sponsorship, u.next.company_name, u.id],
         );
       }
       await client.query('COMMIT');
@@ -257,12 +265,13 @@ function runSqlite() {
   console.log(`\nApplying ${toUpdate.length} updates...`);
   const upd = db.prepare(
     `UPDATE jobs
-        SET restriction = ?, yoe_min = ?, is_entry_level = ?, is_mid_level = ?, sponsorship = ?
+        SET restriction = ?, yoe_min = ?, is_entry_level = ?, is_mid_level = ?, sponsorship = ?,
+            company_name = ?
       WHERE id = ?`,
   );
   const tx = db.transaction((list) => {
     for (const u of list) {
-      upd.run(u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.next.sponsorship, u.id);
+      upd.run(u.next.restriction, u.next.yoe_min, u.next.is_entry_level, u.next.is_mid_level, u.next.sponsorship, u.next.company_name, u.id);
     }
   });
   tx(toUpdate);

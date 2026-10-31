@@ -78,6 +78,8 @@ test('company naming: ATS path beats generic page metadata', () => {
   assert.strictEqual(X.companyFromUrl('https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite'), 'Nvidia');
   assert.strictEqual(X.companyFromUrl('https://www.tesla.com/careers/search'), '');
   assert.strictEqual(X.cleanSiteName('Careers at Netflix'), 'Netflix');
+  assert.strictEqual(X.cleanSiteName('Build your Career at Tesla'), 'Tesla');
+  assert.strictEqual(X.cleanSiteName('The future of work starts with our amazing people'), '');
   assert.strictEqual(X.cleanSiteName('Apply'), '');
   assert.strictEqual(X.companyFromHost('www.tesla.com'), 'Tesla');
 });
