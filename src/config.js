@@ -962,6 +962,12 @@ const COMPANIES = [
   { source: 'workday', slug: 'davita-dkc_external', tenant: 'davita', wd: '1', site: 'DKC_External', displayName: 'Davita' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
   { source: 'workday', slug: 'pitneybowes-pbcareers', tenant: 'pitneybowes', wd: '1', site: 'PBCareers', displayName: 'Pitney Bowes' },  // 1 kept on 2026-10-31 (re-measured after a rate limit)
 
+  // ─── YC companies newly hiring (scripts/probe-yc-ats.js + verify-yc-ats.js, 2026-10-31) ───
+  // Of 32 verified boards only these had a current entry/mid US software opening.
+  { source: 'greenhouse', slug: 'morph', displayName: 'Morph' }, // YC Summer 2023
+  { source: 'ashby', slug: 'datafold', displayName: 'Datafold' }, // YC Summer 2020
+  { source: 'ashby', slug: 'reform', displayName: 'Reform' }, // YC Winter 2024
+
   // ─── Gem / Pinpoint / Recruitee (scripts/probe-ats.js, verified 2026-10-31) ───
   // Kept only where the board's postings mention the company's own website
   // (from the YC feed), or the slug is the exact multi-word YC name. Rejected:
