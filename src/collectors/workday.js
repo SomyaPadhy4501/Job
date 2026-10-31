@@ -40,18 +40,18 @@ function looksUSLocation(loc) {
   );
 }
 
-async function fetchList(company) {
+async function fetchPages(company, searchText, cap) {
   // Workday quirk: the `total` field is only returned on the first page; subsequent
   // pages report `total: 0`. So we capture total once and paginate until either
-  // (a) we've reached total, (b) we hit our hard cap, or (c) we get a short page.
+  // (a) we've reached total, (b) we hit the cap, or (c) we get a short page.
   const all = [];
   let offset = 0;
   const limit = 20;
   let total = Infinity;
-  while (offset < DEFAULT_MAX_LIST) {
+  while (offset < cap) {
     const data = await fetchJson(`${baseUrl(company)}/jobs`, {
       method: 'POST',
-      body: { appliedFacets: {}, limit, offset, searchText: '' },
+      body: { appliedFacets: {}, limit, offset, searchText },
       retries: 1,
     });
     const items = Array.isArray(data?.jobPostings) ? data.jobPostings : [];
@@ -62,7 +62,30 @@ async function fetchList(company) {
     if (items.length < limit) break;
     if (offset >= total) break;
   }
-  return all;
+  return { items: all, total };
+}
+
+// Large tenants bury software roles: an unfiltered list is capped (NVIDIA
+// reports total 2000, in no useful order) and the first 500 rows of a retailer
+// or bank are mostly stores, branches and operations. Workday's searchText
+// ranks by relevance, so above DEFAULT_MAX_LIST the collector switches to a
+// handful of targeted searches. Similar request count, far better recall.
+// Small tenants are still listed in full — a search would miss titles like
+// "SRE" or "Security Engineer" that no query below names.
+const SEARCHES = ['software engineer', 'software developer', 'machine learning', 'data engineer', 'data scientist', 'new grad', 'site reliability'];
+const SEARCH_CAP = 100;
+
+async function fetchList(company) {
+  const first = await fetchPages(company, '', DEFAULT_MAX_LIST);
+  if (first.total <= DEFAULT_MAX_LIST) return first.items;
+
+  const byPath = new Map(first.items.map((j) => [j.externalPath, j]));
+  for (const q of company.searches || SEARCHES) {
+    // eslint-disable-next-line no-await-in-loop
+    const { items } = await fetchPages(company, q, SEARCH_CAP);
+    for (const j of items) if (!byPath.has(j.externalPath)) byPath.set(j.externalPath, j);
+  }
+  return [...byPath.values()];
 }
 
 // Workday collapses multi-site postings to the placeholder "2 Locations" /

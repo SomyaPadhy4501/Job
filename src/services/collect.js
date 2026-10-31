@@ -38,11 +38,26 @@ async function collectAll({ companies = COMPANIES } = {}) {
   const started = Date.now();
   log.info('collection.start', { runId, companies: companies.length });
 
-  const results = await runWithConcurrency(
-    companies,
-    CONFIG.fetchConcurrency,
-    fetchCompanySafe
+  // Each source gets its own pool, all running at once. One shared pool of 4
+  // stopped scaling once Workday grew past a few dozen tenants — and tenants
+  // live on separate hosts, so they can safely run wider — while sources that
+  // rate-limit by IP across every tenant (Getro, Eightfold) must stay narrow
+  // however many entries they have.
+  const bySource = new Map();
+  for (const c of companies) {
+    if (!bySource.has(c.source)) bySource.set(c.source, []);
+    bySource.get(c.source).push(c);
+  }
+  const groups = await Promise.all(
+    [...bySource.entries()].map(([source, list]) =>
+      runWithConcurrency(
+        list,
+        CONFIG.sourceConcurrency[source] || CONFIG.fetchConcurrency,
+        fetchCompanySafe
+      )
+    )
   );
+  const results = groups.flat();
 
   const errors = [];
   let companiesOk = 0;

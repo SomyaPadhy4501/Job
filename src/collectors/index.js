@@ -21,6 +21,12 @@ const getro = require('./getro');
 const eightfold = require('./eightfold');
 const smartrecruiters = require('./smartrecruiters');
 const rippling = require('./rippling');
+const workable = require('./workable');
+const recruitee = require('./recruitee');
+const pinpoint = require('./pinpoint');
+const gem = require('./gem');
+const bamboohr = require('./bamboohr');
+const mdtable = require('./mdtable');
 
 // Registry keyed by source. Adding a new source = drop a module here.
 const REGISTRY = {
@@ -45,6 +51,12 @@ const REGISTRY = {
   [eightfold.source]: eightfold,
   [smartrecruiters.source]: smartrecruiters,
   [rippling.source]: rippling,
+  [workable.source]: workable,
+  [recruitee.source]: recruitee,
+  [pinpoint.source]: pinpoint,
+  [gem.source]: gem,
+  [bamboohr.source]: bamboohr,
+  [mdtable.source]: mdtable,
 };
 
 function getCollector(source) {

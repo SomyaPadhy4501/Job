@@ -35,10 +35,25 @@ const { fetchJson } = require('./http');
 const API_BASE = 'https://api.adzuna.com/v1/api/jobs';
 const DEFAULT_COUNTRY = 'us';
 const DEFAULT_RESULTS_PER_PAGE = 50;
-const DEFAULT_MAX_PAGES = 3;
+const DEFAULT_MAX_PAGES = 2;
 const DEFAULT_MAX_DAYS_OLD = 30;
 
 const DEFAULT_QUERIES = ['software engineer', 'machine learning engineer', 'data engineer'];
+
+// Request budget. Collect runs every 2 h, and every configured employer costs
+// up to queries × maxPages calls, so running Adzuna on every collect would burn
+// ~650 calls/day for six employers — well past the free tier. By default only
+// the 00:xx and 12:xx UTC runs call Adzuna (≈72 calls/day at 3 queries × 2
+// pages × 6 employers). Override with ADZUNA_RUN_HOURS="0,6,12,18", or set it
+// to "*" to run on every collect (manual testing).
+const DEFAULT_RUN_HOURS = '0,12';
+
+function isScheduledRun(now = new Date()) {
+  const raw = (process.env.ADZUNA_RUN_HOURS || DEFAULT_RUN_HOURS).trim();
+  if (raw === '*') return true;
+  const hours = new Set(raw.split(',').map((h) => Number(h.trim())).filter(Number.isInteger));
+  return hours.has(now.getUTCHours());
+}
 
 function credentials() {
   const id = process.env.ADZUNA_APP_ID;
@@ -85,6 +100,11 @@ async function fetchCompany(config) {
     console.warn(`[adzuna] ADZUNA_APP_ID/ADZUNA_APP_KEY not set — skipping ${slug}`);
     return [];
   }
+  if (!isScheduledRun()) {
+    // eslint-disable-next-line no-console
+    console.warn(`[adzuna] not a scheduled Adzuna hour (ADZUNA_RUN_HOURS) — skipping ${slug}`);
+    return [];
+  }
 
   const seen = new Set();
   const jobs = [];
@@ -126,4 +146,4 @@ async function fetchCompany(config) {
   return jobs.filter((j) => j.external_id && j.job_title && j.apply_url);
 }
 
-module.exports = { fetchCompany, source: 'adzuna' };
+module.exports = { fetchCompany, isScheduledRun, source: 'adzuna' };

@@ -36,5 +36,9 @@ jobs:
           FILTER_SOFTWARE:   'true'
           ENTRY_LEVEL_MODE:  'permissive'
           RETENTION_DAYS:    '30'
+          # Adzuna (src/collectors/adzuna.js). Empty until the secrets exist,
+          # in which case the collector logs a skip and returns nothing.
+          ADZUNA_APP_ID:     ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY:    ${{ secrets.ADZUNA_APP_KEY }}
           # COLLECT_TOKEN is only needed if you want to also hit /admin/collect.
           # The npm run collect script writes directly to Neon via DATABASE_URL.

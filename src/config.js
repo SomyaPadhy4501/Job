@@ -769,6 +769,10 @@ const COMPANIES = [
   { source: 'adzuna', slug: 'cisco',    displayName: 'Cisco',    company: 'Cisco' },
   { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
   { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
+  // Wayfair and LinkedIn have no other route: wayfair.com/careers sits behind a
+  // PerimeterX challenge and LinkedIn posts only on linkedin.com (see HANDOFF).
+  { source: 'adzuna', slug: 'wayfair',  displayName: 'Wayfair',  company: 'Wayfair' },
+  { source: 'adzuna', slug: 'linkedin', displayName: 'LinkedIn', company: 'LinkedIn' },
 
   // ─── Oracle HCM / Candidate Experience ───────────────────────────────────
   { source: 'oracle_hcm', slug: 'oracle', displayName: 'Oracle', apiHost: 'eeho.fa.us2.oraclecloud.com', siteNumber: 'CX_45001', uiBaseUrl: 'https://careers.oracle.com/en/sites/jobsearch' },
@@ -864,6 +868,19 @@ const COMPANIES = [
     url: 'https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json',
   },
 
+  // Markdown-table lists (src/collectors/mdtable.js). speedyapply links straight
+  // to each employer's own ATS; on 2026-10-31 it added ~194 visible rows not
+  // already in the DB (Roblox, HelloFresh, Home Depot, KLA, Snap…). Its ~50
+  // TikTok rows are 77-106 days old, so retention drops them — expected.
+  // jobright-ai's lists were checked and skipped: every link goes through
+  // jobright.ai rather than to the employer.
+  {
+    source: 'mdtable',
+    slug: 'speedyapply-newgrad-usa',
+    displayName: 'speedyapply/2026-SWE-College-Jobs',
+    url: 'https://raw.githubusercontent.com/speedyapply/2026-SWE-College-Jobs/main/NEW_GRAD_USA.md',
+  },
+
   // ─── YC startups via HN "Who is hiring?" ─────────────────────────────────
   // Pulls the last 2 monthly threads, parses "Company | Location | … | URL"
   // headers, and keeps only comments whose company matches a US-based YC
@@ -949,7 +966,10 @@ const CONFIG = {
   retentionDays: Number(process.env.RETENTION_DAYS || 30),
 
   requestTimeoutMs: 20_000,
-  fetchConcurrency: 4, // parallel companies per run
+  fetchConcurrency: 4, // parallel companies per source per run (default)
+  // Per-source overrides; see collectAll(). Workday tenants are separate hosts.
+  // Getro and Eightfold rate-limit by IP across all their tenants.
+  sourceConcurrency: { workday: 8, getro: 2, eightfold: 1 },
 
   defaultPageSize: 50,
   maxPageSize: 200,
