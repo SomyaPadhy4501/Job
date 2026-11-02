@@ -115,8 +115,10 @@ function endsWithForeignIso3(l) {
 // override the "bare remote → US" heuristic and the US_STATES `ca` fallback
 // (which would otherwise match both California and Canada). Kept broad: it's
 // cheaper to let a few borderline US rows through than to leak foreign ones.
+// Indian states and second-tier cities are listed because "Noida, Uttar
+// Pradesh, IN" otherwise reaches the state-token fallback and reads as Indiana.
 const FOREIGN_MARKERS =
-  /\b(worldwide|global|anywhere|emea|apac|latam|eu|europe|european|asia|asian|india|uk|united kingdom|ireland|scotland|wales|germany|deutschland|france|spain|portugal|netherlands|belgium|poland|czech|romania|hungary|denmark|norway|sweden|finland|switzerland|austria|canada|canadian|ontario|toronto|montreal|quebec|vancouver|calgary|british columbia|alberta|manitoba|brazil|mexico|argentina|chile|colombia|peru|australia|japan|singapore|israel|nigeria|egypt|china|turkey|dubai|uae|united arab emirates|saudi|qatar|bahrain|new zealand|south africa|thailand|vietnam|philippines|indonesia|malaysia|pakistan|bangladesh|berlin|london|paris|amsterdam|sydney|melbourne|bangalore|bengaluru|hyderabad|delhi|mumbai|chennai|pune|tokyo|seoul|tel aviv|bogota|santiago|buenos aires|taipei|hong kong|madrid|rome|athens|oslo|stockholm|copenhagen|helsinki|zurich|geneva|brussels|prague|budapest|warsaw|bucharest|lisbon|istanbul)\b/i;
+  /\b(worldwide|global|anywhere|emea|apac|latam|eu|europe|european|asia|asian|india|uk|united kingdom|ireland|scotland|wales|germany|deutschland|france|spain|portugal|netherlands|belgium|poland|czech|romania|hungary|denmark|norway|sweden|finland|switzerland|austria|canada|canadian|ontario|toronto|montreal|quebec|vancouver|calgary|burnaby|british columbia|alberta|manitoba|brazil|mexico|argentina|chile|colombia|medell[ií]n|peru|costa rica|australia|japan|singapore|israel|haifa|herzliya|nigeria|egypt|china|shanghai|beijing|shenzhen|taiwan|hsinchu|korea|turkey|dubai|uae|united arab emirates|saudi|qatar|bahrain|new zealand|south africa|thailand|vietnam|philippines|indonesia|malaysia|pakistan|bangladesh|berlin|munich|bavaria|london|paris|amsterdam|sydney|melbourne|tbilisi|bangalore|bengaluru|hyderabad|delhi|noida|gurgaon|gurugram|mumbai|chennai|pune|kolkata|ahmedabad|kochi|coimbatore|jaipur|chandigarh|trivandrum|thiruvananthapuram|mysore|mysuru|karnataka|telangana|tamil nadu|maharashtra|uttar pradesh|haryana|kerala|gujarat|west bengal|andhra pradesh|tokyo|seoul|tel aviv|bogota|santiago|buenos aires|taipei|hong kong|madrid|rome|athens|oslo|stockholm|copenhagen|helsinki|zurich|geneva|brussels|prague|budapest|warsaw|bucharest|lisbon|istanbul)\b/i;
 
 function looksUS(location) {
   if (!location) return true; // unknown → don't drop
@@ -142,7 +144,10 @@ function looksUS(location) {
   // names only — the ambiguous two-letter state tokens ("ca" matching both
   // California and Canada) stay below the foreign check, which is what the
   // "Vancouver, BC, CA" case actually needed.
-  for (const c of US_CITY_MARKERS) if (l.includes(c)) return true;
+  // Province names are blanked first: "British Columbia" contains "columbia",
+  // which passed "Vancouver, British Columbia, Canada" as Columbia, SC.
+  const cityText = l.replace(/british columbia/g, ' ');
+  for (const c of US_CITY_MARKERS) if (cityText.includes(c)) return true;
 
   // Explicit non-US country/region/city → reject. This runs BEFORE the remote
   // check so "Remote, United Arab Emirates" doesn't slip through via the
@@ -414,7 +419,12 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
 
   const role_type = classifyRole(job_title);
   if (filterSoftwareOnly && role_type === 'OTHER') return null;
-  if (filterUSOnly && !looksUS(location)) return null;
+  // A collector whose API reports each location's country separately passes
+  // them as `countries` ('US' for the United States). That outranks reading
+  // the joined location string, where a trailing country code is ambiguous:
+  // Microsoft's "IN" and "IL" are India and Israel, not Indiana and Illinois.
+  const countries = Array.isArray(raw.countries) && raw.countries.length ? raw.countries : null;
+  if (filterUSOnly && !(countries ? countries.includes('US') : looksUS(location))) return null;
   if (!passesLevel(job_title, entryLevelMode || 'permissive')) return null;
 
   // Years of experience stated in the description, e.g. "3+ years of

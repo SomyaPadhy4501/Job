@@ -32,11 +32,19 @@ function extract(data) {
         : Array.isArray(p.locations)
         ? p.locations.join(', ')
         : p.locations || '';
+    // Trailing ISO country code of each "City, Region, CC" entry. Joined into
+    // `loc`, "IN" and "IL" read as Indiana and Illinois — see locationOf in
+    // src/collectors/pcsx.js. normalizeJob prefers these over the string.
+    const std = Array.isArray(p.standardizedLocations) ? p.standardizedLocations.filter(Boolean) : [];
+    const countries = std.length
+      ? [...new Set(std.map((s) => s.split(',').pop().trim().toUpperCase()))]
+      : undefined;
     return {
       external_id: id ? String(id) : '',
       company_name: 'Microsoft',
       job_title: p.name || '',
       location: loc,
+      countries,
       apply_url: p.positionUrl
         ? `https://jobs.careers.microsoft.com${p.positionUrl}`
         : `https://jobs.careers.microsoft.com/global/en/job/${id}`,

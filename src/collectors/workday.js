@@ -1,6 +1,8 @@
 'use strict';
 
 const { fetchJson, runWithConcurrency } = require('./http');
+const { CONFIG } = require('../config');
+const { passesLevel } = require('../services/normalize');
 
 // Public Workday "CxS" JSON endpoints. Each company has a tenant + wd shard + site path:
 //   https://{tenant}.wd{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs   (POST list)
@@ -89,8 +91,15 @@ function resolveLocation(j) {
   return locationFromPath(j.externalPath) || text;
 }
 
+// `externalPath` already starts with "/job/". Prefixing another "/job" asked
+// for /job/job/…, which Workday answers with HTTP 406 — so from the first
+// commit until 2026-11-01 every detail fetch failed into the catch below and
+// every Workday row was stored without a description. Sponsorship then came
+// from the USCIS lookup alone: PayPal postings stating "Visa Sponsorship
+// through PayPal is not available for this position" read YES, and the years
+// ceiling and clearance check never saw any text.
 async function fetchDetail(company, externalPath) {
-  const data = await fetchJson(`${baseUrl(company)}/job${externalPath}`, { retries: 1 });
+  const data = await fetchJson(`${baseUrl(company)}${externalPath}`, { retries: 1 });
   return data?.jobPostingInfo?.jobDescription || '';
 }
 
@@ -127,9 +136,16 @@ async function fetchCompany(company) {
 
   const list = await fetchList(company);
 
-  // Pre-filter by title + location so we only burn detail requests on US SWE/ML/DS roles.
+  // Pre-filter so detail requests go to rows normalizeJob will keep: US
+  // SWE/ML/DS titles at an eligible level. The location is the resolved one —
+  // the raw "2 Locations" placeholder matched no US pattern, so multi-site
+  // postings were never enriched — and senior titles are skipped because
+  // normalizeJob drops them anyway; they used to fill the cap.
   const candidates = list.filter(
-    (j) => looksRelevantTitle(j.title) && looksUSLocation(j.locationsText)
+    (j) =>
+      looksRelevantTitle(j.title) &&
+      looksUSLocation(resolveLocation(j)) &&
+      passesLevel(j.title, CONFIG.entryLevelMode)
   );
   const enrichTargets = candidates.slice(0, DEFAULT_ENRICH_MAX);
 
@@ -160,4 +176,4 @@ async function fetchCompany(company) {
   }));
 }
 
-module.exports = { fetchCompany, parsePostedOn, source: 'workday' };
+module.exports = { fetchCompany, fetchDetail, parsePostedOn, source: 'workday' };

@@ -633,3 +633,138 @@ test('every Adzuna employer resolves to a sponsor in the USCIS data', () => {
     assert.strictEqual(classifySponsorship('Software Engineer', c.displayName), 'YES', c.displayName);
   }
 });
+
+// ─── Location countries (PCSX, Getro) ─────────────────────────────────────────
+
+const US_ONLY = { filterUSOnly: true, filterSoftwareOnly: true };
+const pcsx = require('../src/collectors/pcsx');
+
+test('pcsx: a trailing country code is read as a country, not a US state', () => {
+  // Live Microsoft rows (2026-11-01): standardizedLocations ["IN"] was stored
+  // as location "IN" and passed the US filter as Indiana.
+  assert.deepStrictEqual(pcsx.locationOf({ standardizedLocations: ['IN'] }), { location: 'IN', countries: ['IN'] });
+  assert.deepStrictEqual(
+    pcsx.locationOf({ standardizedLocations: ['Herzliya, Tel Aviv District, IL'] }).countries,
+    ['IL']
+  );
+  const row = (standardizedLocations) => ({
+    source: 'microsoft', company_name: 'Microsoft', job_title: 'Software Engineer II',
+    apply_url: 'https://apply.careers.microsoft.com/careers/job/1', description: '',
+    ...pcsx.locationOf({ standardizedLocations }),
+  });
+  assert.strictEqual(normalizeJob(row(['IN']), US_ONLY), null);
+  assert.strictEqual(normalizeJob(row(['Noida, Uttar Pradesh, IN']), US_ONLY), null);
+  assert.strictEqual(normalizeJob(row(['Munich, BY, DE']), US_ONLY), null);
+  assert.ok(normalizeJob(row(['Redmond, WA, US']), US_ONLY));
+  assert.ok(normalizeJob(row(['US']), US_ONLY), 'a US-wide posting stays');
+});
+
+test('pcsx: a posting open in the US and abroad keeps only its US locations', () => {
+  const { location, countries } = pcsx.locationOf({
+    standardizedLocations: ['San Diego, CA, US', 'Hsinchu, Hsinchu City, TW', 'Munich, BY, DE'],
+  });
+  assert.strictEqual(location, 'San Diego, CA, US');
+  assert.deepStrictEqual(countries, ['US', 'TW', 'DE']);
+});
+
+test('pcsx: without standardizedLocations the raw string is left to the US filter', () => {
+  assert.deepStrictEqual(
+    pcsx.locationOf({ locations: ['United States, Washington, Redmond'] }),
+    { location: 'United States, Washington, Redmond', countries: undefined }
+  );
+});
+
+test('getro: a state-only US entry beside cities abroad is a geocoding error', () => {
+  // Live PayPal iOS role (2026-10-31): Bengaluru and Chennai, plus "Tennessee,
+  // USA" — Chennai's TN (Tamil Nadu) geocoded as Tennessee.
+  const details = [
+    { name: 'Tennessee, USA', area_type: 'administrative_area_level_1' },
+    { name: 'Bengaluru, Karnataka, India', area_type: 'locality' },
+    { name: 'Chennai, Tamil Nadu, India', area_type: 'locality' },
+  ];
+  assert.deepStrictEqual(getro.countriesOf(details), ['India']);
+  const row = getro.mapJob(
+    {
+      ...GETRO_JOB, title: 'Software Engineer - iOS', seniority: null,
+      locations: details.map((d) => d.name), location_details: details,
+    },
+    'accel', null
+  );
+  assert.strictEqual(normalizeJob(row, US_ONLY), null);
+});
+
+test('getro: real US locations are kept, alone or beside ones abroad', () => {
+  assert.deepStrictEqual(
+    getro.countriesOf([
+      { name: 'San Jose, CA, USA', area_type: 'locality' },
+      { name: 'Bengaluru, Karnataka, India', area_type: 'locality' },
+    ]),
+    ['US', 'India']
+  );
+  // A state with no city is fine when nothing abroad is listed.
+  assert.deepStrictEqual(getro.countriesOf([{ name: 'Florida, USA', area_type: 'administrative_area_level_1' }]), ['US']);
+  assert.deepStrictEqual(
+    getro.countriesOf([{ name: 'United States', area_type: 'country' }, { name: 'Remote', area_type: 'global' }]),
+    ['US']
+  );
+});
+
+test('getro: names that are not places give no country evidence', () => {
+  // undefined sends normalizeJob back to the location string.
+  assert.strictEqual(getro.countriesOf([{ name: 'Remote', area_type: 'global' }]), undefined);
+  assert.strictEqual(getro.countriesOf([{ name: 'North America', area_type: 'continent' }]), undefined);
+  assert.strictEqual(getro.countriesOf(undefined), undefined);
+});
+
+// ─── Workday detail enrichment ────────────────────────────────────────────────
+
+const WD_PAYPAL = { source: 'workday', slug: 'paypal', tenant: 'paypal', wd: '1', site: 'jobs', displayName: 'PayPal' };
+const WD_LIST = {
+  total: 3,
+  jobPostings: [
+    // Multi-site postings show only a count; the path names the primary site.
+    { title: 'Software Engineer - Android', locationsText: '2 Locations', postedOn: 'Posted 3 Days Ago',
+      externalPath: '/job/San-Jose-California-United-States-of-America/Software-Engineer---Android_R0138333' },
+    { title: 'Staff Software Engineer', locationsText: 'Austin, Texas, United States of America', postedOn: 'Posted 3 Days Ago',
+      externalPath: '/job/Austin-Texas-United-States-of-America/Staff-Software-Engineer_R0138272-1' },
+    { title: 'Software Engineer', locationsText: 'Chennai, Tamil Nadu, India', postedOn: 'Posted 3 Days Ago',
+      externalPath: '/job/Chennai-Tamil-Nadu-India/Software-Engineer_R0138599-1' },
+  ],
+};
+const WD_NO_SPONSOR =
+  '<p>Build Android features.</p><p>Visa Sponsorship through PayPal is not available for this position now or any time in the future.</p>';
+
+test('workday: detail requests use externalPath as-is, with no second /job', async () => {
+  await withFetch(
+    (n) => ok(n === 1 ? WD_LIST : { jobPostingInfo: { jobDescription: WD_NO_SPONSOR } }),
+    async (calls) => {
+      await workday.fetchCompany(WD_PAYPAL);
+      const details = calls.filter((c) => c.url.pathname.includes('/job/'));
+      assert.ok(details.length > 0);
+      for (const c of details) {
+        assert.doesNotMatch(c.url.pathname, /\/job\/job\//, 'Workday answers /job/job/… with HTTP 406');
+        assert.match(c.url.pathname, /^\/wday\/cxs\/paypal\/jobs\/job\/[^/]+\/[^/]+$/);
+      }
+    }
+  );
+});
+
+test('workday: descriptions go to eligible US rows, and their sponsorship text counts', async () => {
+  await withFetch(
+    (n) => ok(n === 1 ? WD_LIST : { jobPostingInfo: { jobDescription: WD_NO_SPONSOR } }),
+    async (calls) => {
+      const rows = await workday.fetchCompany(WD_PAYPAL);
+      const fetched = calls.filter((c) => c.url.pathname.includes('/job/')).map((c) => c.url.pathname);
+      // The "2 Locations" US row is enriched; the senior and the Chennai rows
+      // are dropped by normalizeJob anyway, so they don't spend the budget.
+      assert.deepStrictEqual(fetched, [`/wday/cxs/paypal/jobs${WD_LIST.jobPostings[0].externalPath}`]);
+
+      const android = rows.find((r) => r.job_title === 'Software Engineer - Android');
+      assert.match(android.description, /not available/);
+      // PayPal files H-1Bs, so without the text this read YES; with it, NO —
+      // and NO rows are not stored.
+      assert.strictEqual(normalizeJob(android, US_ONLY), null);
+      assert.strictEqual(classifySponsorship('Software Engineer - Android', 'PayPal'), 'YES');
+    }
+  );
+});

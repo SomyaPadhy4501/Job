@@ -83,6 +83,40 @@ test('an ISO-3 country code outranks a US city name that also exists abroad', ()
   assert.strictEqual(looksUS('Cambridge, MA'), true);
 });
 
+test('foreign regions whose codes collide with US states are still rejected', () => {
+  // Each ends in a token the state fallback read as a US state: IN (Indiana),
+  // IL (Illinois), DE (Delaware), CA (California), CO (Colorado), or the full
+  // name Georgia. "British Columbia" also contains the US city "columbia".
+  for (const loc of [
+    'Noida, Uttar Pradesh, IN',
+    'Gurugram, Haryana, IN',
+    'Haifa, Haifa District, IL',
+    'Munich, BY, DE',
+    'Burnaby, BC, CA',
+    'Vancouver, British Columbia, Canada',
+    'Medellín, Antioquia, CO',
+    'Tbilisi, Georgia',
+  ]) {
+    assert.strictEqual(looksUS(loc), false, loc);
+  }
+});
+
+test('US places that read like "City, Region, CC" are kept', () => {
+  // Live ghlistings rows (2026-11-01). A rule that treated any trailing
+  // two-letter ISO code as a country dropped these as Israel and Vatican City,
+  // which is why trailing codes are read in the collectors that know the
+  // format instead.
+  for (const loc of [
+    'Abbott Park, Green Oaks, IL',
+    'Arlington County, Arlington, VA',
+    'Seattle, WA, Austin, TX, Santa Clara, CA, Westford, MA',
+    'Seattle, WA; Vancouver, British Columbia',
+    'Columbia, SC',
+  ]) {
+    assert.strictEqual(looksUS(loc), true, loc);
+  }
+});
+
 test('treats a missing location as unknown rather than foreign', () => {
   assert.strictEqual(looksUS(''), true);
   assert.strictEqual(looksUS(null), true);
@@ -119,6 +153,22 @@ test('an excluded employer is dropped whichever source lists it', () => {
   };
   assert.strictEqual(normalizeJob(row, { filterUSOnly: true, filterSoftwareOnly: true }), null);
   assert.ok(normalizeJob({ ...row, company_name: 'Shield AI' }, { filterUSOnly: true, filterSoftwareOnly: true }));
+});
+
+test('countries reported by the collector outrank the location string', () => {
+  const row = {
+    source: 'microsoft', company_name: 'Microsoft', job_title: 'Software Engineer',
+    apply_url: 'https://apply.careers.microsoft.com/careers/job/1', description: '',
+  };
+  const opts = { filterUSOnly: true, filterSoftwareOnly: true };
+  // "IN" alone looks like Indiana to the string filter...
+  assert.strictEqual(looksUS('IN'), true);
+  // ...but the collector knows it's India.
+  assert.strictEqual(normalizeJob({ ...row, location: 'IN', countries: ['IN'] }, opts), null);
+  assert.ok(normalizeJob({ ...row, location: 'Redmond, WA, US', countries: ['US', 'IN'] }, opts));
+  // No countries (or an empty list) falls back to the string.
+  assert.ok(normalizeJob({ ...row, location: 'Austin, TX' }, opts));
+  assert.ok(normalizeJob({ ...row, location: 'Austin, TX', countries: [] }, opts));
 });
 
 test('an employer filing H-1Bs under another name is still labelled', () => {

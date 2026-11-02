@@ -57,12 +57,25 @@ async function fetchQuery(company, query) {
   return rows;
 }
 
+// standardizedLocations entries are "City, Region, CC" — "Redmond, WA, US",
+// "Noida, Uttar Pradesh, IN" — or a bare "CC" for a country-wide posting. The
+// trailing ISO country code is only unambiguous while each entry is still
+// separate: joined into one string, Microsoft's India and Israel postings
+// ("IN", "IL") passed the US filter as Indiana and Illinois. So the countries
+// go to normalizeJob on their own, and the displayed location keeps just the
+// US entries when there are any.
 function locationOf(p) {
-  if (Array.isArray(p.standardizedLocations) && p.standardizedLocations.length) {
-    return p.standardizedLocations.join(', ');
+  const std = Array.isArray(p.standardizedLocations) ? p.standardizedLocations.filter(Boolean) : [];
+  if (!std.length) {
+    const raw = Array.isArray(p.locations) ? p.locations.join(', ') : p.locations || '';
+    return { location: raw, countries: undefined };
   }
-  if (Array.isArray(p.locations)) return p.locations.join(', ');
-  return p.locations || '';
+  const countryOf = (s) => s.split(',').pop().trim().toUpperCase();
+  const us = std.filter((s) => countryOf(s) === 'US');
+  return {
+    location: (us.length ? us : std).join(', '),
+    countries: [...new Set(std.map(countryOf))],
+  };
 }
 
 async function fetchCompany(company) {
@@ -87,12 +100,14 @@ async function fetchCompany(company) {
   const out = [];
   for (const p of byId.values()) {
     const id = p.id || p.displayJobId || p.atsJobId;
+    const { location, countries } = locationOf(p);
     out.push({
       source: 'pcsx',
       external_id: id ? String(id) : null,
       company_name: displayName || slug,
       job_title: p.name || '',
-      location: locationOf(p),
+      location,
+      countries,
       apply_url: p.positionUrl
         ? (p.positionUrl.startsWith('http') ? p.positionUrl : applyUrlBase + p.positionUrl)
         : `${applyUrlBase}/ShowJob/Id/${id}`,
@@ -103,4 +118,4 @@ async function fetchCompany(company) {
   return out;
 }
 
-module.exports = { fetchCompany, source: 'pcsx' };
+module.exports = { fetchCompany, locationOf, source: 'pcsx' };

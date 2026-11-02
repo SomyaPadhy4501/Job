@@ -166,9 +166,16 @@ them together at the process level only.
 All collectors return jobs in this common shape:
 ```
 { source, external_id, company_name, job_title, location,
-  apply_url, description, date_posted,
+  apply_url, description, date_posted, countries?,
   sponsorship_override?, entry_level_override?, mid_level_override? }
 ```
+
+`countries` is for sources whose API reports each location's country on its
+own (PCSX/Microsoft's trailing ISO code, Getro's geocoded `location_details`).
+When present, `normalizeJob` keeps the row iff it contains `'US'` and skips the
+string heuristic `looksUS()` — which can't tell India's "IN" from Indiana once
+locations are joined into one string. Prefer it over adding markers to
+`looksUS()` whenever the source has structured location data.
 
 | Source | Type | Where | How |
 |---|---|---|---|

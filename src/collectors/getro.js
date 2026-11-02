@@ -277,6 +277,38 @@ function employerFromApplyUrl(url) {
   return labels.length >= 2 ? labels[labels.length - 2] : null;
 }
 
+// Countries a posting is open in, from Getro's geocoded `location_details`
+// ({ name: "Bengaluru, Karnataka, India", area_type: "locality" }). The country
+// is the last part of a multi-part name, or the whole name of a country row.
+// Single-part names that aren't a country ("Remote", "North America") say
+// nothing and are skipped; undefined means "no evidence", so normalizeJob falls
+// back to reading the location string.
+//
+// Getro's geocoder resolves Indian state codes to US states: a PayPal iOS role
+// in Bengaluru and Chennai came back with a third location, "Tennessee, USA" —
+// Chennai's "TN" (Tamil Nadu) read as Tennessee — and the server-side United
+// States filter let it through. So a US entry naming only a state is ignored
+// when the same posting names a city abroad. A genuine US + abroad posting
+// names a US city ("San Jose, CA, USA"), which is kept.
+const US_COUNTRY = /^(usa|us|united states(?: of america)?)$/i;
+
+function countriesOf(details) {
+  if (!Array.isArray(details)) return undefined;
+  const placed = details
+    .filter((d) => d?.name)
+    .map((d) => {
+      const parts = d.name.split(',').map((s) => s.trim());
+      const country = parts.length > 1 || d.area_type === 'country' ? parts[parts.length - 1] : null;
+      return { type: d.area_type, us: !!country && US_COUNTRY.test(country), country };
+    })
+    .filter((d) => d.country);
+
+  const cityAbroad = placed.some((d) => !d.us && d.type === 'locality');
+  const kept = placed.filter((d) => !(d.us && d.type === 'administrative_area_level_1' && cityAbroad));
+  const countries = [...new Set(kept.map((d) => (d.us ? 'US' : d.country)))];
+  return countries.length ? countries : undefined;
+}
+
 // Pure field mapping, split out so it can be regression-tested without network
 // access. Note the API uses snake_case (`created_at`, `location_details`) while
 // the board's server-rendered __NEXT_DATA__ uses camelCase (`createdAt`,
@@ -300,6 +332,7 @@ function mapJob(j, slug, extra) {
     company_name: (j.organization?.name || '').trim(),
     job_title: (j.title || '').trim(),
     location,
+    countries: countriesOf(j.location_details),
     // Direct ATS apply link (boards.greenhouse.io/…, jobs.ashbyhq.com/…),
     // not a Getro redirect — so the user lands where they'd have landed
     // anyway had we discovered the company's board directly.
@@ -314,4 +347,4 @@ function mapJob(j, slug, extra) {
   };
 }
 
-module.exports = { fetchCompany, mapJob, employerFromApplyUrl, source: 'getro' };
+module.exports = { fetchCompany, mapJob, employerFromApplyUrl, countriesOf, source: 'getro' };
