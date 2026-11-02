@@ -1,7 +1,7 @@
 'use strict';
 
 const { fetchJson } = require('./http');
-const { addDescriptions } = require('./pcsx');
+const { addDescriptions, locationOf } = require('./pcsx');
 
 // Microsoft's apply.careers.microsoft.com fetches from a public PCSX API:
 //   GET /api/pcsx/search?domain=microsoft.com&query=…&start=…&sort_by=…
@@ -62,12 +62,9 @@ async function fetchCompany({ displayName }) {
   const out = [];
   for (const p of byId.values()) {
     const id = p.id || p.displayJobId || p.atsJobId;
-    const loc =
-      Array.isArray(p.standardizedLocations) && p.standardizedLocations.length
-        ? p.standardizedLocations.join(', ')
-        : Array.isArray(p.locations)
-        ? p.locations.join(', ')
-        : p.locations || '';
+    // Same PCSX shape as pcsx.js, including the trailing country codes that
+    // let "IN" (India) pass the US filter as Indiana — see locationOf there.
+    const { location, countries } = locationOf(p);
     // The real Microsoft jobs site lives on apply.careers.microsoft.com — the
     // PCSX `positionUrl` field correctly encodes the path ("/careers/job/{id}")
     // but we were prefixing it with `jobs.careers.microsoft.com`, which 301s
@@ -77,7 +74,8 @@ async function fetchCompany({ displayName }) {
       external_id: id ? String(id) : null,
       company_name: displayName || 'Microsoft',
       job_title: p.name || '',
-      location: loc,
+      location,
+      countries,
       apply_url: p.positionUrl
         ? `https://apply.careers.microsoft.com${p.positionUrl}`
         : `https://apply.careers.microsoft.com/careers/job/${id}`,

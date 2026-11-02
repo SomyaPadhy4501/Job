@@ -163,7 +163,11 @@ function pickCandidates(list) {
     .filter(
       (j) =>
         looksRelevantTitle(j.title) &&
-        looksUSLocation(j.locationsText) &&
+        // The resolved location, not locationsText: multi-site postings show
+        // only "2 Locations", which matched no US pattern, so they never got a
+        // description — PayPal's US Android and DevOps roles among them, whose
+        // "Visa Sponsorship through PayPal is not available" went unread.
+        looksUSLocation(resolveLocation(j)) &&
         (!CONFIG.filterSoftwareOnly || looksSoftware(j.title)) &&
         passesLevel(j.title, CONFIG.entryLevelMode || 'permissive')
     )

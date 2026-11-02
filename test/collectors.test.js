@@ -557,3 +557,106 @@ test('workday: "Posted Today" and "Posted Yesterday" rank as newest', () => {
     .sort((a, b) => workday.postedAgeDays(a) - workday.postedAgeDays(b));
   assert.deepStrictEqual(order, ['Posted Today', 'Posted Yesterday', 'Posted 3 Days Ago', 'Posted 30+ Days Ago']);
 });
+
+// ─── Location countries (PCSX, Getro) ─────────────────────────────────────────
+
+const US_ONLY = { filterUSOnly: true, filterSoftwareOnly: true };
+const pcsx = require('../src/collectors/pcsx');
+
+test('pcsx: a trailing country code is read as a country, not a US state', () => {
+  // Live Microsoft rows (2026-11-01): standardizedLocations ["IN"] was stored
+  // as location "IN" and passed the US filter as Indiana.
+  assert.deepStrictEqual(pcsx.locationOf({ standardizedLocations: ['IN'] }), { location: 'IN', countries: ['IN'] });
+  assert.deepStrictEqual(
+    pcsx.locationOf({ standardizedLocations: ['Herzliya, Tel Aviv District, IL'] }).countries,
+    ['IL']
+  );
+  const row = (standardizedLocations) => ({
+    source: 'microsoft', company_name: 'Microsoft', job_title: 'Software Engineer II',
+    apply_url: 'https://apply.careers.microsoft.com/careers/job/1', description: '',
+    ...pcsx.locationOf({ standardizedLocations }),
+  });
+  assert.strictEqual(normalizeJob(row(['IN']), US_ONLY), null);
+  assert.strictEqual(normalizeJob(row(['Noida, Uttar Pradesh, IN']), US_ONLY), null);
+  assert.strictEqual(normalizeJob(row(['Munich, BY, DE']), US_ONLY), null);
+  assert.ok(normalizeJob(row(['Redmond, WA, US']), US_ONLY));
+  assert.ok(normalizeJob(row(['US']), US_ONLY), 'a US-wide posting stays');
+});
+
+test('pcsx: a posting open in the US and abroad keeps only its US locations', () => {
+  const { location, countries } = pcsx.locationOf({
+    standardizedLocations: ['San Diego, CA, US', 'Hsinchu, Hsinchu City, TW', 'Munich, BY, DE'],
+  });
+  assert.strictEqual(location, 'San Diego, CA, US');
+  assert.deepStrictEqual(countries, ['US', 'TW', 'DE']);
+});
+
+test('pcsx: without standardizedLocations the raw string is left to the US filter', () => {
+  assert.deepStrictEqual(
+    pcsx.locationOf({ locations: ['United States, Washington, Redmond'] }),
+    { location: 'United States, Washington, Redmond', countries: undefined }
+  );
+});
+
+test('pcsx: India rows do not spend the description budget', () => {
+  // "IN" looks like Indiana to looksUS, so before countries were read these
+  // took detail requests from US rows.
+  const picked = pcsx.pickForDetail([
+    { external_id: '1', job_title: 'Software Engineer', date_posted: 2, ...pcsx.locationOf({ standardizedLocations: ['IN'] }) },
+    { external_id: '2', job_title: 'Software Engineer', date_posted: 1, ...pcsx.locationOf({ standardizedLocations: ['Redmond, WA, US'] }) },
+  ]);
+  assert.deepStrictEqual(picked.map((r) => r.external_id), ['2']);
+});
+
+test('getro: a state-only US entry beside cities abroad is a geocoding error', () => {
+  // Live PayPal iOS role (2026-10-31): Bengaluru and Chennai, plus "Tennessee,
+  // USA" — Chennai's TN (Tamil Nadu) geocoded as Tennessee.
+  const details = [
+    { name: 'Tennessee, USA', area_type: 'administrative_area_level_1' },
+    { name: 'Bengaluru, Karnataka, India', area_type: 'locality' },
+    { name: 'Chennai, Tamil Nadu, India', area_type: 'locality' },
+  ];
+  assert.deepStrictEqual(getro.countriesOf(details), ['India']);
+  const row = getro.mapJob(
+    {
+      ...GETRO_JOB, title: 'Software Engineer - iOS', seniority: null,
+      locations: details.map((d) => d.name), location_details: details,
+    },
+    'accel', null
+  );
+  assert.strictEqual(normalizeJob(row, US_ONLY), null);
+});
+
+test('getro: real US locations are kept, alone or beside ones abroad', () => {
+  assert.deepStrictEqual(
+    getro.countriesOf([
+      { name: 'San Jose, CA, USA', area_type: 'locality' },
+      { name: 'Bengaluru, Karnataka, India', area_type: 'locality' },
+    ]),
+    ['US', 'India']
+  );
+  // A state with no city is fine when nothing abroad is listed.
+  assert.deepStrictEqual(getro.countriesOf([{ name: 'Florida, USA', area_type: 'administrative_area_level_1' }]), ['US']);
+  assert.deepStrictEqual(
+    getro.countriesOf([{ name: 'United States', area_type: 'country' }, { name: 'Remote', area_type: 'global' }]),
+    ['US']
+  );
+});
+
+test('getro: names that are not places give no country evidence', () => {
+  // undefined sends normalizeJob back to the location string.
+  assert.strictEqual(getro.countriesOf([{ name: 'Remote', area_type: 'global' }]), undefined);
+  assert.strictEqual(getro.countriesOf([{ name: 'North America', area_type: 'continent' }]), undefined);
+  assert.strictEqual(getro.countriesOf(undefined), undefined);
+});
+
+test('workday: a multi-site US posting shown as "2 Locations" still gets a description', () => {
+  // Live PayPal roles (2026-11-01). The path names the primary site; the raw
+  // locationsText matched no US pattern, so these were never enriched.
+  const posting = (title, externalPath) => ({ title, postedOn: 'Posted 3 Days Ago', locationsText: '2 Locations', externalPath });
+  const picked = workday.pickCandidates([
+    posting('Software Engineer - Android', '/job/San-Jose-California-United-States-of-America/Software-Engineer---Android_R0138333'),
+    posting('Software Engineer - iOS', '/job/Bangalore-Karnataka-India/Software-Engineer---iOS_R0138550-1'),
+  ]);
+  assert.deepStrictEqual(picked.map((j) => j.title), ['Software Engineer - Android']);
+});
