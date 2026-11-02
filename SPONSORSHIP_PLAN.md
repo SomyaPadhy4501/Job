@@ -146,9 +146,12 @@ explicit description language.
 2. Parse (stream-based; CSV is big but simple).
 3. Normalize `Employer (Petitioner) Name` via the classifier's `normSlug`.
 4. Aggregate: `approvals = sum of the six … Approval measures`, summed
-   across FYs and across subsidiary name variants. One-word brands whose
-   petitions are filed under a legal name ("Harvey" → Harvey AI Corporation)
-   also get a key of their own (`BRAND_KEYS`).
+   across FYs and across subsidiary name variants. Names are first put back
+   into the spelling the old files used ("AT AND T" → "AT&T", hyphens and
+   periods also indexed as spaces). Board names that can't reach their legal
+   petitioner ("Harvey" → Harvey AI Corporation) map through
+   `EMPLOYER_ALIASES` in `classifier.js`; a test fails if a refresh drops a
+   target.
 5. Write `src/data/h1b-sponsors.json`.
 
 Run cadence: **manually once per quarter** when USCIS releases new data.

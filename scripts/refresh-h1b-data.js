@@ -290,37 +290,6 @@ const SYNONYMS = {
   'moog-inc': 'moog',
 };
 
-// ─── Brand keys ──────────────────────────────────────────────────────────────
-// Job boards show a one-word brand ("Harvey", "Cursor"); USCIS records the
-// legal petitioner ("Harvey AI Corporation", "Anysphere"). The prefix lookup in
-// classifier.js skips single words on purpose, so without these the brand reads
-// UNKNOWN however many petitions its employer files. Unlike SYNONYMS the legal
-// key is kept, so "Notion Labs" resolves as well as "Notion". Only brands with
-// postings on the board or a board in src/config.js belong here.
-//
-// Format: { [legal slug]: brand slug | [brand slugs] }
-const BRAND_KEYS = {
-  'openai-opco': 'openai',
-  'notion-labs': 'notion',
-  'harvey-ai-corporation': 'harvey',
-  'counsel-ai-corporation': 'harvey', // Harvey's legal name in its FY2025 filings
-  'anysphere': 'cursor',
-  'eleven-labs': 'elevenlabs',
-  'perplexity-ai': 'perplexity',
-  'cognition-ai': 'cognition',
-  // These read YES on the FY2022–23 data and filed under a new legal name by
-  // FY2025, so they would have dropped to UNKNOWN in the refresh.
-  'atlassian-us': 'atlassian',
-  'dk-crown-holdings': 'draftkings',
-  'motive-technologies': ['motive', 'keep-truckin'], // KeepTruckin renamed itself Motive
-  'corporation-mercer-university': 'mercer-university', // "The Corporation of Mercer University"
-  'elevance-health': 'anthem', // its Workday board is still labelled Anthem
-  'deel-us': 'deel',
-  // "Clover Health" has an exact key of its own (2 approvals), which hides the
-  // labs entity's petitions from the prefix lookup.
-  'clover-health-labs': 'clover-health',
-};
-
 // ─── CSV parsing ─────────────────────────────────────────────────────────────
 
 // Incremental CSV reader: push() text as it arrives, end() at EOF. Quoted
@@ -410,6 +379,16 @@ async function fetchExport(fy) {
 
 // ─── Aggregation ─────────────────────────────────────────────────────────────
 
+// The hub spells some ampersands out ("AT AND T SERVICES INC"), and normSlug
+// drops "at", "and" and lone letters, which leaves AT&T's 890 approvals under
+// the key "services" (M&T Bank under "bank", S&P Global under "global"). Put
+// the ampersand back wherever a lone letter sits beside the AND, so the name
+// slugs the way the old files and job boards spell it: att-services.
+const AND_BETWEEN_INITIALS = /\b([A-Z]{1,2}) AND ([A-Z]{1,2})\b/g;
+function restoreAmpersands(name) {
+  return name.replace(AND_BETWEEN_INITIALS, (m, a, b) => (a.length === 1 || b.length === 1 ? `${a}&${b}` : m));
+}
+
 // years: [{ fy, totals: Map<employer name, approvals> }]
 // Schema: { [slug]: { approvals_last_2fy: number, latest_fy: number } }
 function buildSponsors(years) {
@@ -421,16 +400,18 @@ function buildSponsors(years) {
   };
 
   for (const { fy, totals } of years) {
-    for (const [employerName, approvals] of totals) {
-      // The hub keeps hyphens the old CSVs dropped ("BRISTOL-MYERS SQUIBB",
-      // "EMBRY-RIDDLE"), and normSlug deletes a hyphen without a space, so the
-      // legal name would only match postings that hyphenate it too. Index the
-      // spaced spelling as well, which is what the old files produced — unless
-      // it shrinks to one word ("C-VISION INC" → "vision"), the kind of key the
-      // prefix lookup in classifier.js refuses to guess from.
+    for (const [rawName, approvals] of totals) {
+      const employerName = restoreAmpersands(rawName);
+      // The hub keeps hyphens and periods the old CSVs turned into spaces
+      // ("BRISTOL-MYERS SQUIBB", "LOB.COM INC"), and normSlug deletes them
+      // without a space, so the legal name would only match postings that
+      // punctuate it the same way. Index the spaced spelling as well, which is
+      // what the old files produced — unless it shrinks to one word ("C-VISION
+      // INC" → "vision"), the kind of key the prefix lookup in classifier.js
+      // refuses to guess from.
       const candidates = [normSlug(employerName)];
-      if (employerName.includes('-')) {
-        const spaced = normSlug(employerName.replace(/-/g, ' '));
+      if (/[-.]/.test(employerName)) {
+        const spaced = normSlug(employerName.replace(/[-.]/g, ' '));
         if (spaced.includes('-')) candidates.push(spaced);
       }
       const slugs = new Set();
@@ -445,7 +426,6 @@ function buildSponsors(years) {
         if (slug.startsWith('amazon')) slug = 'amazon';
 
         slugs.add(slug);
-        for (const brand of [].concat(BRAND_KEYS[slug] || [])) slugs.add(brand);
       }
       for (const slug of slugs) add(slug, approvals, fy);
     }
@@ -525,4 +505,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { readExport, buildSponsors, csvReader, BRAND_KEYS };
+module.exports = { readExport, buildSponsors, csvReader };

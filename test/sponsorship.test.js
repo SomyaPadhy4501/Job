@@ -5,11 +5,12 @@
 // The data half pins employers by name. A sponsor that drops out of
 // h1b-sponsors.json doesn't fail loudly: its jobs read UNKNOWN and vanish from
 // the board's default view. If a refresh breaks one of these, find the
-// employer's new legal name in the hub before deleting the case.
+// employer's new legal name in the hub and point its EMPLOYER_ALIASES entry
+// there before deleting the case.
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { classifySponsorship, normSlug } = require('../src/services/classifier');
+const { classifySponsorship, approvalsFor, normSlug } = require('../src/services/classifier');
 const { readExport, buildSponsors } = require('../scripts/refresh-h1b-data');
 const SPONSORS = require('../src/data/h1b-sponsors.json');
 
@@ -37,6 +38,8 @@ test('employers that began sponsoring after FY2023 resolve as sponsors', () => {
   ]) {
     assert.strictEqual(classifySponsorship(NEUTRAL, company), 'YES', company);
   }
+  // The legal AI company, not the recruiter Harvey Nash.
+  assert.strictEqual(approvalsFor('harvey'), SPONSORS['harvey-ai-corporation'].approvals_last_2fy);
 });
 
 test("today's big sponsors still resolve", () => {
@@ -70,7 +73,23 @@ test('employers that changed legal name between FY2023 and FY2025 keep resolving
     'Mercer University', // THE CORPORATION OF MERCER UNIVERSITY
     'Deel', // DEEL US INC
     'Clover Health',
-    // The hub hyphenates these; postings usually don't.
+    'Tempus', // TEMPUS AI INC
+    'Yahoo', // YAHOO HOLDINGS INC
+    'FedEx', // FEDERAL EXPRESS CORPORATION
+  ]) {
+    assert.strictEqual(classifySponsorship(NEUTRAL, company), 'YES', company);
+  }
+});
+
+test('names the hub punctuates differently from job boards still resolve', () => {
+  for (const company of [
+    // Written "AT AND T SERVICES INC", "M AND T BANK" in the hub.
+    'AT&T',
+    'M&T Bank',
+    'S&P Global',
+    'SS&C Technologies',
+    'Texas A&M University',
+    // Hyphenated in the hub, usually spaced on boards.
     'Bristol Myers Squibb',
     'Bristol-Myers Squibb',
     'Embry Riddle Aeronautical University',
@@ -81,7 +100,7 @@ test('employers that changed legal name between FY2023 and FY2025 keep resolving
 });
 
 test('the lookup carries current fiscal years', () => {
-  for (const slug of ['amazon', 'google', 'xai', 'openai']) {
+  for (const slug of ['amazon', 'google', 'xai', 'openai-opco']) {
     assert.ok(SPONSORS[slug].latest_fy >= 2025, `${slug}: FY${SPONSORS[slug].latest_fy}`);
   }
 });
@@ -134,20 +153,24 @@ test('readExport reads an unpublished year as empty', async () => {
   assert.strictEqual((await readExport([Buffer.from('\n')], 2027)).size, 0);
 });
 
-test('buildSponsors slugs with the classifier and adds brand and spaced keys', () => {
+test('buildSponsors slugs the way the old files and job boards spell names', () => {
   const sponsors = buildSponsors([
-    { fy: 2025, totals: new Map([['COUNSEL AI CORPORATION', 14], ['BRISTOL-MYERS SQUIBB COMPANY', 200]]) },
-    { fy: 2026, totals: new Map([['HARVEY AI CORPORATION', 31], ['C-VISION INC', 4], ['AMAZON.COM SERVICES LLC', 9]]) },
+    { fy: 2025, totals: new Map([['BRISTOL-MYERS SQUIBB COMPANY', 200], ['LOB.COM INC', 3], ['AT AND T SERVICES INC', 400]]) },
+    { fy: 2026, totals: new Map([['AT AND T SERVICES INC', 490], ['C-VISION INC', 4], ['AMAZON.COM SERVICES LLC', 9], ['TEXAS A AND M UNIVERSITY', 30]]) },
   ]);
-  // Legal names keep their own keys, and the brand sums both filers.
-  assert.deepStrictEqual(sponsors['counsel-ai-corporation'], { approvals_last_2fy: 14, latest_fy: 2025 });
-  assert.deepStrictEqual(sponsors['harvey'], { approvals_last_2fy: 45, latest_fy: 2026 });
-  // Both spellings of a hyphenated name, as normSlug reads each.
+  // Both spellings of a hyphenated or dotted name, as normSlug reads each.
   assert.strictEqual(sponsors[normSlug('Bristol-Myers Squibb Company')].approvals_last_2fy, 200);
   assert.strictEqual(sponsors[normSlug('Bristol Myers Squibb Company')].approvals_last_2fy, 200);
+  assert.ok(sponsors.lobcom && sponsors['lob-com']);
   // A spaced spelling that shrinks to one generic word is not indexed.
   assert.ok(sponsors.cvision);
   assert.strictEqual(sponsors.vision, undefined);
+  // A spelled-out ampersand beside a lone letter goes back to "&", rather than
+  // leaving AT&T under "services".
+  assert.deepStrictEqual(sponsors[normSlug('AT&T Services')], { approvals_last_2fy: 890, latest_fy: 2026 });
+  assert.strictEqual(sponsors[normSlug('Texas A&M University')].approvals_last_2fy, 30);
+  assert.strictEqual(sponsors.services, undefined);
+  // Each employer counts once per key, whatever its spellings.
   assert.strictEqual(sponsors.amazon.approvals_last_2fy, 9);
   assert.deepStrictEqual(Object.keys(sponsors), Object.keys(sponsors).sort());
 });
