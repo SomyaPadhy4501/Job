@@ -3,56 +3,63 @@
 /**
  * refresh-h1b-data.js
  *
- * Fetches the last 2 fiscal years of USCIS H-1B Employer Data Hub CSVs,
- * normalizes employer names via normSlug(), aggregates approvals, and writes
+ * Downloads the last 2 fiscal years of the USCIS H-1B Employer Data Hub,
+ * normalizes employer names via normSlug(), sums approvals, and writes
  * src/data/h1b-sponsors.json.
  *
- * Run manually once per quarter when USCIS releases new data:
+ * Run manually once per quarter when USCIS updates the hub:
  *   node scripts/refresh-h1b-data.js
- *   git diff src/data/h1b-sponsors.json   # sanity-check the diff
+ *   git diff --stat src/data/h1b-sponsors.json   # sanity-check the diff
  *   git commit -am "refresh h1b sponsor data Q<n> <year>"
  *
- * Takes ~30 seconds. No API key required; CSVs are US government public domain.
+ * Options (rarely needed):
+ *   --fy=2022,2023   pull these fiscal years instead of the latest two
+ *   --out=<file>     write somewhere other than src/data/h1b-sponsors.json
+ *
+ * Takes ~1 minute (about 100 MB per fiscal year). No API key required; the
+ * data is US government public domain.
  */
 
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const { TextDecoder } = require('util');
+const { normSlug } = require('../src/services/classifier');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const DATA_DIR = path.resolve(__dirname, '../src/data');
-const OUTPUT_FILE = path.join(DATA_DIR, 'h1b-sponsors.json');
+const OUTPUT_FILE = path.resolve(__dirname, '../src/data/h1b-sponsors.json');
 const NUM_FY = 2; // last N fiscal years to pull
 
-// USCIS H-1B Employer Data Hub — CSV per fiscal year.
-// FY runs Oct 1 – Sep 30. FY2025 = Oct 2024 – Sep 2025.
-// URL pattern confirmed from the official USCIS H-1B Employer Data Hub Files page:
-//   https://www.uscis.gov/tools/reports-studies/h-1b-employer-data-hub-files
-// Latest published FY is 2023 (as of Apr 2026); FY2024+ are not yet released.
-function csvUrl(fy) {
-  return `https://www.uscis.gov/sites/default/files/document/data/h1b_datahubexport-${fy}.csv`;
+// USCIS stopped publishing one CSV per fiscal year after FY2023 (the old files
+// are at https://www.uscis.gov/archive/h-1b-employer-data-hub-files). Newer
+// years exist only in the interactive hub,
+//   https://www.uscis.gov/tools/reports-and-studies/h-1b-employer-data-hub
+// a Tableau dashboard whose "Crosstab View" button opens the H1BPublic view.
+// Tableau serves any view as CSV when ".csv" is appended to its URL, and sets a
+// filter from a query parameter named after the field. That field is literally
+// "Fiscal Year   " with three trailing spaces: "Fiscal Year" is ignored without
+// an error and the default year comes back, so readExport() checks every row.
+//
+// FY runs Oct 1 – Sep 30. FY2026 = Oct 2025 – Sep 2026.
+const VIEW_URL = 'https://bigdataanalyticspub-sb.uscis.dhs.gov/views/H1BEmployerDataHub-Final/H1BPublic.csv';
+const FY_FIELD = 'Fiscal Year   ';
+function exportUrl(fy) {
+  return `${VIEW_URL}?${encodeURIComponent(FY_FIELD)}=${fy}`;
 }
 
-// ─── Normalization ───────────────────────────────────────────────────────────
-// Mirrors the slug logic in normalize.js so lookups hit the same keys.
-// Keep in sync with normCompany() in src/services/normalize.js.
-
-const STOPWORDS = new Set(['the', 'and', 'or', 'of', 'for', 'in', 'to', 'a', 'an', 'at']);
-
-function normSlug(s) {
-  if (!s) return '';
-  return String(s)
-    .toLowerCase()
-    // Strip corporate suffixes
-    .replace(/\b(inc|llc|ltd|corp|co|pbc|gmbh|plc|bv|ag)\b\.?/g, ' ')
-    // Strip anything that's not a letter, digit, or space
-    .replace(/[^a-z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter((w) => w.length > 1 && !STOPWORDS.has(w))
-    .join('-');
-}
+// The export is long-format: one row per employer location and measure, twelve
+// measures per employer (an approval and a denial count for each case type).
+// The six approvals together are what the old files split into "Initial
+// Approval" (new employment, new concurrent, change of employer) and
+// "Continuing Approval" (continuation, change with same employer, amended).
+const APPROVAL_MEASURES = new Set([
+  'New Employment Approval',
+  'Continuation Approval',
+  'Change with Same Employer Approval',
+  'New Concurrent Approval',
+  'Change of Employer Approval',
+  'Amended Approval',
+]);
 
 // ─── High-value synonym map ──────────────────────────────────────────────────
 // USCIS sometimes lists the same company under multiple DBA names. Map the
@@ -283,163 +290,225 @@ const SYNONYMS = {
   'moog-inc': 'moog',
 };
 
-// ─── CSV fetching ─────────────────────────────────────────────────────────────
-
-function fetchCsv(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'node.js job-aggregator' } }, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        // Follow redirect
-        https.get(res.headers.location, (res2) => {
-          if (res2.statusCode !== 200) {
-            reject(new Error(`HTTP ${res2.statusCode} for ${url}`));
-            return;
-          }
-          const chunks = [];
-          res2.on('data', (c) => chunks.push(c));
-          res2.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-          res2.on('error', reject);
-        });
-        return;
-      }
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-        return;
-      }
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      res.on('error', reject);
-    }).on('error', reject);
-  });
-}
+// ─── Brand keys ──────────────────────────────────────────────────────────────
+// Job boards show a one-word brand ("Harvey", "Cursor"); USCIS records the
+// legal petitioner ("Harvey AI Corporation", "Anysphere"). The prefix lookup in
+// classifier.js skips single words on purpose, so without these the brand reads
+// UNKNOWN however many petitions its employer files. Unlike SYNONYMS the legal
+// key is kept, so "Notion Labs" resolves as well as "Notion". Only brands with
+// postings on the board or a board in src/config.js belong here.
+//
+// Format: { [legal slug]: brand slug | [brand slugs] }
+const BRAND_KEYS = {
+  'openai-opco': 'openai',
+  'notion-labs': 'notion',
+  'harvey-ai-corporation': 'harvey',
+  'counsel-ai-corporation': 'harvey', // Harvey's legal name in its FY2025 filings
+  'anysphere': 'cursor',
+  'eleven-labs': 'elevenlabs',
+  'perplexity-ai': 'perplexity',
+  'cognition-ai': 'cognition',
+  // These read YES on the FY2022–23 data and filed under a new legal name by
+  // FY2025, so they would have dropped to UNKNOWN in the refresh.
+  'atlassian-us': 'atlassian',
+  'dk-crown-holdings': 'draftkings',
+  'motive-technologies': ['motive', 'keep-truckin'], // KeepTruckin renamed itself Motive
+  'corporation-mercer-university': 'mercer-university', // "The Corporation of Mercer University"
+  'elevance-health': 'anthem', // its Workday board is still labelled Anthem
+  'deel-us': 'deel',
+  // "Clover Health" has an exact key of its own (2 approvals), which hides the
+  // labs entity's petitions from the prefix lookup.
+  'clover-health-labs': 'clover-health',
+};
 
 // ─── CSV parsing ─────────────────────────────────────────────────────────────
 
-// Parse the USCIS CSV. It has no BOM but may have quoted fields.
-// Returns an array of objects keyed by the header row.
-function parseCsv(raw) {
-  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return [];
-  const headers = splitCsvLine(lines[0]);
-  return lines.slice(1).map((line) => {
-    const vals = splitCsvLine(line);
-    const obj = {};
-    headers.forEach((h, i) => { obj[h.trim()] = vals[i] || ''; });
-    return obj;
-  });
+// Incremental CSV reader: push() text as it arrives, end() at EOF. Quoted
+// fields may hold commas ("ANYSPHERE, INC."), doubled quotes and newlines, and
+// a field or quote may straddle two chunks.
+function csvReader(onRecord) {
+  let field = '';
+  let record = [];
+  let inQuotes = false;
+  let quotePending = false; // inside quotes, the last char was a quote
+  return {
+    push(text) {
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (quotePending) {
+            quotePending = false;
+            if (ch === '"') { field += '"'; continue; }
+            inQuotes = false; // that quote closed the field; read ch below
+          } else if (ch === '"') {
+            quotePending = true;
+            continue;
+          } else {
+            field += ch;
+            continue;
+          }
+        }
+        if (ch === '"') inQuotes = true;
+        else if (ch === ',') { record.push(field); field = ''; }
+        else if (ch === '\n') { record.push(field); onRecord(record); record = []; field = ''; }
+        else if (ch !== '\r') field += ch;
+      }
+    },
+    end() {
+      if (field || record.length) { record.push(field); onRecord(record); }
+      field = '';
+      record = [];
+    },
+  };
 }
 
-// Simple CSV field splitter — handles quoted fields with commas inside.
-function splitCsvLine(line) {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-      else inQuotes = !inQuotes;
-    } else if (ch === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+// Reads one fiscal year's export from an async iterable of byte chunks (a fetch
+// body, a file stream). Returns Map<employer name, approvals>; empty when the
+// year isn't published yet, which the server answers with a 1-byte body.
+async function readExport(chunks, fy) {
+  const totals = new Map();
+  let cols = null;
+  const reader = csvReader((rec) => {
+    if (rec.length === 1 && !rec[0]) return; // blank line
+    if (!cols) {
+      const names = rec.map((h) => h.trim());
+      cols = {
+        employer: names.indexOf('Employer (Petitioner) Name'),
+        fy: names.indexOf('Fiscal Year'),
+        measure: names.indexOf('Measure Names'),
+        value: names.indexOf('Measure Values'),
+      };
+      const missing = Object.keys(cols).filter((k) => cols[k] < 0);
+      if (missing.length) throw new Error(`FY${fy}: export header lacks ${missing.join(', ')}: ${rec.join(',')}`);
+      return;
+    }
+    const rowFy = Number(rec[cols.fy]);
+    if (rowFy !== fy) {
+      throw new Error(`asked for FY${fy} but the export holds FY${rec[cols.fy]} — the "${FY_FIELD}" filter was ignored`);
+    }
+    if (!APPROVAL_MEASURES.has(rec[cols.measure])) return;
+    const name = rec[cols.employer].trim();
+    const n = Number((rec[cols.value] || '0').replace(/,/g, ''));
+    if (!name || !Number.isFinite(n) || n <= 0) return;
+    totals.set(name, (totals.get(name) || 0) + n);
+  });
+  const decoder = new TextDecoder('utf-8');
+  for await (const chunk of chunks) reader.push(decoder.decode(chunk, { stream: true }));
+  reader.push(decoder.decode());
+  reader.end();
+  return totals;
+}
+
+async function fetchExport(fy) {
+  const res = await fetch(exportUrl(fy), {
+    headers: { 'User-Agent': 'node.js job-aggregator' },
+    signal: AbortSignal.timeout(10 * 60 * 1000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${exportUrl(fy)}`);
+  return readExport(res.body, fy);
+}
+
+// ─── Aggregation ─────────────────────────────────────────────────────────────
+
+// years: [{ fy, totals: Map<employer name, approvals> }]
+// Schema: { [slug]: { approvals_last_2fy: number, latest_fy: number } }
+function buildSponsors(years) {
+  const aggregate = {};
+  const add = (slug, approvals, fy) => {
+    if (!aggregate[slug]) aggregate[slug] = { approvals_last_2fy: 0, latest_fy: 0 };
+    aggregate[slug].approvals_last_2fy += approvals;
+    if (fy > aggregate[slug].latest_fy) aggregate[slug].latest_fy = fy;
+  };
+
+  for (const { fy, totals } of years) {
+    for (const [employerName, approvals] of totals) {
+      // The hub keeps hyphens the old CSVs dropped ("BRISTOL-MYERS SQUIBB",
+      // "EMBRY-RIDDLE"), and normSlug deletes a hyphen without a space, so the
+      // legal name would only match postings that hyphenate it too. Index the
+      // spaced spelling as well, which is what the old files produced — unless
+      // it shrinks to one word ("C-VISION INC" → "vision"), the kind of key the
+      // prefix lookup in classifier.js refuses to guess from.
+      const candidates = [normSlug(employerName)];
+      if (employerName.includes('-')) {
+        const spaced = normSlug(employerName.replace(/-/g, ' '));
+        if (spaced.includes('-')) candidates.push(spaced);
+      }
+      const slugs = new Set();
+      for (let slug of candidates) {
+        if (!slug) continue;
+
+        // Apply synonym map if exists
+        if (SYNONYMS[slug]) slug = SYNONYMS[slug];
+
+        // Amazon: aggregate across all Amazon subsidiaries under 'amazon' prefix
+        // (catches amazon, amazon-web-services, amazon-devops, etc.)
+        if (slug.startsWith('amazon')) slug = 'amazon';
+
+        slugs.add(slug);
+        for (const brand of [].concat(BRAND_KEYS[slug] || [])) slugs.add(brand);
+      }
+      for (const slug of slugs) add(slug, approvals, fy);
     }
   }
-  result.push(current.trim());
-  return result;
+
+  // Every employer with an approval is kept; the classifier applies its
+  // USCIS_THRESHOLD at runtime. Keys sorted for deterministic diffs.
+  const sorted = {};
+  Object.keys(aggregate).sort().forEach((k) => { sorted[k] = aggregate[k]; });
+  return sorted;
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-async function probeLatestAvailableFY() {
+function argValue(name) {
+  const arg = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return arg ? arg.slice(name.length + 3) : null;
+}
+
+// The newest NUM_FY published years, walking down from the current FY. A year
+// USCIS hasn't published yet comes back empty, so this costs no extra download.
+async function fetchLatestYears() {
   const now = new Date();
   const currentFY = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
-  // USCIS publishes with a lag; probe from current FY downward until we get a 200.
-  for (let fy = currentFY; fy >= currentFY - 3; fy--) {
-    const url = csvUrl(fy);
-    try {
-      const res = await new Promise((resolve) => {
-        https.get(url, { headers: { 'User-Agent': 'node.js job-aggregator' } }, resolve)
-          .on('error', () => resolve({ statusCode: 999 }));
-      });
-      if (res.statusCode === 200) return fy;
-    } catch { /* try next */ }
+  const years = [];
+  for (let fy = currentFY; fy >= currentFY - 3 && years.length < NUM_FY; fy--) {
+    console.log(`  Downloading FY${fy}…`);
+    const totals = await fetchExport(fy);
+    console.log(`  FY${fy}: ${totals.size ? `${totals.size} employers` : 'not published yet'}`);
+    if (totals.size) years.push({ fy, totals });
   }
-  throw new Error('Could not reach USCIS H-1B data hub — check network');
+  if (!years.length) throw new Error('No fiscal year from the USCIS hub had data — check the view URL');
+  return years;
 }
 
 async function main() {
-  // Probe to find the latest FY available
-  const latestFY = await probeLatestAvailableFY();
-  console.log(`Latest available FY on USCIS site: ${latestFY}`);
-  // Pull that FY + the one before it (or same if only one available)
-  const fyYears = latestFY - (NUM_FY - 1) <= 0 ? [latestFY] : [latestFY, latestFY - 1];
-
-  console.log(`Fetching FY${fyYears.join(', ')} USCIS H-1B Employer Data Hub CSVs…`);
-
-  // Fetch and parse all FY CSVs in parallel
-  const fyData = await Promise.all(
-    fyYears.map(async (fy) => {
-      const url = csvUrl(fy);
+  const out = argValue('out') ? path.resolve(argValue('out')) : OUTPUT_FILE;
+  const pinned = argValue('fy');
+  let years;
+  if (pinned) {
+    years = [];
+    for (const fy of pinned.split(',').map(Number)) {
       console.log(`  Downloading FY${fy}…`);
-      const raw = await fetchCsv(url);
-      const rows = parseCsv(raw);
-      console.log(`  FY${fy}: ${rows.length} rows`);
-      return { fy, rows };
-    })
-  );
-
-  // Aggregate by normalized slug
-  // Schema: { [slug]: { approvals_last_2fy: number, latest_fy: number } }
-  const aggregate = {};
-
-  for (const { fy, rows } of fyData) {
-    for (const row of rows) {
-      const employerName = row['Employer'] || '';
-      const initialApprovals = parseInt(row['Initial Approval'] || '0', 10);
-      const continuingApprovals = parseInt(row['Continuing Approval'] || '0', 10);
-      const approvals = initialApprovals + continuingApprovals;
-
-      if (!employerName || isNaN(approvals)) continue;
-
-      let slug = normSlug(employerName);
-
-      // Apply synonym map if exists
-      if (SYNONYMS[slug]) slug = SYNONYMS[slug];
-
-      // Amazon: aggregate across all Amazon subsidiaries under 'amazon' prefix
-      // (catches amazon, amazon-web-services, amazon-devops, etc.)
-      if (slug.startsWith('amazon')) slug = 'amazon';
-
-      if (!aggregate[slug]) {
-        aggregate[slug] = { approvals_last_2fy: 0, latest_fy: 0 };
-      }
-      aggregate[slug].approvals_last_2fy += approvals;
-      if (fy > aggregate[slug].latest_fy) {
-        aggregate[slug].latest_fy = fy;
-      }
+      const totals = await fetchExport(fy);
+      if (!totals.size) throw new Error(`FY${fy} is not published on the USCIS hub`);
+      console.log(`  FY${fy}: ${totals.size} employers`);
+      years.push({ fy, totals });
     }
+  } else {
+    console.log('Fetching the latest USCIS H-1B Employer Data Hub fiscal years…');
+    years = await fetchLatestYears();
   }
 
-  // Prune entries below the threshold (saves space, reduces noise)
-  const THRESHOLD = 1; // keep all; classifier applies >= 3 cutoff at runtime
-  const pruned = Object.entries(aggregate).filter(([, v]) => v.approvals_last_2fy >= THRESHOLD);
-  const sponsors = Object.fromEntries(pruned);
-
-  // Sort keys for deterministic diffs
-  const sorted = {};
-  Object.keys(sponsors).sort().forEach((k) => { sorted[k] = sponsors[k]; });
-
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(sorted, null, 2) + os.EOL);
+  const sorted = buildSponsors(years);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify(sorted, null, 2) + '\n');
 
   const totalSlugs = Object.keys(sorted).length;
-  const totalApprovals = Object.values(sorted).reduce((s, v) => s + v.approvals_last_2fy, 0);
-  console.log(`\nWrote ${OUTPUT_FILE}`);
+  // From the export, not the keys: brand and spaced keys repeat an employer.
+  const totalApprovals = years.reduce((s, y) => s + [...y.totals.values()].reduce((a, b) => a + b, 0), 0);
+  console.log(`\nWrote ${out} (FY${years.map((y) => y.fy).join(' + FY')})`);
   console.log(`  Companies: ${totalSlugs}`);
-  console.log(`  Total approvals (last ${NUM_FY} FY): ${totalApprovals.toLocaleString()}`);
+  console.log(`  Total approvals: ${totalApprovals.toLocaleString()}`);
   console.log(`  Top 10 by approvals:`);
   const top10 = Object.entries(sorted)
     .sort(([, a], [, b]) => b.approvals_last_2fy - a.approvals_last_2fy)
@@ -449,7 +518,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('refresh-h1b-data failed:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('refresh-h1b-data failed:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { readExport, buildSponsors, csvReader, BRAND_KEYS };

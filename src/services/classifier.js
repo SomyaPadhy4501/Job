@@ -103,6 +103,11 @@ function doubtsSponsorship(t) {
 }
 
 // Threshold for USCIS YES signal: ≥ 3 approved H-1B petitions in last 2 FY.
+// Rechecked when the data moved to the hub's FY2025–26 export (2026-11-02):
+// its six approval measures add up to the old files' Initial + Continuing
+// counts (FY2022 matched employer for employer), so 3 still means three
+// approved petitions, not applications. Only 27 of 1,377 board rows labelled by
+// this classifier sit at 1–5 approvals, so nudging the cut moves little.
 const USCIS_THRESHOLD = 3;
 
 // Load h1b-sponsors.json once at startup (deterministic, no runtime fetch).

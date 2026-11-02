@@ -54,11 +54,16 @@ regex + hash-map lookup. Reasons:
 speculative); USCIS Hub is *approved petitions* (actual sponsorships).
 
 - URL: <https://www.uscis.gov/tools/reports-and-studies/h-1b-employer-data-hub>
-- Format: one CSV per fiscal year (FY runs Oct 1 – Sep 30).
-- Size: ~200k rows / ~30 MB per FY.
-- Columns (the ones we use): `Fiscal Year`, `Employer (Petitioner) Name`,
-  `Petitioner City`, `Petitioner State`, `Initial Approvals`,
-  `Continuing Approvals`, `Initial Denials`, `Continuing Denials`.
+- Format: USCIS stopped publishing one CSV per fiscal year after FY2023
+  (archived at <https://www.uscis.gov/archive/h-1b-employer-data-hub-files>).
+  Since the 2026-11-02 refresh we read the hub's Tableau "Crosstab View"
+  (`H1BPublic`) as CSV, one fiscal year per request (FY runs Oct 1 – Sep 30).
+  `scripts/refresh-h1b-data.js` has the URL and its quirks.
+- Size: ~65k employer rows × 12 measures / ~100 MB per FY.
+- Columns (the ones we use): `Employer (Petitioner) Name`, `Fiscal Year`,
+  `Measure Names`, `Measure Values`. The six `… Approval` measures sum to the
+  old files' Initial + Continuing approvals (FY2022 matched employer for
+  employer).
 - License: US government public domain — safe to redistribute.
 
 We pull the **last 2 fiscal years** (to smooth single-year anomalies and
@@ -137,15 +142,17 @@ explicit description language.
 
 `scripts/refresh-h1b-data.js`:
 
-1. Fetch the last 2 FY CSVs from USCIS.
+1. Fetch the latest 2 published fiscal years from the hub's CSV export.
 2. Parse (stream-based; CSV is big but simple).
-3. Normalize `Employer (Petitioner) Name` via our existing `normSlug`.
-4. Aggregate: `approvals = Initial Approvals + Continuing Approvals`, summed
-   across FYs and across subsidiary name variants.
+3. Normalize `Employer (Petitioner) Name` via the classifier's `normSlug`.
+4. Aggregate: `approvals = sum of the six … Approval measures`, summed
+   across FYs and across subsidiary name variants. One-word brands whose
+   petitions are filed under a legal name ("Harvey" → Harvey AI Corporation)
+   also get a key of their own (`BRAND_KEYS`).
 5. Write `src/data/h1b-sponsors.json`.
 
 Run cadence: **manually once per quarter** when USCIS releases new data.
-Takes ~30 seconds. No cron — this is intentionally offline/manual.
+Takes ~1–2 minutes. No cron — this is intentionally offline/manual.
 
 Typical flow:
 
