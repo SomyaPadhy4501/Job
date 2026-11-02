@@ -601,6 +601,7 @@ module.exports = {
   buildDedupeKey,
   looksUS,
   inUS,
+  US_STATES,
   looksSoftware,
   classifyRole,
   looksIntern,

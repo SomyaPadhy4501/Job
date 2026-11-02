@@ -10,20 +10,39 @@
 //   node src/scripts/prune-rejected.js
 //   DATABASE_URL=... node src/scripts/prune-rejected.js --apply
 
-const { classifyRole, passesLevel, looksUS, inUS } = require('../services/normalize');
+const { classifyRole, passesLevel, looksUS, inUS, US_STATES } = require('../services/normalize');
 const { CONFIG } = require('../config');
 
 const APPLY = process.argv.includes('--apply');
 const USE_PG = !!process.env.DATABASE_URL;
-const LIST_MAX = 25; // rows printed per reason
+const LIST_MAX = 100; // rows printed per reason
+
+// ISO 3166-1 alpha-2 codes that can't be read as a US state: the full list
+// minus the US, its territories and every code shared with a state (IN, IL,
+// CA, CO, DE, GA, …). Those shared ones are exactly what can't be settled from
+// the string alone.
+const ISO2 = (
+  'ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bv bw by bz ' +
+  'ca cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et fi fj fk fm fo fr ' +
+  'ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu id ie il im in io iq ir is it je jm jo jp ' +
+  'ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt ' +
+  'mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw ' +
+  'sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug ' +
+  'um us uy uz va vc ve vg vi vn vu wf ws ye yt za zm zw'
+).split(' ');
+const US_CODES = new Set([...US_STATES, 'us', 'pr', 'gu', 'vi', 'as', 'mp', 'um']);
+const FOREIGN_ONLY_ISO2 = new Set(ISO2.filter((c) => !US_CODES.has(c)));
 
 // Rows keep only the joined location string, not the `countries` a collector
 // now passes to normalizeJob (see inUS in normalize.js). For the two sources
 // whose string format still carries the answer, read it back here, so rows
 // collected before countries existed are judged the way new ones are:
-//   microsoft / pcsx — "City, Region, CC" entries or a bare "CC", joined, so
-//     the string ends in a two-letter code and is US iff one of its parts is
-//     "US". Microsoft rows stored as "IN" (India) had passed as Indiana.
+//   microsoft / pcsx — since mid-2026 "City, Region, CC" entries or a bare
+//     "CC", joined; a part that is exactly "US" means a US entry. A bare code
+//     is a country-wide posting: Microsoft rows stored as "IN" (India) had
+//     passed as Indiana. Earlier rows read "Redmond, WA" with no country at
+//     all, so a trailing code only counts as foreign when no state shares it;
+//     "Mountain View, CA" is left to looksUS.
 //   getro — US entries read "City, ST, USA", "State, USA" or "United States".
 //     When every US entry is a bare state and the rest is abroad, the state is
 //     Getro's geocoder misreading an Indian state code ("Tennessee, USA" for
@@ -32,8 +51,11 @@ const LIST_MAX = 25; // rows printed per reason
 function storedCountries({ source, location }) {
   const parts = String(location || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (source === 'microsoft' || source === 'pcsx') {
+    if (parts.includes('US')) return ['US'];
+    const code = (parts[parts.length - 1] || '').toLowerCase();
     if (!/^[A-Z]{2}$/.test(parts[parts.length - 1] || '')) return undefined;
-    return parts.includes('US') ? ['US'] : ['abroad'];
+    if (parts.length === 1 && ISO2.includes(code)) return ['abroad'];
+    return FOREIGN_ONLY_ISO2.has(code) ? ['abroad'] : undefined;
   }
   if (source === 'getro') {
     const usAt = parts.flatMap((p, i) => (p === 'USA' ? [i] : []));

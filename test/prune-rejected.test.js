@@ -20,6 +20,23 @@ test('stored Microsoft / PCSX rows are judged by their trailing country codes', 
   assert.strictEqual(storedCountries(row('microsoft', 'United States, Washington, Redmond')), undefined);
 });
 
+test('a bare country code is a country; a trailing one counts only if no state shares it', () => {
+  // From the production dry run (2026-11-02, 15,690 rows).
+  assert.deepStrictEqual(storedCountries(row('microsoft', 'CA')), ['abroad'], 'country-wide Canada');
+  assert.deepStrictEqual(storedCountries(row('microsoft', 'IL')), ['abroad'], 'country-wide Israel');
+  assert.deepStrictEqual(storedCountries(row('pcsx', 'Cork, CO, IE')), ['abroad']);
+  assert.deepStrictEqual(storedCountries(row('microsoft', 'Cambridge, England, GB')), ['abroad']);
+  // April-era Microsoft rows carry no country: "Redmond, WA" was flagged by the
+  // first version of this rule. Codes a state shares are left to looksUS.
+  assert.strictEqual(storedCountries(row('microsoft', 'Redmond, WA')), undefined);
+  assert.strictEqual(storedCountries(row('microsoft', 'Mountain View, CA')), undefined);
+  assert.strictEqual(storedCountries(row('pcsx', 'Markham, ON, CA')), undefined);
+  assert.strictEqual(reason(row('microsoft', 'Redmond, WA')), null);
+  assert.strictEqual(reason(row('microsoft', 'Mountain View, CA')), null);
+  // A shared code with a foreign marker is still caught by looksUS.
+  assert.strictEqual(reason(row('pcsx', 'Noida, UP, IN')), 'not US');
+});
+
 test('stored Getro rows whose only US entry is a bare state beside places abroad', () => {
   assert.deepStrictEqual(
     storedCountries(row('getro', 'Tennessee, USA, Bengaluru, Karnataka, India, Chennai, Tamil Nadu, India')),
