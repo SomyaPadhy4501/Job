@@ -1,13 +1,28 @@
 name: collect
 
+# Every 2 hours. GitHub delays and drops scheduled runs under load, worst at
+# the top of the hour: on '0 */2 * * *' runs came every 3.5-9 hours (about 4 a
+# day, not 12) in the week to 2026-11-02. So the main slot is at :23, and a
+# backup at :53 runs only if no collect has succeeded in the last 90 minutes,
+# i.e. when the :23 run was dropped.
 on:
   schedule:
-    - cron: '0 */2 * * *'   # Every 2 hours UTC (matches local COLLECT_CRON default)
+    - cron: '23 */2 * * *'
+    - cron: '53 */2 * * *'   # backup — skips itself if the :23 run happened
   workflow_dispatch:         # Manual "Run workflow" button in GitHub UI
+
+# Never two collects at once: a backup that starts while a slow run is still
+# going waits for it, then sees it and skips.
+concurrency:
+  group: collect
+  cancel-in-progress: false
 
 jobs:
   collect:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read   # the freshness check lists this workflow's runs
     # Was 15 when the fan-out was ~7 min across 700+ companies. The getro,
     # smartrecruiters, eightfold and rippling sources add roughly 5 min: getro
     # pages 16 VC networks until each crosses the retention window and then
@@ -20,17 +35,45 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      # A run that skips itself still ends as "success", so look for the last
+      # run whose collect step actually ran — otherwise skipped backups would
+      # count as collects and could make the next main slot skip too.
+      - name: Skip if a collect ran in the last 90 minutes
+        id: fresh
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=""
+          for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow collect.yml --status success \
+                        --limit 6 --json databaseId --jq '.[].databaseId'); do
+            ran=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                    --jq '[.jobs[].steps[] | select(.name=="Run one-shot collect" and .conclusion=="success")] | length')
+            if [ "$ran" -gt 0 ]; then
+              last=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .run_started_at)
+              break
+            fi
+          done
+          if [ -n "$last" ] && [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 5400 ]; then
+            echo "Last collect started at $last; skipping this slot."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.fresh.outputs.skip != 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.fresh.outputs.skip != 'true'
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
+        if: steps.fresh.outputs.skip != 'true'
         run: npm ci
 
       - name: Run one-shot collect
+        if: steps.fresh.outputs.skip != 'true'
         run: npm run collect
         env:
           DATABASE_URL:      ${{ secrets.DATABASE_URL }}
