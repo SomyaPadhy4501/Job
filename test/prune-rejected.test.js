@@ -67,3 +67,14 @@ test('reason() flags the leaked rows and keeps the US ones', () => {
     assert.strictEqual(reason(r), null, r.location);
   }
 });
+
+test('stored rows asking for more than 2 years are flagged; unstated ones are not', () => {
+  assert.strictEqual(reason({ ...row('greenhouse', 'Seattle, WA'), yoe_min: 4 }), 'over 2 years of experience');
+  assert.strictEqual(reason({ ...row('greenhouse', 'Seattle, WA'), yoe_min: 2 }), null);
+  assert.strictEqual(reason({ ...row('greenhouse', 'Seattle, WA'), yoe_min: -1 }), null);
+});
+
+test('a startup "Product Engineer" is not pruned as a non-software role', () => {
+  assert.strictEqual(reason(row('ashby', 'San Francisco, CA', 'Product Engineer')), null);
+  assert.strictEqual(reason(row('workday', 'Boise, ID', 'Product Engineer')), 'not a software role');
+});

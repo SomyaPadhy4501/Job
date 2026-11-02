@@ -3,7 +3,7 @@
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
 const { deriveRestriction } = require('./clearance');
-const { extractExperience, levelFromYears } = require('./experience');
+const { extractExperience, levelFromYears, exceedsMaxYoe } = require('./experience');
 
 function stripHtml(html) {
   if (!html) return '';
@@ -305,8 +305,10 @@ const NON_CS_OTHER =
 
 // ─── CS whitelist — phrase-anchored, most specific first ───────────────────
 
+// "ml X engineer" allows one word between: OpenAI's "ML Framework Engineer",
+// "ML Infrastructure Engineer", "ML Systems Engineer".
 const MLE_PATTERN =
-  /\b(machine\s+learning\s+(?:engineer|developer)|\bml\s+(?:engineer|developer)|\bmle\b|applied\s+(?:scientist|researcher)|machine\s+learning\s+scientist|computer\s+vision\s+engineer|nlp\s+engineer|deep\s+learning\s+engineer)/i;
+  /\b(machine\s+learning\s+(?:engineer|developer)|\bml\s+(?:[a-z]+\s+)?(?:engineer|developer)|\bmle\b|applied\s+(?:scientist|researcher)|machine\s+learning\s+scientist|computer\s+vision\s+engineer|nlp\s+engineer|deep\s+learning\s+engineer)/i;
 
 const AI_PATTERN =
   /\b(ai\s+(?:engineer|developer|researcher|scientist)|artificial\s+intelligence\s+(?:engineer|scientist)|research\s+engineer|research\s+scientist|ml\s+scientist|nlp\s+scientist|computer\s+vision\s+scientist|llm\s+(?:engineer|researcher|scientist))/i;
@@ -330,9 +332,18 @@ const SRE_PATTERN =
   /\b(site\s+reliability\s+engineer|\bsre\b|dev\s*ops\s+(?:engineer|developer)|platform\s+(?:engineer|developer|software\s+engineer)|infrastructure\s+(?:engineer|developer|software\s+engineer)|cloud\s+(?:engineer|developer|software\s+engineer)|production\s+engineer(?:ing)?|build\s+engineer|release\s+engineer|kubernetes\s+(?:engineer|developer)|observability\s+engineer)/i;
 
 const SWE_PATTERN =
-  /\b(software\s+(?:engineer|developer)|software\s+development\s+engineer|\bsde\b|\bswe\b|full[-\s]?stack\s+(?:engineer|developer)|front[-\s]?end\s+(?:engineer|developer)|back[-\s]?end\s+(?:engineer|developer)|web\s+(?:engineer|developer)|applications?\s+developer|embedded\s+software(?:\s+engineer)?|software\s+architect|systems\s+software\s+engineer|distributed\s+systems\s+engineer|programmer|game\s+(?:engineer|developer|programmer)|ios\s+developer|android\s+developer|robotics\s+software\s+engineer|autonomy\s+software\s+engineer|compiler\s+engineer|graphics\s+software\s+engineer)/i;
+  /\b(software\s+(?:engineer|developer)|software\s+development\s+engineer|\bsde\b|\bswe\b|full[-\s]?stack\s+(?:engineer|developer)|front[-\s]?end\s+(?:engineer|developer)|back[-\s]?end\s+(?:engineer|developer)|web\s+(?:engineer|developer)|applications?\s+developer|embedded\s+software(?:\s+engineer)?|software\s+architect|systems\s+software\s+engineer|distributed\s+systems\s+engineer|programmer|game\s+(?:engineer|developer|programmer)|ios\s+developer|android\s+developer|robotics\s+software\s+engineer|autonomy\s+software\s+engineer|compiler\s+engineer|graphics\s+software\s+engineer|member\s+of\s+technical\s+staff|forward[-\s]deployed\s+(?:software\s+)?engineer)/i;
 
-function classifyRole(title) {
+// Titles that mean software work only at software startups. "Product Engineer"
+// is the full-stack SWE title at Ramp, Linear and PostHog, but a semiconductor
+// test role at Micron or Intel; OpenAI titles research roles "Researcher,
+// Alignment", while "Researcher" alone elsewhere can be anything. So these
+// count only for postings from the startup ATSes.
+const STARTUP_ATS = new Set(['ashby', 'greenhouse', 'lever']);
+const STARTUP_SWE = /\bproduct\s+engineer\b/i;
+const STARTUP_AI = /^researcher\b\s*(?:[,:(\-–—]|$)/i;
+
+function classifyRole(title, source) {
   const t = (title || '').toLowerCase();
   if (!t) return 'OTHER';
 
@@ -371,12 +382,16 @@ function classifyRole(title) {
   if (MOBILE_PATTERN.test(t)) return 'MOBILE';
   if (SRE_PATTERN.test(t)) return 'SRE';
   if (SWE_PATTERN.test(t)) return 'SWE';
+  if (STARTUP_ATS.has(source)) {
+    if (STARTUP_AI.test(t)) return 'AI';
+    if (STARTUP_SWE.test(t)) return 'SWE';
+  }
 
   return 'OTHER';
 }
 
-function looksSoftware(title) {
-  return classifyRole(title) !== 'OTHER';
+function looksSoftware(title, source) {
+  return classifyRole(title, source) !== 'OTHER';
 }
 
 // ─── Entry-level filter ────────────────────────────────────────────────────
@@ -393,7 +408,8 @@ const INTERN_REJECT = [
 // II is allowed through — at most companies "Software Engineer II" means 1-3 YOE
 // which matches the user's target range. III/IV/V/VI are always senior.
 const SENIOR_REJECT = [
-  /\bsenior\b/, /\bsr\.?\b/, /\bstaff\b/, /\bprincipal\b/, /\bdistinguished\b/,
+  // "Member of Technical Staff" is a level-less title at AI labs, not Staff.
+  /\bsenior\b/, /\bsr\.?\b/, /(?<!technical\s+)\bstaff\b/, /\bprincipal\b/, /\bdistinguished\b/,
   /\blead\b/, /\bdirector\b/, /\bmanager\b/, /\bhead of\b/,
   /\bvp\b/, /\bvice\s+president\b/, /\barchitect\b/, /\bsupervisor\b/,
   /\bchief\b/, // "Programs Chief Engineer", "Chief of Staff", etc.
@@ -508,10 +524,21 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
     if (ageMs > retentionDays * 24 * 60 * 60 * 1000) return null;
   }
 
-  const role_type = classifyRole(job_title);
+  const role_type = classifyRole(job_title, raw.source);
   if (filterSoftwareOnly && role_type === 'OTHER') return null;
   if (filterUSOnly && !inUS(location, raw.countries)) return null;
   if (!passesLevel(job_title, entryLevelMode || 'permissive')) return null;
+
+  // Years of experience stated in the description, e.g. "3+ years of
+  // professional android development experience". Titles alone leave most rows
+  // unlabelled — the majority read only "Software Engineer" — so a stated
+  // number is the better signal where one exists.
+  const years = extractExperience(`${job_title}\n${description}`);
+
+  // Hard ceiling: 0-2 years only (MAX_YOE). Applies to every source, curated
+  // overrides included — a level label doesn't outrank the posting's own text.
+  // 375 of 1,599 visible rows asked for 3+ years before this (2026-11-02).
+  if (exceedsMaxYoe(years)) return null;
 
   // A source can supply a pre-labeled sponsorship (e.g. the New-Grad-2027 repo
   // tags every posting). Trust it over the rule-based classifier when present.
@@ -528,11 +555,6 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
           raw.sponsor_company_fallbacks || []
         );
 
-  // Years of experience stated in the description, e.g. "3+ years of
-  // professional android development experience". Titles alone leave most rows
-  // unlabelled — the majority read only "Software Engineer" — so a stated
-  // number is the better signal where one exists.
-  const years = extractExperience(`${job_title}\n${description}`);
   const yoe_min = years ? years.min : -1; // -1 = not stated
   const yearsLevel = levelFromYears(years);
 

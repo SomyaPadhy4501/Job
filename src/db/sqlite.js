@@ -142,14 +142,14 @@ function migrate(database) {
   // eslint-disable-next-line global-require
   const { classifyRole, passesLevel } = require('../services/normalize');
   const allRows = database
-    .prepare('SELECT id, job_title, role_type FROM jobs')
+    .prepare('SELECT id, source, job_title, role_type FROM jobs')
     .all();
   let reclassified = 0;
   const updRole = database.prepare('UPDATE jobs SET role_type = ? WHERE id = ?');
   const killIds = [];
   const tx = database.transaction((list) => {
     for (const r of list) {
-      const nextRole = classifyRole(r.job_title);
+      const nextRole = classifyRole(r.job_title, r.source);
       if (nextRole !== r.role_type) {
         updRole.run(nextRole, r.id);
         reclassified++;
@@ -381,13 +381,15 @@ function upsertJob(job) {
     database
       .prepare(
         // Keep derived fields when this fetch has no description but the stored
-        // row does — same rule as the Postgres upsert (see src/db/pg.js).
+        // row does, and keep the earliest date_posted so a re-listed role isn't
+        // shown as new — same rules as the Postgres upsert (see src/db/pg.js).
         `UPDATE jobs
          SET last_seen_at   = datetime('now'),
              apply_url      = @apply_url,
              description    = CASE WHEN COALESCE(@description,'') = '' THEN description ELSE @description END,
              location       = @location,
-             date_posted    = COALESCE(@date_posted, date_posted),
+             date_posted    = CASE WHEN date_posted IS NULL OR @date_posted < date_posted
+                                   THEN COALESCE(@date_posted, date_posted) ELSE date_posted END,
              sponsorship    = CASE WHEN COALESCE(@description,'') = '' AND COALESCE(description,'') <> '' THEN sponsorship ELSE @sponsorship END,
              role_type      = @role_type,
              category       = @category,

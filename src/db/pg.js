@@ -76,13 +76,18 @@ async function upsertJob(job, client) {
     // from that text, and recomputing them from nothing turns a stored "will not
     // sponsor" back into a USCIS-driven YES. Keep the stored values only when the
     // stored row actually has text; rows that never had any still update freely.
+    //
+    // date_posted keeps the EARLIEST date seen. Employers re-list a role to bump
+    // it (new posting date, same company/title/location), and taking the new
+    // date put a weeks-old job back at the top of the 7-day window as if new.
+    // ISO-8601 strings compare correctly as text, and LEAST ignores NULLs.
     await db.query(
       `UPDATE jobs
          SET last_seen_at   = $1,
              apply_url      = $2,
              description    = CASE WHEN COALESCE($3::text,'') = '' THEN description ELSE $3::text END,
              location       = $4,
-             date_posted    = COALESCE($5, date_posted),
+             date_posted    = LEAST(date_posted, COALESCE($5, date_posted)),
              sponsorship    = CASE WHEN COALESCE($3::text,'') = '' AND COALESCE(description,'') <> '' THEN sponsorship ELSE $6 END,
              role_type      = $7,
              category       = $8,

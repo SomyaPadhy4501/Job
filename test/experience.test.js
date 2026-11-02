@@ -74,11 +74,39 @@ test('maps years to level flags', () => {
   assert.deepStrictEqual(levelFromYears({ min: 0 }), { is_entry_level: 1, is_mid_level: 0 });
   assert.deepStrictEqual(levelFromYears({ min: 1 }), { is_entry_level: 1, is_mid_level: 0 });
   assert.deepStrictEqual(levelFromYears({ min: 2 }), { is_entry_level: 0, is_mid_level: 1 });
-  assert.deepStrictEqual(levelFromYears({ min: 3 }), { is_entry_level: 0, is_mid_level: 1 });
+  // 3+ is over the 0-2 year ceiling, so no longer mid.
+  assert.deepStrictEqual(levelFromYears({ min: 3 }), { is_entry_level: 0, is_mid_level: 0 });
   assert.deepStrictEqual(levelFromYears({ min: 4 }), { is_entry_level: 0, is_mid_level: 0 });
 });
 
 test('returns null for unknown years so callers fall back to title heuristics', () => {
   assert.strictEqual(levelFromYears(null), null);
   assert.strictEqual(levelFromYears({}), null);
+});
+
+// ─── 0-2 year ceiling ─────────────────────────────────────────────────────────
+
+const { exceedsMaxYoe, MAX_YOE } = require('../src/services/experience');
+const { normalizeJob } = require('../src/services/normalize');
+
+test('the ceiling is 2 years and unknown years never exceed it', () => {
+  assert.strictEqual(MAX_YOE, 2);
+  assert.strictEqual(exceedsMaxYoe({ min: 2 }), false);
+  assert.strictEqual(exceedsMaxYoe({ min: 3 }), true);
+  assert.strictEqual(exceedsMaxYoe(null), false);
+});
+
+test('postings asking for more than 2 years are dropped, whatever the source says', () => {
+  // On 2026-11-02, 171 of the 882 jobs in the default view asked for 3+ years.
+  const row = (description, extra = {}) => normalizeJob(
+    {
+      source: 'greenhouse', company_name: 'Stripe', job_title: 'Software Engineer, Secure Devices',
+      location: 'Seattle, WA', apply_url: 'https://stripe.com/jobs/1', description, ...extra,
+    },
+    { filterUSOnly: true, filterSoftwareOnly: true }
+  );
+  assert.strictEqual(row('You have 4+ years of experience building secure systems.'), null);
+  assert.strictEqual(row('3+ years of professional software development experience.', { entry_level_override: 1 }), null);
+  assert.strictEqual(row('2+ years of professional software development experience.').yoe_min, 2);
+  assert.strictEqual(row('Build secure systems.').yoe_min, -1, 'no stated number is kept');
 });

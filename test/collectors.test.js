@@ -456,7 +456,9 @@ test('apple: the detail description carries the qualifications from jobsData', (
         jobsData: {
           jobSummary: 'Intro.',
           description: 'Build things.',
-          minimumQualifications: "5+ years of experience. Visa sponsorship is not available.",
+          // 1+ rather than 5+: a posting over the 0-2 year ceiling is dropped
+          // before sponsorship is read.
+          minimumQualifications: "1+ years of experience. Visa sponsorship is not available.",
           preferredQualifications: 'Swift.',
         },
         requestUrl: 'x',
@@ -466,7 +468,7 @@ test('apple: the detail description carries the qualifications from jobsData', (
   const d = apple.jobsDataFrom(apple.extractHydration(html));
   assert.ok(d, 'jobsData must be found');
   const row = apple.mapPosting(APPLE_RESULT, d);
-  assert.match(row.description, /Minimum Qualifications\n5\+ years/);
+  assert.match(row.description, /Minimum Qualifications\n1\+ years/);
   assert.match(row.description, /Visa sponsorship is not available/);
   assert.strictEqual(normalizeJob(row)?.sponsorship, 'NO');
 });

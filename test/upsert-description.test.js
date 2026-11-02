@@ -93,3 +93,22 @@ test('a row that never had a description still updates freely', () => {
 
   assert.strictEqual(stored('bare-1').sponsorship, 'YES');
 });
+
+// Employers re-list a role to bump it: same company/title/location, a new
+// posting date. Taking the new date put a weeks-old job back at the top of the
+// 7-day window as if it were new.
+test('a re-listed job keeps its original posting date', () => {
+  const datePosted = (key) => getDb().prepare('SELECT date_posted FROM jobs WHERE dedupe_key = ?').get(key).date_posted;
+  const first = '2026-10-01T12:00:00.000Z';
+  upsertJob(job({ dedupe_key: 'repost-1', apply_url: 'https://example.com/repost-1', date_posted: first }));
+
+  // The repost arrives under a new URL with a later date: the original stands.
+  upsertJob(job({ dedupe_key: 'repost-1', apply_url: 'https://example.com/repost-1-new', date_posted: '2026-11-01T12:00:00.000Z' }));
+  assert.strictEqual(datePosted('repost-1'), first);
+
+  // A fetch with no date keeps it too; an earlier, more accurate date replaces it.
+  upsertJob(job({ dedupe_key: 'repost-1', apply_url: 'https://example.com/repost-1-new', date_posted: null }));
+  assert.strictEqual(datePosted('repost-1'), first);
+  upsertJob(job({ dedupe_key: 'repost-1', apply_url: 'https://example.com/repost-1-new', date_posted: '2026-09-20T12:00:00.000Z' }));
+  assert.strictEqual(datePosted('repost-1'), '2026-09-20T12:00:00.000Z');
+});

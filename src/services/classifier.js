@@ -144,9 +144,131 @@ function getPrefixCache() {
   return _prefixCache;
 }
 
+// Employers whose board name can't reach their USCIS petitioner name, keyed by
+// normSlug(board name) → h1b-sponsors.json key. Mostly one-word brands, which
+// the prefix index above skips on purpose ("Uber" → uber-technologies, 1,279
+// approvals), plus names that share no leading words with the filing entity
+// ("Walmart" → wal-mart-associates, "Hive" → castle-global). On 2026-11-02
+// JPMorgan Chase, Walmart, Cisco, IBM, Oracle, Uber, OpenAI and the rest of
+// this list all read UNKNOWN, so the board's default sponsorship = YES view hid
+// every one of their jobs.
+//
+// Only entries where the board's company IS the petitioner. Same-word matches
+// that are a different employer stay out — Harvey ≠ harvey-nash, Exa ≠
+// exa-data-solutions, Lattice (HR software) ≠ lattice-semiconductor, and the
+// YC startups Outset, Pure, Parker, Runway and Weave ≠ Outset Medical, Pure
+// Storage, Parker Hannifin, Runway AI and Weave Communications. SpaceX, RTX and
+// other defense employers are left out too: few approvals, mostly ITAR roles.
+// A test checks every target exists above USCIS_THRESHOLD.
+const EMPLOYER_ALIASES = {
+  // Large employers
+  'abbott': 'abbott-laboratories',
+  'accenture': 'accenture-llp',
+  'agilent': 'agilent-technologies',
+  'aig': 'aig-pc-global-services',
+  'amd': 'advanced-micro-devices',
+  'att': 'att-services',
+  'barclays': 'barclays-services',
+  'bloomberg': 'bloomberg-lp',
+  'boeing': 'boeing-company',
+  'broadcom': 'broadcom-corporation',
+  'chevron': 'chevron-corporation',
+  'ciena': 'ciena-corporation',
+  'cisco': 'cisco-systems',
+  'citadel': 'citadel-americas-services',
+  'cognizant': 'cognizant-technology-solutions-us',
+  'crowe': 'crowe-llp',
+  'cvs-health': 'caremark',
+  'expedia-group': 'expedia',
+  'fedex': 'fedex-corporate-services',
+  'flextronics': 'flextronics-international-usa',
+  'honeywell': 'honeywell-international',
+  'hpe': 'hewlett-packard-enterprise-company',
+  'ibm': 'ibm-corporation',
+  'instana': 'ibm-corporation', // acquired by IBM; Getro still lists it by name
+  'intuitive': 'intuitive-surgical-operations',
+  'jpmorgan-chase': 'jpmorgan',
+  'kla': 'kla-corporation',
+  'linkedin': 'linkedin-corporation',
+  'mastercard': 'mastercard-international-incorporated',
+  'mckesson': 'mckesson-corporation',
+  'microchip': 'microchip-technology',
+  'micron': 'micron-technology',
+  'ncr': 'ncr-corporation',
+  'netscout': 'netscout-systems',
+  'nxp': 'nxp-usa',
+  'opower': 'oracle-america', // Oracle subsidiary
+  'oracle': 'oracle-america',
+  'prudential': 'prudential-insurance-company-america',
+  'rackspace': 'rackspace-us',
+  'refinitiv': 'refinitiv-us',
+  'rsm': 'rsm-us-llp',
+  'stryker': 'stryker-corporation',
+  'tmobile': 'mobile-usa', // USCIS "T-Mobile USA"; normSlug drops the lone "t"
+  'truist': 'truist-bank',
+  'unisys': 'unisys-corporation',
+  'unum': 'unum-group',
+  'usaa': 'united-services-automobile-association',
+  'vanguard': 'vanguard-group',
+  'verizon': 'verizon-data-services',
+  'walmart': 'wal-mart-associates',
+  'yahoo': 'oath-holdings',
+  'zebra': 'zebra-technologies-corporation',
+  // Tech companies and startups
+  'anthropic': 'anthropic-dba-anthropic',
+  'attentive': 'attentive-mobile',
+  'aveva': 'aveva-software',
+  'blend': 'blend-labs',
+  'bmc': 'bmc-software',
+  'cedar': 'cedar-cares-dba-cedar',
+  'chime': 'chime-financial',
+  'coda': 'coda-project',
+  'cresta': 'cresta-intelligence',
+  'dots': 'dots-technologies',
+  'faire': 'faire-wholesale',
+  'finix': 'finix-payments',
+  'flywire': 'flywire-corporation',
+  'freenome': 'freenome-holdings',
+  'glean': 'glean-technologies',
+  'h1': 'h1-insights',
+  'hive': 'castle-global', // Hive AI's legal name is Castle Global
+  'honor': 'honor-technology',
+  'imply': 'imply-data',
+  'infinitus': 'infinitus-systems',
+  'insulet': 'insulet-corporation',
+  'kayak': 'kayak-software-corporation',
+  'lob': 'lob-com',
+  'motive': 'motive-technologies',
+  'mutiny': 'mutiny-hq-corporation-dba-mutiny',
+  'notion': 'notion-labs',
+  'nuna': 'nuna-incorporated',
+  'openai': 'openai-lp',
+  'opendoor': 'opendoor-labs',
+  'palantir': 'palantir-technologies',
+  'peloton': 'peloton-interactive',
+  'prosper': 'prosper-marketplace',
+  'robinhood': 'robinhood-markets',
+  'roblox': 'roblox-corporation',
+  'sailpoint': 'sailpoint-technologies',
+  'sift': 'sift-science',
+  'spoton': 'spoton-transact',
+  'spotify': 'spotify-usa',
+  'startree': 'startree-fka-cortexdata',
+  'synthego': 'synthego-corporation',
+  'tempus': 'tempus-labs',
+  'turing': 'turing-enterprises',
+  'twitch': 'twitch-interactive',
+  'uber': 'uber-technologies',
+  'upstart': 'upstart-network',
+  'workstream': 'workstream-technologies',
+  'zipline': 'zipline-international',
+  'zoom': 'zoom-video-communications',
+  'zum': 'zum-services',
+};
+
 function approvalsFor(slug) {
   if (!slug) return 0;
-  const exact = getH1bCache()[slug];
+  const exact = getH1bCache()[EMPLOYER_ALIASES[slug] || slug];
   if (exact) return exact.approvals_last_2fy || 0;
   return slug.includes('-') ? getPrefixCache().get(slug) || 0 : 0;
 }
@@ -198,4 +320,4 @@ function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   return 'UNKNOWN';
 }
 
-module.exports = { classifySponsorship, approvalsFor, normSlug };
+module.exports = { classifySponsorship, approvalsFor, normSlug, EMPLOYER_ALIASES, USCIS_THRESHOLD };

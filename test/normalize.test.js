@@ -260,3 +260,53 @@ test('genuine management and seniority titles are still rejected', () => {
     assert.strictEqual(passesLevel(title, 'permissive'), false, title);
   }
 });
+
+// ─── Titles the role filter used to miss (2026-11-02 Ashby audit) ────────────
+
+test('AI-lab and startup engineering titles count as software', () => {
+  const { classifyRole, passesLevel } = require('../src/services/normalize');
+  // Seen on OpenAI, Anthropic, Ramp, Linear and PostHog boards.
+  assert.strictEqual(classifyRole('Member of Technical Staff (AI Inference Engineer)', 'ashby'), 'SWE');
+  assert.strictEqual(passesLevel('Member of Technical Staff', 'permissive'), true, '"Technical Staff" is not a Staff level');
+  assert.strictEqual(passesLevel('Staff Software Engineer', 'permissive'), false);
+  assert.strictEqual(classifyRole('Forward Deployed Engineer', 'ashby'), 'SWE');
+  assert.strictEqual(classifyRole('Training: ML Framework Engineer', 'ashby'), 'MLE');
+  assert.strictEqual(classifyRole('Researcher, Alignment', 'ashby'), 'AI');
+  assert.strictEqual(classifyRole('Product Engineer', 'ashby'), 'SWE');
+});
+
+test('startup-only titles stay out elsewhere, and look-alikes stay out everywhere', () => {
+  const { classifyRole } = require('../src/services/normalize');
+  // A semiconductor test role at Micron or Intel.
+  assert.strictEqual(classifyRole('Product Engineer', 'workday'), 'OTHER');
+  assert.strictEqual(classifyRole('Product Engineer - DRAM', 'workday'), 'OTHER');
+  assert.strictEqual(classifyRole('Researcher, Clinical', 'workday'), 'OTHER');
+  for (const t of ['UX Researcher', 'User Researcher', 'Hardware Product Engineer', 'Mechanical Product Engineer', 'ML Sales Engineer', 'Network Engineer']) {
+    assert.strictEqual(classifyRole(t, 'ashby'), 'OTHER', t);
+  }
+});
+
+// ─── Sponsorship: brands filing under another name ──────────────────────────
+
+test('every employer alias points at a sponsor in the USCIS data', () => {
+  const { EMPLOYER_ALIASES, USCIS_THRESHOLD } = require('../src/services/classifier');
+  const data = require('../src/data/h1b-sponsors.json');
+  for (const [brand, key] of Object.entries(EMPLOYER_ALIASES)) {
+    assert.ok(data[key], `${brand} → ${key} is missing from h1b-sponsors.json`);
+    assert.ok(data[key].approvals_last_2fy >= USCIS_THRESHOLD, `${brand} → ${key} is under the threshold`);
+  }
+});
+
+test('one-word and renamed brands resolve; same-word strangers do not', () => {
+  const { classifySponsorship } = require('../src/services/classifier');
+  // All read UNKNOWN on 2026-11-02, hiding their jobs from the default view.
+  for (const name of ['OpenAI', 'Uber', 'JPMorgan Chase', 'Walmart', 'T-Mobile', 'AT&T', 'Cisco', 'Notion', 'Instana']) {
+    assert.strictEqual(classifySponsorship('Software Engineer', name), 'YES', name);
+  }
+  // Different employers that share a word with a USCIS filer.
+  for (const name of ['Harvey', 'Exa', 'Lattice', 'Outset', 'Weave', 'Pure']) {
+    assert.strictEqual(classifySponsorship('Software Engineer', name), 'UNKNOWN', name);
+  }
+  // Posting text still wins over the alias.
+  assert.strictEqual(classifySponsorship('We are unable to sponsor visas for this role.', 'OpenAI'), 'NO');
+});

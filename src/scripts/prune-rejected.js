@@ -1,7 +1,8 @@
 'use strict';
 
 // Remove stored rows that today's collect-time filters would reject — the
-// role, level and US-location checks in normalizeJob. Rules get tightened
+// role, level, years-of-experience and US-location checks in normalizeJob.
+// Rules get tightened
 // (e.g. "CNC Programmer" stopped counting as software, 2026-10-31), but rows
 // collected under the old rules stay until the retention sweep; this clears
 // them now.
@@ -11,6 +12,7 @@
 //   DATABASE_URL=... node src/scripts/prune-rejected.js --apply
 
 const { classifyRole, passesLevel, looksUS, inUS, US_STATES } = require('../services/normalize');
+const { MAX_YOE } = require('../services/experience');
 const { CONFIG } = require('../config');
 
 const APPLY = process.argv.includes('--apply');
@@ -69,8 +71,10 @@ function storedCountries({ source, location }) {
 }
 
 function reason(row) {
-  if (CONFIG.filterSoftwareOnly && classifyRole(row.job_title) === 'OTHER') return 'not a software role';
+  if (CONFIG.filterSoftwareOnly && classifyRole(row.job_title, row.source) === 'OTHER') return 'not a software role';
   if (!passesLevel(row.job_title, CONFIG.entryLevelMode || 'permissive')) return 'senior / intern / supervisor';
+  // yoe_min is the lowest requirement stated in the description (-1 = none).
+  if (Number(row.yoe_min) > MAX_YOE) return `over ${MAX_YOE} years of experience`;
   if (CONFIG.filterUSOnly && !inUS(row.location, storedCountries(row))) return 'not US';
   return null;
 }
@@ -79,7 +83,7 @@ async function main() {
   let rows;
   let del;
   let close = () => {};
-  const SELECT = 'SELECT id, source, company_name, job_title, location FROM jobs';
+  const SELECT = 'SELECT id, source, company_name, job_title, location, yoe_min FROM jobs';
   if (USE_PG) {
     // eslint-disable-next-line global-require
     const { Pool } = require('pg');
