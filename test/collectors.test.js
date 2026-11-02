@@ -660,3 +660,41 @@ test('workday: a multi-site US posting shown as "2 Locations" still gets a descr
   ]);
   assert.deepStrictEqual(picked.map((j) => j.title), ['Software Engineer - Android']);
 });
+
+test('getro: "Georgia, USA" beside other countries is the country Georgia', () => {
+  // Deel's "Backend Engineer Node.js + AWS" (stored 2026, deleted 2026-11-02):
+  // remote across EMEA, with the country Georgia geocoded as the US state.
+  const country = (name) => ({ name, area_type: 'country' });
+  const deel = [
+    country('Spain'),
+    { name: 'Georgia, USA', area_type: 'administrative_area_level_1' },
+    country('India'),
+    country('Croatia'),
+    country('Poland'),
+  ];
+  assert.deepStrictEqual(getro.countriesOf(deel), ['Spain', 'India', 'Croatia', 'Poland']);
+  const row = getro.mapJob(
+    { ...GETRO_JOB, title: 'Backend Engineer', seniority: null, locations: deel.map((d) => d.name), location_details: deel },
+    'accel', null
+  );
+  assert.strictEqual(normalizeJob(row, US_ONLY), null);
+});
+
+test('getro: Georgia the state stays when nothing beside it is a country abroad', () => {
+  // Live Bonterra posting (2026-11-02): US-wide plus states, and a province.
+  const state = (name) => ({ name, area_type: 'administrative_area_level_1' });
+  assert.deepStrictEqual(
+    getro.countriesOf([
+      { name: 'United States', area_type: 'country' },
+      state('Illinois, USA'), state('Georgia, USA'), state('Ontario, Canada'), state('Nevada, USA'),
+      { name: 'Remote', area_type: 'global' },
+    ]),
+    ['US', 'Canada']
+  );
+  // On its own, or with a US city in the state, Georgia is the state.
+  assert.deepStrictEqual(getro.countriesOf([state('Georgia, USA')]), ['US']);
+  assert.deepStrictEqual(
+    getro.countriesOf([{ name: 'Atlanta, GA, USA', area_type: 'locality' }, { name: 'Spain', area_type: 'country' }]),
+    ['US', 'Spain']
+  );
+});

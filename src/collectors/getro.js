@@ -286,6 +286,13 @@ function employerFromApplyUrl(url) {
 // States filter let it through. So a US entry naming only a state is ignored
 // when the same posting names a city abroad. A genuine US + abroad posting
 // names a US city ("San Jose, CA, USA"), which is kept.
+//
+// Georgia is also a country, and the geocoder reads it as the US state: Deel's
+// and Replika's remote-in-EMEA roles listed "Spain, Georgia, USA, India, …"
+// and passed as US. So a state-only "Georgia, USA" is the country when the
+// posting also lists another country abroad. A US list that happens to name a
+// foreign province (Bonterra: "United States", Georgia, Illinois, …, Ontario)
+// has no country abroad and is untouched.
 const US_COUNTRY = /^(usa|us|united states(?: of america)?)$/i;
 
 function countriesOf(details) {
@@ -295,12 +302,15 @@ function countriesOf(details) {
     .map((d) => {
       const parts = d.name.split(',').map((s) => s.trim());
       const country = parts.length > 1 || d.area_type === 'country' ? parts[parts.length - 1] : null;
-      return { type: d.area_type, us: !!country && US_COUNTRY.test(country), country };
+      return { name: d.name, type: d.area_type, us: !!country && US_COUNTRY.test(country), country };
     })
     .filter((d) => d.country);
 
   const cityAbroad = placed.some((d) => !d.us && d.type === 'locality');
-  const kept = placed.filter((d) => !(d.us && d.type === 'administrative_area_level_1' && cityAbroad));
+  const countryAbroad = placed.some((d) => !d.us && d.type === 'country');
+  const misread = (d) =>
+    d.us && d.type === 'administrative_area_level_1' && (cityAbroad || (countryAbroad && /^georgia,/i.test(d.name)));
+  const kept = placed.filter((d) => !misread(d));
   const countries = [...new Set(kept.map((d) => (d.us ? 'US' : d.country)))];
   return countries.length ? countries : undefined;
 }
