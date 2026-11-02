@@ -3,6 +3,8 @@ name: backfill-derived
 # One-off backfill: compute `restriction` (clearance / ITAR / citizenship) for
 # every row in Neon. Manual-only — there's no schedule.
 # Default is dry-run; flip the `apply` input to `true` to actually write.
+# `step` limits a run to one script, so applying one doesn't also apply the
+# others (each deletes or rewrites production rows on its own terms).
 #
 # PREREQUISITE: run migrations/002_add_restriction.sql and 003_add_yoe_min.sql against Neon first.
 # Without the column this fails immediately with an undefined-column error.
@@ -18,6 +20,16 @@ on:
         options:
           - 'false'
           - 'true'
+      step:
+        description: 'Which step to run (all = every step below, in order)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'prune-rejected'
+          - 'dedupe-urls'
+          - 'backfill-derived'
 
 jobs:
   backfill-derived:
@@ -36,6 +48,7 @@ jobs:
         run: npm ci
 
       - name: Remove rows today's filters reject
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'prune-rejected' }}
         run: |
           if [ "${{ github.event.inputs.apply }}" = "true" ]; then
             node src/scripts/prune-rejected.js --apply
@@ -49,6 +62,7 @@ jobs:
           ENTRY_LEVEL_MODE:  'permissive'
 
       - name: Remove duplicate apply links
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'dedupe-urls' }}
         run: |
           if [ "${{ github.event.inputs.apply }}" = "true" ]; then
             node src/scripts/dedupe-urls.js --apply
@@ -59,6 +73,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Backfill derived fields
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'backfill-derived' }}
         run: |
           if [ "${{ github.event.inputs.apply }}" = "true" ]; then
             npm run backfill-derived -- --apply
