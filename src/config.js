@@ -68,7 +68,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'keystone', displayName: 'Keystone' }, // YC Summer 2025
   { source: 'greenhouse', slug: 'lattice', displayName: 'Lattice' }, // YC W16
   { source: 'greenhouse', slug: 'lob', displayName: 'Lob' }, // YC Summer 2013
-  { source: 'greenhouse', slug: 'lucidbots', displayName: 'Lucid Bots' }, // YC Summer 2019
   { source: 'greenhouse', slug: 'maymobility', displayName: 'May Mobility' }, // YC Summer 2017
   { source: 'greenhouse', slug: 'meruhealth', displayName: 'Meru Health' }, // YC Summer 2018
   { source: 'greenhouse', slug: 'mixpanel', displayName: 'Mixpanel' }, // YC S09
@@ -83,21 +82,18 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'pelago', displayName: 'Pelago' }, // YC W18
   { source: 'greenhouse', slug: 'postscript', displayName: 'Postscript' }, // YC Winter 2019
   { source: 'greenhouse', slug: 'prodigal', displayName: 'Prodigal' }, // YC Summer 2018
-  { source: 'greenhouse', slug: 'pulley', displayName: 'Pulley' }, // YC Winter 2020
   { source: 'greenhouse', slug: 'qventus', displayName: 'Qventus' }, // YC Winter 2015
   { source: 'greenhouse', slug: 'reflex', displayName: 'Reflex' }, // YC Winter 2023
   { source: 'greenhouse', slug: 'regent', displayName: 'REGENT' }, // YC W21
   { source: 'greenhouse', slug: 'sendbird', displayName: 'Sendbird' }, // YC W16
   { source: 'greenhouse', slug: 'smartasset', displayName: 'SmartAsset' }, // YC Summer 2012
   { source: 'greenhouse', slug: 'spaceium', displayName: 'Spaceium Inc' }, // YC S24
-  { source: 'greenhouse', slug: 'spade', displayName: 'Spade' }, // YC Winter 2022
   { source: 'greenhouse', slug: 'swayable', displayName: 'Swayable' }, // YC W18
   { source: 'greenhouse', slug: 'tempo', displayName: 'Tempo' }, // YC Winter 2015
   { source: 'greenhouse', slug: 'treasuryprime', displayName: 'Treasury Prime' }, // YC Winter 2018
   { source: 'greenhouse', slug: 'upkeep', displayName: 'UpKeep' }, // YC Winter 2017
   { source: 'greenhouse', slug: 'verse', displayName: 'Verse' }, // YC W22
   { source: 'greenhouse', slug: 'weave', displayName: 'Weave' }, // YC Winter 2025
-  { source: 'greenhouse', slug: 'webflow', displayName: 'Webflow' }, // YC Summer 2013
   { source: 'greenhouse', slug: 'yuma', displayName: 'Yuma AI' }, // YC W23
 
   // ─── Greenhouse — topstartups.io (discovered by scripts/probe-topstartups.js, verified 2026-04-24) ───
@@ -156,12 +152,10 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'launchdarkly', displayName: 'LaunchDarkly' },
   { source: 'greenhouse', slug: 'leaflink', displayName: 'LeafLink' },
   { source: 'greenhouse', slug: 'legalist', displayName: 'Legalist' },
-  { source: 'greenhouse', slug: 'manychat', displayName: 'ManyChat' },
   { source: 'greenhouse', slug: 'marqvision', displayName: 'MarqVision' },
   { source: 'greenhouse', slug: 'matik', displayName: 'Matik' },
   { source: 'greenhouse', slug: 'mavenclinic', displayName: 'Maven Clinic' },
   { source: 'greenhouse', slug: 'medium', displayName: 'Medium' },
-  { source: 'greenhouse', slug: 'melio', displayName: 'Melio' },
   { source: 'greenhouse', slug: 'misfitsmarket', displayName: 'Misfits Market' },
   { source: 'greenhouse', slug: 'modernanimal', displayName: 'Modern Animal' },
   { source: 'greenhouse', slug: 'narvar', displayName: 'Narvar' },
@@ -195,7 +189,6 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'samsara', displayName: 'Samsara' },
   { source: 'greenhouse', slug: 'seatgeek', displayName: 'SeatGeek' },
   { source: 'greenhouse', slug: 'securityscorecard', displayName: 'SecurityScorecard' },
-  { source: 'greenhouse', slug: 'sfox', displayName: 'SFOX' },
   { source: 'greenhouse', slug: 'shopmonkey', displayName: 'Shopmonkey' },
   { source: 'greenhouse', slug: 'singlestore', displayName: 'SingleStore' },
   { source: 'greenhouse', slug: 'smithrx', displayName: 'SmithRx' },
@@ -241,7 +234,6 @@ const COMPANIES = [
   { source: 'lever', slug: 'maverickx', displayName: 'MaverickX' }, // YC Summer 2022
   { source: 'lever', slug: 'multiplylabs', displayName: 'Multiply Labs' }, // YC S16
   { source: 'lever', slug: 'netomi', displayName: 'Netomi' }, // YC W16
-  { source: 'lever', slug: 'nimblerx', displayName: 'NimbleRx' }, // YC Winter 2015
   { source: 'lever', slug: 'people-ai', displayName: 'People.ai' }, // YC S16
   { source: 'lever', slug: 'porter', displayName: 'Porter' }, // YC Summer 2020
   { source: 'lever', slug: 'postera', displayName: 'PostEra' }, // YC Winter 2020
@@ -255,7 +247,6 @@ const COMPANIES = [
   { source: 'lever', slug: 'teleo', displayName: 'Teleo' }, // YC Winter 2020
   { source: 'lever', slug: 'thunkable', displayName: 'Thunkable' }, // YC W16
   { source: 'lever', slug: 'tovala', displayName: 'Tovala' }, // YC W16
-  { source: 'lever', slug: 'tractian', displayName: 'Tractian' }, // YC Winter 2021
   { source: 'lever', slug: 'twodots', displayName: 'Two Dots' }, // YC Summer 2022
   { source: 'lever', slug: 'unusual', displayName: 'Unusual' }, // YC Fall 2024
   { source: 'lever', slug: 'voltalabs', displayName: 'Volta Labs' }, // YC Winter 2019
@@ -264,41 +255,32 @@ const COMPANIES = [
   // ─── Lever — topstartups.io (verified 2026-04-24) ───
   { source: 'lever', slug: 'alluxio', displayName: 'Alluxio' },
   { source: 'lever', slug: 'anchorage', displayName: 'Anchorage' },
-  { source: 'lever', slug: 'anyscale', displayName: 'Anyscale' },
   { source: 'lever', slug: 'basis', displayName: 'Basis' },
   { source: 'lever', slug: 'cents', displayName: 'Cents' },
-  { source: 'lever', slug: 'clari', displayName: 'Clari' },
   { source: 'lever', slug: 'cobaltrobotics', displayName: 'Cobalt Robotics' },
   { source: 'lever', slug: 'dollskill', displayName: 'Dolls Kill' },
   { source: 'lever', slug: 'doxel', displayName: 'Doxel' },
-  { source: 'lever', slug: 'dronedeploy', displayName: 'DroneDeploy' },
   { source: 'lever', slug: 'egenesisbio', displayName: 'eGenesis' },
   { source: 'lever', slug: 'finix', displayName: 'Finix' },
-  { source: 'lever', slug: 'goodeggs', displayName: 'Good Eggs' },
   { source: 'lever', slug: 'h1', displayName: 'H1' },
   { source: 'lever', slug: 'hermeus', displayName: 'Hermeus' },
   { source: 'lever', slug: 'houzz', displayName: 'Houzz' },
   { source: 'lever', slug: 'incorta', displayName: 'InCorta' },
   { source: 'lever', slug: 'tryjeeves', displayName: 'Jeeves' },
-  { source: 'lever', slug: 'kapwing', displayName: 'Kapwing' },
   { source: 'lever', slug: 'kariusdx', displayName: 'Karius' },
-  { source: 'lever', slug: 'kiddom', displayName: 'Kiddom' },
   { source: 'lever', slug: 'lessen', displayName: 'Lessen' },
   { source: 'lever', slug: 'lightship', displayName: 'Lightship' },
   { source: 'lever', slug: 'luxurypresence', displayName: 'Luxury Presence' },
   { source: 'lever', slug: 'osaro', displayName: 'Osaro' },
   { source: 'lever', slug: 'playbook', displayName: 'Playbook' },
   { source: 'lever', slug: 'pyka', displayName: 'Pyka' },
-  { source: 'lever', slug: 'quartzy', displayName: 'Quartzy' },
   { source: 'lever', slug: 'restaurant365', displayName: 'Restaurant365' },
   { source: 'lever', slug: 'rigetti', displayName: 'Rigetti Computing' },
   { source: 'lever', slug: 'secureframe', displayName: 'Secureframe' },
   { source: 'lever', slug: 'shieldai', displayName: 'Shield AI' },
-  { source: 'lever', slug: 'skysafe', displayName: 'SkySafe' },
   { source: 'lever', slug: 'snaplogic', displayName: 'SnapLogic' },
   { source: 'lever', slug: 'getsquire', displayName: 'Squire' },
   { source: 'lever', slug: 'supermove', displayName: 'Supermove' },
-  { source: 'lever', slug: 'swordhealth', displayName: 'SWORD Health' },
   { source: 'lever', slug: 'synthego', displayName: 'Synthego' },
   { source: 'lever', slug: 'sysdig', displayName: 'Sysdig' },
   { source: 'lever', slug: 'tala', displayName: 'Tala' },
@@ -328,7 +310,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'agentmail', displayName: 'AgentMail' }, // YC Summer 2025
   { source: 'ashby', slug: 'aiprise', displayName: 'AiPrise' }, // YC Summer 2022
   { source: 'ashby', slug: 'airgoods', displayName: 'Airgoods' }, // YC Summer 2023
-  { source: 'ashby', slug: 'anara', displayName: 'Anara' }, // YC Summer 2024
   { source: 'ashby', slug: 'apolink', displayName: 'Apolink' }, // YC Fall 2024
   { source: 'ashby', slug: 'archil', displayName: 'Archil' }, // YC Fall 2024
   { source: 'ashby', slug: 'arini', displayName: 'Arini' }, // YC W24
@@ -341,7 +322,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'atlas', displayName: 'Atlas' }, // YC Winter 2019
   { source: 'ashby', slug: 'atob', displayName: 'AtoB' }, // YC Summer 2020
   { source: 'ashby', slug: 'atomic', displayName: 'Atomic' }, // YC Summer 2020
-  { source: 'ashby', slug: 'atomicindustries', displayName: 'Atomic Industries' }, // YC Winter 2021
   { source: 'ashby', slug: 'auctor', displayName: 'Auctor' }, // YC Spring 2025
   { source: 'ashby', slug: 'aurelian', displayName: 'Aurelian' }, // YC Summer 2022
   { source: 'ashby', slug: 'authzed', displayName: 'authzed' }, // YC Winter 2021
@@ -386,7 +366,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'ctgt', displayName: 'CTGT' }, // YC Fall 2024
   { source: 'ashby', slug: 'curri', displayName: 'Curri' }, // YC S19
   { source: 'ashby', slug: 'decodahealth', displayName: 'Decoda Health' }, // YC Summer 2023
-  { source: 'ashby', slug: 'deel', displayName: 'Deel' }, // YC Winter 2019
   { source: 'ashby', slug: 'deepgram', displayName: 'Deepgram' }, // YC W16
   { source: 'ashby', slug: 'dex', displayName: 'Dex' }, // YC S19
   { source: 'ashby', slug: 'diligencesquared', displayName: 'DiligenceSquared' }, // YC Fall 2025
@@ -532,11 +511,9 @@ const COMPANIES = [
   { source: 'ashby', slug: 'sweep', displayName: 'Sweep' }, // YC Summer 2023
   { source: 'ashby', slug: 'taktile', displayName: 'Taktile' }, // YC S20
   { source: 'ashby', slug: 'tavus', displayName: 'Tavus' }, // YC Summer 2021
-  { source: 'ashby', slug: 'tenjin', displayName: 'Tenjin' }, // YC Summer 2014
   { source: 'ashby', slug: 'tennr', displayName: 'Tennr' }, // YC W23
   { source: 'ashby', slug: 'thera', displayName: 'Thera' }, // YC Summer 2022
   { source: 'ashby', slug: 'titan', displayName: 'Titan' }, // YC Summer 2018
-  { source: 'ashby', slug: 'toma', displayName: 'Toma' }, // YC W24
   { source: 'ashby', slug: 'topline-pro', displayName: 'Topline Pro' }, // YC Winter 2021
   { source: 'ashby', slug: 'trm-labs', displayName: 'TRM Labs' }, // YC S19
   { source: 'ashby', slug: 'turion-space', displayName: 'Turion Space' }, // YC Summer 2021
@@ -566,7 +543,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'avoca', displayName: 'Avoca' },
   { source: 'ashby', slug: 'base-power', displayName: 'Base Power' },
   { source: 'ashby', slug: 'benchling', displayName: 'Benchling' },
-  { source: 'ashby', slug: 'bettercloud', displayName: 'BetterCloud' },
   { source: 'ashby', slug: 'brightwheel', displayName: 'Brightwheel' },
   { source: 'ashby', slug: 'built-robotics', displayName: 'Built Robotics' },
   { source: 'ashby', slug: 'bunch', displayName: 'Bunch' },
@@ -578,10 +554,8 @@ const COMPANIES = [
   { source: 'ashby', slug: 'cocodelivery', displayName: 'Coco' },
   { source: 'ashby', slug: 'coder', displayName: 'Coder' },
   { source: 'ashby', slug: 'cognition', displayName: 'Cognition' },
-  { source: 'ashby', slug: 'confluent', displayName: 'Confluent' },
   { source: 'ashby', slug: 'decagon', displayName: 'Decagon' },
   { source: 'ashby', slug: 'doppler', displayName: 'Doppler' },
-  { source: 'ashby', slug: 'electric', displayName: 'Electric.ai' },
   { source: 'ashby', slug: 'ema', displayName: 'Ema' },
   { source: 'ashby', slug: 'envoy', displayName: 'Envoy' },
   { source: 'ashby', slug: 'fullstory', displayName: 'FullStory' },
@@ -630,7 +604,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'sprig', displayName: 'Sprig' },
   { source: 'ashby', slug: 'sprinter-health', displayName: 'Sprinter Health' },
   { source: 'ashby', slug: 'strava', displayName: 'Strava' },
-  { source: 'ashby', slug: 'stytch', displayName: 'Stytch' },
   { source: 'ashby', slug: 'terminal', displayName: 'Terminal' },
   { source: 'ashby', slug: 'traba', displayName: 'Traba' },
   { source: 'ashby', slug: 'turquoise-health', displayName: 'Turquoise Health' },
@@ -704,8 +677,9 @@ const COMPANIES = [
   // so these rows arrive with an empty description — sponsorship falls back to
   // the USCIS company lookup and `restriction` stays '' until a detail-page
   // enrichment pass fills the text in.
+  // Cisco left this list on 2026-11-02: it has a Workday site after all
+  // (cisco.wd5 Cisco_Careers, below with the probe-boards.js entries).
   { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
-  { source: 'adzuna', slug: 'cisco',    displayName: 'Cisco',    company: 'Cisco' },
   { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
   { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
   // Wayfair and LinkedIn have no other route: wayfair.com/careers sits behind a
@@ -1007,6 +981,31 @@ const COMPANIES = [
   { source: 'ashby', slug: 'plaid', displayName: 'Plaid' },
   { source: 'gem', slug: 'motion', displayName: 'Motion' },
 
+  // ─── Moved boards, second pass (scripts/reprobe-dead.js + probe-boards.js, 2026-11-02) ───
+  // 37 Greenhouse/Lever/Ashby/SmartRecruiters entries returned 0 jobs in the
+  // 2026-11-02 08:52 UTC collect run, and lever:anyscale 404'd. These five
+  // moved to a board that lists US software roles; each new board's own
+  // organization name or website was checked.
+  { source: 'ashby', slug: 'spade', displayName: 'Spade' },  // was greenhouse:spade, empty since at least 09-30
+  { source: 'ashby', slug: 'webflow', displayName: 'Webflow' },  // was greenhouse:webflow, emptied after 10-12
+  { source: 'ashby', slug: 'kiddom', displayName: 'Kiddom' },  // was lever:kiddom
+  { source: 'greenhouse', slug: 'atomicindustriesinc', displayName: 'Atomic Industries' },  // was ashby:atomicindustries
+  { source: 'ashby', slug: 'anyscale', displayName: 'Anyscale' },  // was lever:anyscale (404)
+  // Removed, each empty in every run since at least 09-30 unless noted, with
+  // no other board that lists US software roles: Pulley, SFOX, NimbleRx,
+  // Tractian, DroneDeploy, Good Eggs, Kapwing, Quartzy, SWORD Health, Anara,
+  // Deel, Tenjin, Toma, Electric.ai; SkySafe (its Greenhouse board is empty
+  // too); ManyChat, Lucid Bots and BetterCloud (their new Ashby/SmartRecruiters
+  // boards carry no US software roles); and the acquired — Clari (Salesloft),
+  // Melio (Xero; emptied after 10-28), Confluent (IBM; emptied after 10-12),
+  // Stytch (Twilio, already collected).
+  // Still configured though empty on 11-02, because each listed postings in
+  // October and its board is live: Biofourmis, Culdesac, Living Carbon,
+  // Coperniq, Mem0, New Story, Paragon, Rutter, OpenSea, NanoNets. Re-check
+  // them with reprobe-dead.js if they stay empty. smartrecruiters:microchip is
+  // not dead either: that collector filters titles before counting, and its
+  // 9 US postings are all senior or non-software.
+
   // ─── YC companies newly hiring (scripts/probe-yc-ats.js + verify-yc-ats.js, 2026-10-31) ───
   // Of 32 verified boards only these had a current entry/mid US software opening.
   { source: 'greenhouse', slug: 'morph', displayName: 'Morph' }, // YC Summer 2023
@@ -1039,6 +1038,228 @@ const COMPANIES = [
   { source: 'gem', slug: 'growthbook', displayName: 'GrowthBook' },
   { source: 'pinpoint', slug: 'safetywing', displayName: 'SafetyWing' },
   { source: 'recruitee', slug: 'snapmagic', displayName: 'SnapMagic' },
+
+  // ─── Well-known tech, AI, quant and enterprise employers (scripts/probe-boards.js names, 2026-11-02) ───
+  // From a hand-written list of ~300 companies the board didn't collect,
+  // probed on Greenhouse, Ashby, Lever and Workday. Each board was checked to
+  // be that employer's (Greenhouse registered name or apply-link domain, Ashby
+  // organization website, Lever page title or logo link) and lists at least
+  // one US software posting. Comments give US software postings — or, for
+  // Workday, rows a collect kept — on 2026-11-02, and the USCIS approvals the
+  // displayName resolves to. As above, displayName is the petitioner name
+  // where the brand alone wouldn't resolve ("Lucid USA", "Social Finance").
+  // Many show 0 kept today because their US roles are older than the 14-day
+  // window or senior; one request per run picks up new postings as they land.
+  // Not added: SpaceX, Rocket Lab, Varda, Vannevar Labs and Relativity Space
+  // (their kept rows come back EXPORT_CONTROL / CLEARANCE), xAI (in
+  // EXCLUDED_EMPLOYERS), GE Vernova and GE Aerospace (1-3 US software postings
+  // among 600-2,000, not worth a Workday tenant's requests), boards whose US
+  // postings had no software roles (Supabase, Tripadvisor, Miro, Redis…), and
+  // employers whose US software postings all refuse sponsorship in so many
+  // words — PNC ("will not … participate in STEM OPT"), 3M, BILL, LendingTree,
+  // New Relic, Inovalon, Render.
+  // Greenhouse
+  { source: 'greenhouse', slug: 'lucidmotors', displayName: 'Lucid USA' },  // 14 US software of 449 postings, 457 H-1B approvals
+  { source: 'greenhouse', slug: 'waymo', displayName: 'Waymo' },  // 120 US software of 372 postings, 284 H-1B approvals
+  { source: 'greenhouse', slug: 'okta', displayName: 'Okta' },  // 35 US software of 392 postings, 229 H-1B approvals
+  { source: 'greenhouse', slug: 'hp', displayName: 'HP' },  // 9 US software of 25 postings, 167 H-1B approvals
+  { source: 'greenhouse', slug: 'zscaler', displayName: 'Zscaler' },  // 38 US software of 358 postings, 162 H-1B approvals
+  { source: 'greenhouse', slug: 'sofi', displayName: 'Social Finance' },  // 12 US software of 62 postings, 141 H-1B approvals
+  { source: 'greenhouse', slug: 'nuro', displayName: 'Nuro' },  // 54 US software of 95 postings, 137 H-1B approvals
+  { source: 'greenhouse', slug: 'motional', displayName: 'Motional AD' },  // 12 US software of 79 postings, 112 H-1B approvals
+  { source: 'greenhouse', slug: 'boxinc', displayName: 'Box' },  // 7 US software of 125 postings, 108 H-1B approvals
+  { source: 'greenhouse', slug: 'mongodb', displayName: 'MongoDB' },  // 27 US software of 359 postings, 106 H-1B approvals
+  { source: 'greenhouse', slug: 'riotgames', displayName: 'Riot Games' },  // 44 US software of 181 postings, 93 H-1B approvals
+  { source: 'greenhouse', slug: 'axon', displayName: 'Axon Enterprise' },  // 31 US software of 473 postings, 72 H-1B approvals
+  { source: 'greenhouse', slug: 'smartsheet', displayName: 'Smartsheet' },  // 12 US software of 77 postings, 70 H-1B approvals
+  { source: 'greenhouse', slug: 'ripple', displayName: 'Ripple Labs' },  // 15 US software of 112 postings, 61 H-1B approvals
+  { source: 'greenhouse', slug: 'tripactions', displayName: 'TripActions' },  // 6 US software of 223 postings, 56 H-1B approvals
+  { source: 'greenhouse', slug: 'sambanovasystems', displayName: 'SambaNova Systems' },  // 7 US software of 69 postings, 51 H-1B approvals
+  { source: 'greenhouse', slug: 'point72', displayName: 'Point72 LP' },  // 33 US software of 198 postings, 48 H-1B approvals
+  { source: 'greenhouse', slug: 'nextdoor', displayName: 'Nextdoor' },  // 6 US software of 20 postings, 47 H-1B approvals
+  { source: 'greenhouse', slug: 'gemini', displayName: 'Gemini Trust Company' },  // 12 US software of 28 postings, 44 H-1B approvals
+  { source: 'greenhouse', slug: 'janestreet', displayName: 'Jane Street' },  // 19 US software of 217 postings, 44 H-1B approvals
+  { source: 'greenhouse', slug: 'squarepointcapital', displayName: 'Squarepoint Ops' },  // 12 US software of 90 postings, 43 H-1B approvals
+  { source: 'greenhouse', slug: 'torcrobotics', displayName: 'Torc Robotics' },  // 23 US software of 48 postings, 42 H-1B approvals
+  { source: 'greenhouse', slug: 'akunacapital', displayName: 'Akuna Capital' },  // 9 US software of 32 postings, 40 H-1B approvals
+  { source: 'greenhouse', slug: 'oscar', displayName: 'Oscar Management Corporation' },  // 26 US software of 207 postings, 39 H-1B approvals
+  { source: 'greenhouse', slug: 'towerresearchcapital', displayName: 'Tower Research Capital' },  // 11 US software of 94 postings, 38 H-1B approvals
+  { source: 'greenhouse', slug: 'flatironhealth', displayName: 'Flatiron Health' },  // 2 US software of 26 postings, 34 H-1B approvals
+  { source: 'greenhouse', slug: 'aqr', displayName: 'AQR Capital Management' },  // 2 US software of 54 postings, 34 H-1B approvals
+  { source: 'greenhouse', slug: 'collibra', displayName: 'Collibra' },  // 1 US software of 18 postings, 32 H-1B approvals
+  { source: 'greenhouse', slug: 'harnessinc', displayName: 'Harness' },  // 5 US software of 66 postings, 32 H-1B approvals
+  { source: 'greenhouse', slug: 'drweng', displayName: 'DRW Holdings' },  // 34 US software of 161 postings, 31 H-1B approvals
+  { source: 'greenhouse', slug: 'virtu', displayName: 'Virtu Financial' },  // 9 US software of 48 postings, 31 H-1B approvals
+  { source: 'greenhouse', slug: 'worldquant', displayName: 'WorldQuant' },  // 12 US software of 88 postings, 30 H-1B approvals
+  { source: 'greenhouse', slug: 'elastic', displayName: 'Elasticsearch' },  // 28 US software of 416 postings, 29 H-1B approvals
+  { source: 'greenhouse', slug: 'wehrtyou', displayName: 'Hudson River Trading' },  // 17 US software of 84 postings, 29 H-1B approvals
+  { source: 'greenhouse', slug: 'klaviyo', displayName: 'Klaviyo' },  // 31 US software of 157 postings, 28 H-1B approvals
+  { source: 'greenhouse', slug: 'pathai', displayName: 'PathAI' },  // 6 US software of 10 postings, 27 H-1B approvals
+  { source: 'greenhouse', slug: 'digitalocean98', displayName: 'DigitalOcean' },  // 32 US software of 156 postings, 25 H-1B approvals
+  { source: 'greenhouse', slug: 'sigmacomputing', displayName: 'Sigma Computing' },  // 27 US software of 76 postings, 24 H-1B approvals
+  { source: 'greenhouse', slug: 'jfrog', displayName: 'JFrog' },  // 3 US software of 75 postings, 22 H-1B approvals
+  { source: 'greenhouse', slug: 'braze', displayName: 'Braze' },  // 41 US software of 353 postings, 21 H-1B approvals
+  { source: 'greenhouse', slug: 'justworks', displayName: 'Justworks' },  // 14 US software of 105 postings, 19 H-1B approvals
+  { source: 'greenhouse', slug: 'sentinellabs', displayName: 'SentinelOne' },  // 10 US software of 289 postings, 19 H-1B approvals
+  { source: 'greenhouse', slug: 'tenableinc', displayName: 'Tenable' },  // 3 US software of 38 postings, 15 H-1B approvals
+  { source: 'greenhouse', slug: 'planetlabs', displayName: 'Planet Labs' },  // 9 US software of 126 postings, 15 H-1B approvals
+  { source: 'greenhouse', slug: 'fastly', displayName: 'Fastly' },  // 10 US software of 51 postings, 14 H-1B approvals
+  { source: 'greenhouse', slug: 'pathrobotics', displayName: 'Path Robotics' },  // 11 US software of 63 postings, 13 H-1B approvals
+  { source: 'greenhouse', slug: 'tenstorrent', displayName: 'Tenstorrent USA' },  // 3 US software of 125 postings, 12 H-1B approvals
+  { source: 'greenhouse', slug: 'tanium', displayName: 'Tanium' },  // 10 US software of 64 postings, 11 H-1B approvals
+  { source: 'greenhouse', slug: 'icapitalnetwork', displayName: 'iCapital Network' },  // 14 US software of 209 postings, 11 H-1B approvals
+  { source: 'greenhouse', slug: 'spire', displayName: 'Spire' },  // 4 US software of 39 postings, 10 H-1B approvals
+  { source: 'greenhouse', slug: 'starburst', displayName: 'Starburst Data' },  // 6 US software of 34 postings, 10 H-1B approvals
+  { source: 'greenhouse', slug: 'adyen', displayName: 'Adyen' },  // 7 US software of 240 postings, 9 H-1B approvals
+  { source: 'greenhouse', slug: 'fiveringsllc', displayName: 'Five Rings' },  // 4 US software of 17 postings, 7 H-1B approvals
+  { source: 'greenhouse', slug: 'agilityrobotics', displayName: 'Agility Robotics' },  // 13 US software of 78 postings, 6 H-1B approvals
+  { source: 'greenhouse', slug: 'lightmatter', displayName: 'Lightmatter' },  // 2 US software of 58 postings, 4 H-1B approvals
+  { source: 'greenhouse', slug: 'snorkelai', displayName: 'Snorkel AI' },  // 8 US software of 42 postings, 4 H-1B approvals
+  { source: 'greenhouse', slug: 'pdtpartners', displayName: 'PDT Partners' },  // 5 US software of 12 postings, 4 H-1B approvals
+  { source: 'greenhouse', slug: 'recursionpharmaceuticals', displayName: 'Recursion' },  // 2 US software of 9 postings, 2 H-1B approvals
+  { source: 'greenhouse', slug: 'wizinc', displayName: 'Wiz' },  // 2 US software of 115 postings, 2 H-1B approvals
+  { source: 'greenhouse', slug: 'apptronik', displayName: 'Apptronik' },  // 9 US software of 88 postings, 1 H-1B approvals
+  { source: 'greenhouse', slug: 'inflectionai', displayName: 'Inflection AI' },  // 1 US software of 4 postings, 1 H-1B approvals
+  { source: 'greenhouse', slug: 'expel', displayName: 'Expel' },  // 1 US software of 7 postings, 1 H-1B approvals
+  { source: 'greenhouse', slug: 'figureai', displayName: 'Figure AI' },  // 17 US software of 99 postings, 1 H-1B approvals
+  { source: 'greenhouse', slug: 'tailscale', displayName: 'Tailscale' },  // 8 US software of 58 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'togetherai', displayName: 'Together AI' },  // 16 US software of 88 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'coreweave', displayName: 'CoreWeave' },  // 55 US software of 305 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'typeface', displayName: 'Typeface' },  // 7 US software of 18 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'youcom', displayName: 'You.com' },  // 3 US software of 9 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'grafanalabs', displayName: 'Grafana Labs' },  // 14 US software of 125 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'circleci', displayName: 'CircleCI' },  // 5 US software of 14 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'contentful', displayName: 'Contentful' },  // 1 US software of 29 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'bitwarden', displayName: 'Bitwarden' },  // 3 US software of 31 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'huntress', displayName: 'Huntress Labs' },  // 8 US software of 39 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'jumptrading', displayName: 'Jump Trading' },  // 19 US software of 96 postings, 0 H-1B approvals
+  { source: 'greenhouse', slug: 'engineersgate', displayName: 'Engineers Gate' },  // 1 US software of 10 postings, 0 H-1B approvals
+  // Ashby
+  { source: 'ashby', slug: 'quora', displayName: 'Quora' },  // 7 US software of 9 postings, 26 H-1B approvals
+  { source: 'ashby', slug: 'cerebras', displayName: 'Cerebras Systems' },  // 31 US software of 116 postings, 20 H-1B approvals
+  { source: 'ashby', slug: 'acorns', displayName: 'Acorns Grow Incorporated' },  // 1 US software of 14 postings, 20 H-1B approvals
+  { source: 'ashby', slug: 'iterable', displayName: 'Iterable' },  // 2 US software of 13 postings, 18 H-1B approvals
+  { source: 'ashby', slug: 'temporal', displayName: 'Temporal Technologies' },  // 18 US software of 74 postings, 9 H-1B approvals
+  { source: 'ashby', slug: 'color-health', displayName: 'Color Health' },  // 2 US software of 18 postings, 9 H-1B approvals
+  { source: 'ashby', slug: 'airbyte', displayName: 'Airbyte' },  // 3 US software of 9 postings, 6 H-1B approvals
+  { source: 'ashby', slug: 'paxos', displayName: 'Paxos Trust Company' },  // 1 US software of 22 postings, 6 H-1B approvals
+  { source: 'ashby', slug: 'd-matrix', displayName: 'Dmatrix Corporation' },  // 12 US software of 40 postings, 5 H-1B approvals
+  { source: 'ashby', slug: 'lambda', displayName: 'Lambda' },  // 17 US software of 94 postings, 3 H-1B approvals
+  { source: 'ashby', slug: 'wayve', displayName: 'Wayve Technologies' },  // 35 US software of 174 postings, 3 H-1B approvals
+  { source: 'ashby', slug: 'montecarlodata', displayName: 'Monte Carlo' },  // 2 US software of 10 postings, 3 H-1B approvals
+  { source: 'ashby', slug: 'snyk', displayName: 'Snyk' },  // 1 US software of 37 postings, 1 H-1B approvals
+  { source: 'ashby', slug: 'sierra', displayName: 'Sierra' },  // 32 US software of 219 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'etched', displayName: 'Etched' },  // 14 US software of 124 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'pinecone', displayName: 'Pinecone' },  // 3 US software of 6 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'fireworks', displayName: 'Fireworks AI' },  // 3 US software of 90 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'crusoe', displayName: 'Crusoe' },  // 43 US software of 338 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'matx', displayName: 'MatX' },  // 6 US software of 41 postings, 0 H-1B approvals
+  { source: 'ashby', slug: '1x', displayName: '1X' },  // 16 US software of 100 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'motherduck', displayName: 'MotherDuck' },  // 1 US software of 7 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'hex', displayName: 'Hex' },  // 9 US software of 40 postings, 0 H-1B approvals
+  { source: 'ashby', slug: '1password', displayName: '1Password' },  // 3 US software of 77 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'socket', displayName: 'Socket' },  // 2 US software of 27 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'voleon', displayName: 'The Voleon Group' },  // 20 US software of 63 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'reka', displayName: 'Reka' },  // 1 US software of 9 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'liquid-ai', displayName: 'Liquid AI' },  // 2 US software of 20 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'baseten', displayName: 'Baseten' },  // 32 US software of 103 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'character', displayName: 'Character.AI' },  // 10 US software of 13 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'surge-ai', displayName: 'Surge AI' },  // 6 US software of 33 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'llamaindex', displayName: 'LlamaIndex' },  // 1 US software of 4 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'writer', displayName: 'Writer' },  // 8 US software of 46 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'lumaai', displayName: 'Luma AI' },  // 7 US software of 28 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'suno', displayName: 'Suno' },  // 29 US software of 71 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'synthesia', displayName: 'Synthesia' },  // 2 US software of 33 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'physicalintelligence', displayName: 'Physical Intelligence' },  // 10 US software of 44 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'cobot', displayName: 'Collaborative Robotics' },  // 1 US software of 14 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'sanity', displayName: 'Sanity' },  // 3 US software of 33 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'uniswap', displayName: 'Uniswap Labs' },  // 3 US software of 9 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'kraken.com', displayName: 'Kraken' },  // 2 US software of 88 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'drata', displayName: 'Drata' },  // 3 US software of 27 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'materialsecurity', displayName: 'Material Security' },  // 2 US software of 5 postings, 0 H-1B approvals
+  { source: 'ashby', slug: 'hims-and-hers', displayName: 'Hims & Hers' },  // 7 US software of 152 postings, 0 H-1B approvals
+  // Lever
+  { source: 'lever', slug: 'wealthfront', displayName: 'Wealthfront Corporation' },  // 8 US software of 20 postings, 14 H-1B approvals
+  { source: 'lever', slug: 'moonpay', displayName: 'MoonPay USA' },  // 3 US software of 23 postings, 5 H-1B approvals
+  { source: 'lever', slug: 'ro', displayName: 'Ro' },  // 13 US software of 53 postings, 0 H-1B approvals
+  { source: 'lever', slug: 'belvederetrading', displayName: 'Belvedere Trading' },  // 2 US software of 17 postings, 0 H-1B approvals
+  // Workday
+  { source: 'workday', slug: 'cisco-cisco_careers', tenant: 'cisco', wd: '5', site: 'Cisco_Careers', displayName: 'Cisco Systems' },  // 19 kept of 1435 postings, 3396 H-1B approvals
+  { source: 'workday', slug: 'cvshealth-cvs_health_careers', tenant: 'cvshealth', wd: '1', site: 'CVS_Health_Careers', displayName: 'CVS Pharmacy' },  // 3 kept of 19092 postings, 550 H-1B approvals
+  { source: 'workday', slug: 'att-attgeneral', tenant: 'att', wd: '1', site: 'ATTGeneral', displayName: 'AT&T Services' },  // 1 kept of 1121 postings, 480 H-1B approvals
+  { source: 'workday', slug: 'att-attcollege', tenant: 'att', wd: '1', site: 'ATTCollege', displayName: 'AT&T Services' },  // 0 kept of 9 postings, 480 H-1B approvals
+  { source: 'workday', slug: 'illumina-illumina-careers', tenant: 'illumina', wd: '1', site: 'illumina-careers', displayName: 'Illumina' },  // 0 kept of 168 postings, 233 H-1B approvals
+  { source: 'workday', slug: 'motorolasolutions-careers', tenant: 'motorolasolutions', wd: '5', site: 'Careers', displayName: 'Motorola Solutions' },  // 13 kept of 861 postings, 191 H-1B approvals
+  { source: 'workday', slug: 'hp-externalcareersite', tenant: 'hp', wd: '5', site: 'ExternalCareerSite', displayName: 'HP' },  // 5 kept of 905 postings, 167 H-1B approvals
+  { source: 'workday', slug: 'fanniemae-fanniemaecareers', tenant: 'fanniemae', wd: '1', site: 'FannieMaeCareers', displayName: 'Fannie Mae' },  // 0 kept of 55 postings, 66 H-1B approvals
+  { source: 'workday', slug: 'circle-circle', tenant: 'circle', wd: '1', site: 'Circle', displayName: 'Circle Internet Financial' },  // 0 kept of 62 postings, 35 H-1B approvals
+  { source: 'workday', slug: 'postman-careers', tenant: 'postman', wd: '108', site: 'careers', displayName: 'Postman' },  // 0 kept of 27 postings, 8 H-1B approvals
+  { source: 'workday', slug: 'bloomberg-bloombergindustrygroup_external_career_site', tenant: 'bloomberg', wd: '1', site: 'Bloombergindustrygroup_External_Career_Site', displayName: 'Bloomberg Industry Group' },  // 1 kept of 73 postings, 0 H-1B approvals
+  { source: 'workday', slug: 'cityblockhealth-cityblockexternalcareersite', tenant: 'cityblockhealth', wd: '1', site: 'CityblockExternalCareerSite', displayName: 'Cityblock Health' },  // 1 kept of 40 postings, 0 H-1B approvals
+  { source: 'workday', slug: 'devoted-devoted', tenant: 'devoted', wd: '1', site: 'Devoted', displayName: 'Devoted Health' },  // 0 kept of 69 postings, 0 H-1B approvals
+
+  // ─── H-1B sponsors on Greenhouse / Ashby / Lever (scripts/probe-boards.js sponsors 20, 2026-11-02) ───
+  // discover-sponsors.js only read Workday robots.txt and careers pages, so a
+  // sponsor whose careers page didn't link its board was never found. This
+  // pass tried slug variants of the 3,791 uncovered sponsors with >= 20
+  // approvals directly: 83 boards matched by name, and these list US software
+  // roles and survived review. The ones that overlap the list above (Waymo,
+  // Okta, Zscaler, Nuro, MongoDB…) are entered once, above.
+  // Rejected as a different employer under the sponsor's name: Astera
+  // Institute (not Astera Labs), Casa (not Casa Systems), Yotta Labs (not
+  // Yotta Systems), maxima.ai (not Maxima Consulting), Squad of Kyiv (not Squad
+  // Software), Pivotal the eVTOL maker (not Pivotal Software). Unify is the
+  // go-to-market startup, not the Unify Solutions petitioner, so it keeps its
+  // own name. Skipped as heavy for the yield: Carvana (3 US software among
+  // 1,701 postings), AlixPartners (1 of 121). LendingTree and Inovalon were
+  // dropped for refusing sponsorship on every US software posting.
+  // Greenhouse
+  { source: 'greenhouse', slug: 'roku', displayName: 'Roku' },  // 24 US software of 82 postings, 283 H-1B approvals
+  { source: 'greenhouse', slug: 'roblox', displayName: 'Roblox Corporation' },  // 148 US software of 267 postings, 186 H-1B approvals
+  { source: 'greenhouse', slug: 'zoominfo', displayName: 'ZoomInfo Technologies' },  // 22 US software of 98 postings, 130 H-1B approvals
+  { source: 'greenhouse', slug: 'oportun', displayName: 'Oportun' },  // 3 US software of 28 postings, 102 H-1B approvals
+  { source: 'greenhouse', slug: 'faradayfuture', displayName: 'Faraday Future' },  // 2 US software of 82 postings, 82 H-1B approvals
+  { source: 'greenhouse', slug: 'onetrust', displayName: 'OneTrust' },  // 9 US software of 82 postings, 82 H-1B approvals
+  { source: 'greenhouse', slug: 'anaplan', displayName: 'Anaplan' },  // 1 US software of 156 postings, 78 H-1B approvals
+  { source: 'greenhouse', slug: 'zuora', displayName: 'Zuora' },  // 4 US software of 35 postings, 65 H-1B approvals
+  { source: 'greenhouse', slug: 'weee', displayName: 'Weee!' },  // 1 US software of 21 postings, 61 H-1B approvals
+  { source: 'greenhouse', slug: 'asm', displayName: 'ASM America' },  // 10 US software of 508 postings, 58 H-1B approvals
+  { source: 'greenhouse', slug: 'cargurus', displayName: 'CarGurus' },  // 9 US software of 40 postings, 51 H-1B approvals
+  { source: 'greenhouse', slug: 'appian', displayName: 'Appian Corporation' },  // 18 US software of 161 postings, 44 H-1B approvals
+  { source: 'greenhouse', slug: 'quinstreet', displayName: 'QuinStreet' },  // 1 US software of 32 postings, 43 H-1B approvals
+  { source: 'greenhouse', slug: 'applovin', displayName: 'AppLovin Corporation' },  // 5 US software of 43 postings, 40 H-1B approvals
+  { source: 'greenhouse', slug: 'williamblair', displayName: 'William Blair' },  // 5 US software of 50 postings, 37 H-1B approvals
+  { source: 'greenhouse', slug: 'pubmatic', displayName: 'PubMatic' },  // 4 US software of 77 postings, 34 H-1B approvals
+  { source: 'greenhouse', slug: 'upgrade', displayName: 'Upgrade' },  // 1 US software of 32 postings, 34 H-1B approvals
+  { source: 'greenhouse', slug: 'veranahealth', displayName: 'Verana Health' },  // 1 US software of 6 postings, 33 H-1B approvals
+  { source: 'greenhouse', slug: 'life360', displayName: 'Life360' },  // 9 US software of 25 postings, 30 H-1B approvals
+  { source: 'greenhouse', slug: 'happymoney', displayName: 'Happy Money' },  // 1 US software of 6 postings, 29 H-1B approvals
+  { source: 'greenhouse', slug: 'squarespace', displayName: 'Squarespace' },  // 6 US software of 26 postings, 28 H-1B approvals
+  { source: 'greenhouse', slug: '8451', displayName: '84 51' },  // 4 US software of 14 postings, 27 H-1B approvals
+  { source: 'greenhouse', slug: 'five9', displayName: 'Five9' },  // 7 US software of 83 postings, 27 H-1B approvals
+  { source: 'greenhouse', slug: 'mindbody', displayName: 'Mindbody' },  // 3 US software of 18 postings, 27 H-1B approvals
+  { source: 'greenhouse', slug: 'verisign', displayName: 'Verisign' },  // 5 US software of 16 postings, 26 H-1B approvals
+  { source: 'greenhouse', slug: 'credible', displayName: 'Credible Labs' },  // 1 US software of 14 postings, 26 H-1B approvals
+  { source: 'greenhouse', slug: 'intersystems', displayName: 'InterSystems Corporation' },  // 4 US software of 101 postings, 25 H-1B approvals
+  { source: 'greenhouse', slug: 'ixllearning', displayName: 'IXL Learning' },  // 24 US software of 119 postings, 23 H-1B approvals
+  { source: 'greenhouse', slug: 'ziprecruiter', displayName: 'ZipRecruiter' },  // 16 US software of 46 postings, 22 H-1B approvals
+  // Ashby
+  { source: 'ashby', slug: 'nerdwallet', displayName: 'NerdWallet' },  // 4 US software of 24 postings, 30 H-1B approvals
+  { source: 'ashby', slug: 'poshmark', displayName: 'Poshmark' },  // 5 US software of 28 postings, 24 H-1B approvals
+  { source: 'ashby', slug: 'patreon', displayName: 'Patreon' },  // 8 US software of 20 postings, 22 H-1B approvals
+  { source: 'ashby', slug: 'mapbox', displayName: 'Mapbox' },  // 2 US software of 35 postings, 20 H-1B approvals
+  { source: 'ashby', slug: 'unify', displayName: 'Unify' },  // 5 US software of 11 postings, 0 H-1B approvals
+  // Lever
+  { source: 'lever', slug: 'zoox', displayName: 'Zoox' },  // 72 US software of 226 postings, 280 H-1B approvals
+  { source: 'lever', slug: 'saviynt', displayName: 'Saviynt' },  // 10 US software of 66 postings, 94 H-1B approvals
+  { source: 'lever', slug: 'egen', displayName: 'Egen Solutions' },  // 7 US software of 23 postings, 75 H-1B approvals
+  { source: 'lever', slug: 'aeva', displayName: 'Aeva' },  // 1 US software of 45 postings, 45 H-1B approvals
+  { source: 'lever', slug: 'greenlight', displayName: 'Greenlight Financial Technology' },  // 3 US software of 16 postings, 41 H-1B approvals
+  { source: 'lever', slug: 'outreach', displayName: 'Outreach Corporation' },  // 2 US software of 20 postings, 35 H-1B approvals
+  { source: 'lever', slug: 'ttecdigital', displayName: 'TTEC Digital' },  // 3 US software of 59 postings, 31 H-1B approvals
+  { source: 'lever', slug: 'weride', displayName: 'WeRide' },  // 5 US software of 13 postings, 27 H-1B approvals
+  { source: 'lever', slug: 'smarsh', displayName: 'Smarsh' },  // 2 US software of 23 postings, 24 H-1B approvals
+  { source: 'lever', slug: 'payjoy', displayName: 'PayJoy' },  // 1 US software of 87 postings, 21 H-1B approvals
 
   // ─── Community-curated GitHub new-grad lists ─────────────────────────────
   // These give us broad FAANG + enterprise coverage (Google, Apple, Meta,
