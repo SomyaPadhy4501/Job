@@ -300,11 +300,12 @@ test('every employer alias points at a sponsor in the USCIS data', () => {
 test('one-word and renamed brands resolve; same-word strangers do not', () => {
   const { classifySponsorship } = require('../src/services/classifier');
   // All read UNKNOWN on 2026-11-02, hiding their jobs from the default view.
-  for (const name of ['OpenAI', 'Uber', 'JPMorgan Chase', 'Walmart', 'T-Mobile', 'AT&T', 'Cisco', 'Notion', 'Instana']) {
+  for (const name of ['OpenAI', 'Uber', 'JPMorgan Chase', 'Walmart', 'T-Mobile', 'AT&T', 'Cisco', 'Notion', 'Instana', 'Harvey']) {
     assert.strictEqual(classifySponsorship('Software Engineer', name), 'YES', name);
   }
-  // Different employers that share a word with a USCIS filer.
-  for (const name of ['Harvey', 'Exa', 'Lattice', 'Outset', 'Weave', 'Pure']) {
+  // Different employers that share a word with a USCIS filer. Harvey left this
+  // list when Harvey AI Corporation began filing; it maps there, not to Harvey Nash.
+  for (const name of ['Exa', 'Lattice', 'Outset', 'Weave', 'Pure']) {
     assert.strictEqual(classifySponsorship('Software Engineer', name), 'UNKNOWN', name);
   }
   // Posting text still wins over the alias.

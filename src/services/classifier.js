@@ -103,6 +103,11 @@ function doubtsSponsorship(t) {
 }
 
 // Threshold for USCIS YES signal: ≥ 3 approved H-1B petitions in last 2 FY.
+// Rechecked when the data moved to the hub's FY2025–26 export (2026-11-02):
+// its six approval measures add up to the old files' Initial + Continuing
+// counts (FY2022 matched employer for employer), so 3 still means three
+// approved petitions, not applications. Only 42 of 1,458 board rows labelled by
+// this classifier sit at 1–5 approvals, so nudging the cut moves little.
 const USCIS_THRESHOLD = 3;
 
 // Load h1b-sponsors.json once at startup (deterministic, no runtime fetch).
@@ -154,12 +159,14 @@ function getPrefixCache() {
 // every one of their jobs.
 //
 // Only entries where the board's company IS the petitioner. Same-word matches
-// that are a different employer stay out — Harvey ≠ harvey-nash, Exa ≠
+// that are a different employer stay out — Harvey is harvey-ai-corporation,
+// never harvey-nash; Exa ≠
 // exa-data-solutions, Lattice (HR software) ≠ lattice-semiconductor, and the
 // YC startups Outset, Pure, Parker, Runway and Weave ≠ Outset Medical, Pure
 // Storage, Parker Hannifin, Runway AI and Weave Communications. SpaceX, RTX and
 // other defense employers are left out too: few approvals, mostly ITAR roles.
-// A test checks every target exists above USCIS_THRESHOLD.
+// A refresh of h1b-sponsors.json can rename a target (OpenAI LP became OpenAI
+// OpCo); a test checks every target exists above USCIS_THRESHOLD.
 const EMPLOYER_ALIASES = {
   // Large employers
   'abbott': 'abbott-laboratories',
@@ -167,6 +174,8 @@ const EMPLOYER_ALIASES = {
   'agilent': 'agilent-technologies',
   'aig': 'aig-pc-global-services',
   'amd': 'advanced-micro-devices',
+  'anthem': 'elevance-health', // Elevance's Workday board is labelled Anthem
+  'atlassian': 'atlassian-us',
   'att': 'att-services',
   'barclays': 'barclays-services',
   'bloomberg': 'bloomberg-lp',
@@ -177,24 +186,28 @@ const EMPLOYER_ALIASES = {
   'cisco': 'cisco-systems',
   'citadel': 'citadel-americas-services',
   'cognizant': 'cognizant-technology-solutions-us',
+  'cox-enterprises': 'cox-corporate-services', // Cox Enterprises Inc through FY2023, both Atlanta
   'crowe': 'crowe-llp',
+  'draftkings': 'dk-crown-holdings',
   'cvs-health': 'caremark',
   'expedia-group': 'expedia',
-  'fedex': 'fedex-corporate-services',
+  'fedex': 'federal-express-corporation', // FedEx Corporate Services filed here by FY2025
   'flextronics': 'flextronics-international-usa',
   'honeywell': 'honeywell-international',
   'hpe': 'hewlett-packard-enterprise-company',
   'ibm': 'ibm-corporation',
   'instana': 'ibm-corporation', // acquired by IBM; Getro still lists it by name
   'intuitive': 'intuitive-surgical-operations',
+  'ironmountain': 'iron-mountain-information-management', // Getro's apply-URL employer for Clutter
   'jpmorgan-chase': 'jpmorgan',
   'kla': 'kla-corporation',
   'linkedin': 'linkedin-corporation',
   'mastercard': 'mastercard-international-incorporated',
   'mckesson': 'mckesson-corporation',
+  'mercer-university': 'corporation-mercer-university', // "The Corporation of Mercer University"
   'microchip': 'microchip-technology',
   'micron': 'micron-technology',
-  'ncr': 'ncr-corporation',
+  'ncr': 'ncr-voyix-corporation', // NCR Corporation renamed itself NCR Voyix
   'netscout': 'netscout-systems',
   'nxp': 'nxp-usa',
   'opower': 'oracle-america', // Oracle subsidiary
@@ -212,40 +225,48 @@ const EMPLOYER_ALIASES = {
   'vanguard': 'vanguard-group',
   'verizon': 'verizon-data-services',
   'walmart': 'wal-mart-associates',
-  'yahoo': 'oath-holdings',
+  'yahoo': 'yahoo-holdings', // Oath Holdings through FY2023
   'zebra': 'zebra-technologies-corporation',
   // Tech companies and startups
-  'anthropic': 'anthropic-dba-anthropic',
   'attentive': 'attentive-mobile',
   'aveva': 'aveva-software',
   'blend': 'blend-labs',
   'bmc': 'bmc-software',
-  'cedar': 'cedar-cares-dba-cedar',
+  'cedar': 'cedar-cares',
   'chime': 'chime-financial',
-  'coda': 'coda-project',
+  // "Clover Health" has an exact key of its own (2 approvals) that would
+  // otherwise hide the labs entity's petitions from the prefix lookup.
+  'clover-health': 'clover-health-labs',
+  'coda': 'superhuman-platform', // Coda now posts on Superhuman Platform Inc's board
+  'cognition': 'cognition-ai',
   'cresta': 'cresta-intelligence',
+  'cursor': 'anysphere',
+  'deel': 'deel-us',
   'dots': 'dots-technologies',
+  'elevenlabs': 'eleven-labs',
   'faire': 'faire-wholesale',
   'finix': 'finix-payments',
   'flywire': 'flywire-corporation',
   'freenome': 'freenome-holdings',
   'glean': 'glean-technologies',
   'h1': 'h1-insights',
+  'harvey': 'harvey-ai-corporation', // Counsel AI Corporation in its FY2025 filings
   'hive': 'castle-global', // Hive AI's legal name is Castle Global
   'honor': 'honor-technology',
-  'imply': 'imply-data',
+  'imply': 'imply-data-imply',
   'infinitus': 'infinitus-systems',
   'insulet': 'insulet-corporation',
   'kayak': 'kayak-software-corporation',
+  'keep-truckin': 'motive-technologies', // KeepTruckin renamed itself Motive
   'lob': 'lob-com',
   'motive': 'motive-technologies',
-  'mutiny': 'mutiny-hq-corporation-dba-mutiny',
   'notion': 'notion-labs',
   'nuna': 'nuna-incorporated',
-  'openai': 'openai-lp',
+  'openai': 'openai-opco', // OpenAI LP through FY2023
   'opendoor': 'opendoor-labs',
   'palantir': 'palantir-technologies',
   'peloton': 'peloton-interactive',
+  'perplexity': 'perplexity-ai',
   'prosper': 'prosper-marketplace',
   'robinhood': 'robinhood-markets',
   'roblox': 'roblox-corporation',
@@ -253,9 +274,8 @@ const EMPLOYER_ALIASES = {
   'sift': 'sift-science',
   'spoton': 'spoton-transact',
   'spotify': 'spotify-usa',
-  'startree': 'startree-fka-cortexdata',
   'synthego': 'synthego-corporation',
-  'tempus': 'tempus-labs',
+  'tempus': 'tempus-ai', // renamed from Tempus Labs
   'turing': 'turing-enterprises',
   'twitch': 'twitch-interactive',
   'uber': 'uber-technologies',
