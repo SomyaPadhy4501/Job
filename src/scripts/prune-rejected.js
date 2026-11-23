@@ -72,7 +72,7 @@ function storedCountries({ source, location }) {
 
 function reason(row) {
   if (CONFIG.filterSoftwareOnly && classifyRole(row.job_title, row.source) === 'OTHER') return 'not a software role';
-  if (!passesLevel(row.job_title, CONFIG.entryLevelMode || 'permissive')) return 'senior / intern / supervisor';
+  if (!passesLevel(row.job_title, CONFIG.entryLevelMode || 'permissive', row.company_name)) return 'senior / intern / supervisor';
   // yoe_min is the lowest requirement stated in the description (-1 = none).
   if (Number(row.yoe_min) > MAX_YOE) return `over ${MAX_YOE} years of experience`;
   if (CONFIG.filterUSOnly && !inUS(row.location, storedCountries(row))) return 'not US';

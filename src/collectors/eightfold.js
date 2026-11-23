@@ -147,7 +147,7 @@ async function fetchEightfold({
     if (lvl?.reject) continue;
 
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', displayName || slug)) continue;
 
     candidates.push({ position: p, title, lvl });
   }

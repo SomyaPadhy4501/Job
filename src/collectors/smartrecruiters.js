@@ -125,7 +125,7 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     if (LEVEL_REJECT.has(level)) continue;
 
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', p.company?.name || displayName || slug)) continue;
 
     candidates.push({ posting: p, title, level });
   }

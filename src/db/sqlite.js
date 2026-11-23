@@ -142,7 +142,7 @@ function migrate(database) {
   // eslint-disable-next-line global-require
   const { classifyRole, passesLevel } = require('../services/normalize');
   const allRows = database
-    .prepare('SELECT id, source, job_title, role_type FROM jobs')
+    .prepare('SELECT id, source, company_name, job_title, role_type FROM jobs')
     .all();
   let reclassified = 0;
   const updRole = database.prepare('UPDATE jobs SET role_type = ? WHERE id = ?');
@@ -158,7 +158,7 @@ function migrate(database) {
       // assume FILTER_SOFTWARE=true (the default) — any OTHER row isn't
       // supposed to be in the DB. Also drop rows whose title no longer
       // passes the senior/intern rejects.
-      if (nextRole === 'OTHER' || !passesLevel(r.job_title, 'permissive')) {
+      if (nextRole === 'OTHER' || !passesLevel(r.job_title, 'permissive', r.company_name)) {
         killIds.push(r.id);
       }
     }
@@ -362,19 +362,22 @@ function migrate(database) {
 
 function upsertJob(job) {
   const database = getDb();
-  // Primary lookup: canonical dedupe_key. Catches the common case of re-seeing
-  // the same role over time.
-  let existing = database
-    .prepare('SELECT id FROM jobs WHERE dedupe_key = ?')
-    .get(job.dedupe_key);
-  // Secondary lookup: same apply_url already exists under a different
-  // dedupe_key. Happens when the same role is published by two sources with
-  // slightly different company/title/location formatting ("Google LLC" vs
-  // "Google", "SF, CA, USA" vs "San Francisco, California"). Merge them.
-  if (!existing && job.apply_url) {
+  // Primary lookup: the same link. A link names one posting, while one
+  // company|title|location key can cover several (separate openings are keyed
+  // `<key>#<opening>`, see dedupe.js). Matching the key first let an opening
+  // whose group had shrunk back to the plain key overwrite an older row that
+  // held a different opening, leaving the opening's own row as a duplicate.
+  // The link also merges the same role published by two sources with slightly
+  // different formatting ("Google LLC" vs "Google").
+  let existing = job.apply_url
+    ? database.prepare('SELECT id FROM jobs WHERE apply_url = ? LIMIT 1').get(job.apply_url)
+    : undefined;
+  // Secondary lookup: canonical dedupe_key. The same role under a new link
+  // (re-listed) or relayed by another source with a different one.
+  if (!existing) {
     existing = database
-      .prepare('SELECT id FROM jobs WHERE apply_url = ? LIMIT 1')
-      .get(job.apply_url);
+      .prepare('SELECT id FROM jobs WHERE dedupe_key = ?')
+      .get(job.dedupe_key);
   }
 
   if (existing) {

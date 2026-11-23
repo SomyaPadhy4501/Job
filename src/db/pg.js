@@ -53,20 +53,28 @@ function now() {
 async function upsertJob(job, client) {
   const db = client || getPool();
 
-  // Primary lookup: dedupe_key
-  const { rows: byKey } = await db.query(
-    'SELECT id FROM jobs WHERE dedupe_key = $1',
-    [job.dedupe_key],
-  );
-  let existing = byKey[0];
-
-  // Secondary lookup: same apply_url under a different dedupe_key
-  if (!existing && job.apply_url) {
+  // Primary lookup: the same link. A link names one posting, while one
+  // company|title|location key can cover several (separate openings are keyed
+  // `<key>#<opening>`, see dedupe.js). Matching the key first let an opening
+  // whose group had shrunk back to the plain key overwrite an older row that
+  // held a different opening, leaving the opening's own row as a duplicate.
+  let existing;
+  if (job.apply_url) {
     const { rows: byUrl } = await db.query(
       'SELECT id FROM jobs WHERE apply_url = $1 LIMIT 1',
       [job.apply_url],
     );
     existing = byUrl[0];
+  }
+
+  // Secondary lookup: dedupe_key. The same role under a new link (re-listed)
+  // or relayed by another source with a different one.
+  if (!existing) {
+    const { rows: byKey } = await db.query(
+      'SELECT id FROM jobs WHERE dedupe_key = $1',
+      [job.dedupe_key],
+    );
+    existing = byKey[0];
   }
 
   if (existing) {

@@ -194,7 +194,7 @@ async function fetchCompany({ networkId, boardHost, slug, displayName, maxPages,
     const title = j.title || '';
     if (!title || !j.url) continue;
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', j.organization?.name)) continue;
     candidates.push(j);
   }
 

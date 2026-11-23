@@ -55,7 +55,7 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     const title = String(i.jobOpeningName || '').trim();
     if (!i.id || !title) return false;
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) return false;
-    return passesLevel(title, CONFIG.entryLevelMode || 'permissive');
+    return passesLevel(title, CONFIG.entryLevelMode || 'permissive', displayName || slug);
   });
 
   const toEnrich = candidates.slice(0, maxDetail || DEFAULT_MAX_DETAIL);

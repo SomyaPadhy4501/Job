@@ -78,7 +78,7 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     const title = (j.name || '').trim();
     if (!title || !j.uuid) continue;
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', displayName || slug)) continue;
     candidates.push(j);
   }
 

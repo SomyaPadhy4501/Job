@@ -112,7 +112,7 @@ function pickForDetail(rows, max = DETAIL_MAX) {
       (r) =>
         r.external_id &&
         (!CONFIG.filterSoftwareOnly || looksSoftware(r.job_title)) &&
-        passesLevel(r.job_title, CONFIG.entryLevelMode || 'permissive') &&
+        passesLevel(r.job_title, CONFIG.entryLevelMode || 'permissive', r.company_name) &&
         inUS(r.location, r.countries)
     )
     .sort((a, b) => (Number(b.date_posted) || 0) - (Number(a.date_posted) || 0))

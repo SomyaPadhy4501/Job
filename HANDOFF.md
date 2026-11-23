@@ -25,6 +25,18 @@ collect after the merge also triggers a one-shot dedupe migration that
 removes existing `apply_url` duplicates (kept oldest row, ran cleanly on
 2026-04-24 removing 25 dupes).
 
+**Current state (2026-11-23):** `COMPANIES` holds **1,064 boards**: 1,057
+after merging the two branches below, plus 7 security boards. The live board showed 904 visible rows with
+every filter off (783 in the default view), from 16,480 stored.
+
+**Changed 2026-11-23 (branch `fix/panw-staff-and-edge-cases`):**
+- Merged `feat/expand-ats-coverage` (179 more boards, including Cisco on Workday, Okta, Zscaler, SentinelOne, Tenable, Wiz, Snyk, Tanium and 1Password; 5 repointed and 22 dead ones dropped) and `claude/dreamy-leakey-8f1afb` (USCIS sponsor data refreshed to FY2025–26). Both were finished on 2026-11-02 but never merged into `main`. `fix/ci-and-strict-yoe` is an older branch that `main` superseded (d720b24 ported what it kept), so it was not merged.
+- **Palo Alto Networks "Staff" titles are no longer dropped as senior** (owner's call). Its ladder runs Software Engineer → Staff → Senior Staff → Principal, and it hires new grads into "Staff Software Engineer"; the generic `staff` rule dropped all of them before their descriptions were read. (The board held 0 Palo Alto Networks rows that day. The rest of the gap was the date and dedupe issues below: its 20 plain "Software Engineer" postings had collapsed into one undated row that cycled in and out of the 7-day window.) `STAFF_NOT_SENIOR_EMPLOYERS` in `normalize.js` lists the employers where bare "Staff" isn't a level; the 0-2 year cap still decides from the description. A title that names a new-grad track ("Staff Software Engineer (New Grad)") also passes at any employer. `passesLevel(title, mode, company)` now takes the employer, and every caller passes it: collectors, `normalizeJob`, `prune-rejected.js` and SQLite's boot pass. Add an employer to that list rather than loosening `SENIOR_REJECT`.
+- **Workday dates.** `parsePostedOn` read only "Posted N Days Ago", so "Posted Today", "Posted Yesterday" and "Posted 30+ Days Ago" arrived undated and were dated by the first run that saw them. A posting open for months showed as new, was deleted when that date left the 14-day window, then showed as new again on the next run. "30+" is now dated 30 days back, so retention drops it. On 2026-11-23, 48 of the 139 visible Workday rows were undated.
+- **Separate openings get separate rows** (owner's call). The company|title|location key also merged *different* openings that share a title and location, so Palo Alto Networks' 20 headquarters "Software Engineer" reqs showed as one. When one direct source lists several openings under a key, `dedupeBatch` (`src/services/dedupe.js`) now keeps each, keyed `<key>#<opening>`. Two rows are one opening if they share the source's posting id or the link, so a req posted on two of an employer's Workday sites stays one row. Aggregators (`AGGREGATORS`) keep collapsing, because Getro tags one job with a different id in each VC network. An aggregator's copy joins the opening it links to, and an unmatched copy is dropped. `upsertJob` (both backends) now matches `apply_url` before `dedupe_key`. Matching the key first let an opening whose group had shrunk back to the plain key overwrite another opening's row. `/admin/ingest` now runs `dedupeBatch` too.
+- 7 security / networking boards found by `probe-boards.js names`: Gen Digital, Extreme Networks, Cribl, Coalition, Ping Identity, KnowBe4 and BeyondTrust (end of `COMPANIES`). Probed and not added: Teleport, Keeper Security, Dragos and Cato Networks (0-1 H-1B approvals). Workday tenants weren't probed because Workday was rate-limiting the machine (HTTP 429). That leaves AMD, Dell, HPE, Akamai, F5, Proofpoint, Fortinet, Synopsys, DocuSign, Seagate, CyberArk, Rapid7, Trellix, Nutanix and American Express (Oracle HCM) still to check.
+- Gigs moved from Greenhouse to Ashby (`ashby:gigs`). Still failing every run: `ashby:fleetline` and `ashby:cedar` (404 on all three startup ATSes) and `workday:nxp-careers` (HTTP 422). All workflows run Node 22, matching `engines` and Vercel; they were on Node 20, which reached end-of-life in April 2026.
+
 **Recently added (2026-04-24):**
 - Source `hn_hiring` — HN "Who is hiring?" threads filtered by a maintained YC US-hiring allowlist. Only source with clean per-comment `date_posted`.
 - Source `oracle_hcm` — generic Oracle Recruiting Cloud / Candidate Experience collector. Verified live against Oracle (`careers.oracle.com`) and JPMorgan Chase (`jpmc.fa.oraclecloud.com`) on 2026-04-24.
@@ -82,7 +94,7 @@ Other ways to run individual pieces:
 ## User's priorities (ranked; don't re-litigate)
 
 1. **US-based, full-time** (interns and co-ops are rejected globally in `normalize.js`; don't suggest re-enabling them)
-2. **Entry-level OR mid-level (1-2 YOE)**. `II` is mid, `III`+ is senior. Senior/staff/principal/lead/manager/architect are rejected.
+2. **Entry-level OR mid-level (1-2 YOE)**. `II` is mid, `III`+ is senior. Senior/staff/principal/lead/manager/architect are rejected. **Exception (owner's call, 2026-11-23):** a bare "Staff" passes at the employers in `STAFF_NOT_SENIOR_EMPLOYERS` (Palo Alto Networks, whose Staff rung includes new grads) and in titles that name a new-grad track. The 0-2 year cap then decides from the description.
 3. **Role types:** SWE/SDE, MLE, AI/Research, Data Scientist, Data Engineer, DevOps/SRE/Platform, Security, Mobile
 4. **Visa sponsorship tracking.** Classifier is rule-based (`src/services/classifier.js`). Some sources pre-label sponsorship — their labels win over the classifier via `sponsorship_override`. **Roles a visa holder can't take are hidden by default** (owner's call, 2026-10-31): `deriveRestriction()` in `src/services/clearance.js` adds title rules (Cleared / TS/SCI / Federal / US Government…), explicit no-sponsorship (`NO_SPONSORSHIP`), and a defense/ITAR employer list applied only when a row has no description (`DEFENSE_EMPLOYER`). All stay in the DB; `?restriction=all` shows them. After changing these rules, run the `backfill-derived` workflow so existing Neon rows are reclassified.
 5. **Newest first.** Date sort with ISO normalization (`normalize.js::parseDateToIso`).
@@ -392,7 +404,7 @@ For each raw job, in order:
 8. Classify sponsorship — but `raw.sponsorship_override` wins if present (`YES`/`NO`/`UNKNOWN`)
 9. Flag `is_entry_level` (from override if present, else title regex)
 10. Flag `is_mid_level` (from override, else regex on `II`, `Mid-level`, `1-2 years`, etc.) — never double-stamped with entry
-11. Compute `dedupe_key = lower(company)|lower(title)|lower(location)` (slugified)
+11. Compute `dedupe_key = lower(company)|lower(title)|lower(location)` (slugified). `dedupeBatch` later appends `#<opening>` when one direct source lists several openings under it.
 
 ---
 
@@ -565,7 +577,7 @@ Response body for `GET /jobs`:
 - **No LinkedIn / Indeed / Glassdoor.** Legal / ToS hostility.
 - **No headless Chromium stealth plugins.** Not worth the arms race for a personal tool.
 - **Hostname-scoped TLS bypass** in `src/collectors/http.js` (currently dormant but available for future use). Do NOT set `NODE_TLS_REJECT_UNAUTHORIZED=0` globally.
-- **Dedupe by company|title|location, not by external_id — with `apply_url` as a secondary key.** Same role from multiple sources (e.g. Nvidia appears in both Workday and ghlistings) merges into one row. The canonical key collapses cosmetic drift (strips `Inc/LLC/Corp`, parenthetical title modifiers like `(Remote)`, and trailing country codes from location). When two sources publish the same apply URL under slightly different metadata, `upsertJob` does a secondary lookup on `apply_url` and merges them.
+- **Dedupe by company|title|location, not by external_id — with `apply_url` as the other key.** Same role from multiple sources (e.g. Nvidia appears in both Workday and ghlistings) merges into one row. The canonical key collapses cosmetic drift (strips `Inc/LLC/Corp`, parenthetical title modifiers like `(Remote)`, and trailing country codes from location). When two sources publish the same apply URL under slightly different metadata, `upsertJob` matches on `apply_url` (checked before the key since 2026-11-23) and merges them. **Exception (owner's call, 2026-11-23):** separate openings that one direct source lists under the same key keep separate rows (`<key>#<opening>`; see `dedupe.js`).
 - **`II` is mid-level, not senior.** At most companies it means 1-3 YOE. Matches Somya's target range.
 - **YC coverage is dual-path, not single-source.** `hn_hiring` gets the dated-but-narrow feed (HN "Who is hiring?" filtered to US YC companies); the ATS probe tool expands the main collector list to include many more YC companies directly from Greenhouse/Lever/Ashby. workatastartup.com is not usable (no public API). Don't re-investigate.
 - **HN "Who is hiring?" comment parsing drops most rows deliberately.** From ~670 top-level comments/month we keep ~15–20 after: (a) YC allowlist filter, (b) "Company | Role | Location | URL" header format requirement, (c) role-keyword requirement (no generic "Engineer" fallback — would false-match sales/BD "Engineers"), (d) foreign-location early reject. Low yield is a feature, not a bug.
@@ -574,6 +586,9 @@ Response body for `GET /jobs`:
 ---
 
 ## Known issues (not blockers, just context)
+
+- **Same-title openings are indistinguishable in the list.** Separate openings now get separate rows, but they share company, title and location, so the list view shows them as identical lines until opened. The grouped view (the default) counts them under one company.
+- **Collectors on Node 26 locally.** This machine runs Node 26, outside `engines` (22.x). `better-sqlite3` has no binary for it (the six SQLite tests fail locally; CI is unaffected), and Node 26's `fetch` can crash a run with an unhandled HTTP/2 `ECONNRESET`. Use Node 22 for local collects.
 
 - **Canadian cities like "Vancouver, BC, CA"** sometimes pass the US filter because `ca` matches California's state code. Low impact (handful of Workday rows); fix is to tighten `looksUS()` to look at position.
 - **Microsoft descriptions are empty.** The list endpoint (`/api/pcsx/search`) doesn't include them — we'd need a per-job `/api/pcsx/position_details` call which would be 10× traffic. Sponsorship for MS rows will always be UNKNOWN unless fixed.
@@ -589,7 +604,9 @@ Response body for `GET /jobs`:
 
 ## Running tests / verifying state
 
-There's no test suite — the project favors live verification. To verify a change:
+`npm test` runs the suite in `test/` (Node's built-in runner, 155 tests on
+2026-11-23), and CI runs it on every push. Live verification still matters for
+collector changes. To verify one:
 
 ```bash
 # Wipe + full collect
@@ -638,7 +655,7 @@ cd scraper && node src/run-one.js meta
 - Don't globally set `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 - Don't add features the user didn't ask for. They've been specific.
 - Don't add interns. The user explicitly rejected them.
-- Don't add senior/staff/principal titles. Level filter is load-bearing.
+- Don't add senior/staff/principal titles. Level filter is load-bearing. The one exception is bare "Staff" at the employers in `STAFF_NOT_SENIOR_EMPLOYERS` and in new-grad-track titles (owner's call, 2026-11-23). Extend that list; don't loosen `SENIOR_REJECT`.
 - Don't write tests unless the user asks — they haven't.
 - Don't delete `scraper/src/debug-urls.js`. It's a shipped diagnostic, not dev scaffolding.
 - Don't try workatastartup.com again. No public API, endpoints 404 / gate on YC candidate session. `hn_hiring` + the ATS probe cover YC.

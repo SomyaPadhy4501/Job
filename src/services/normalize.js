@@ -401,6 +401,8 @@ const CORE_ROLE_HEAD =
 // Interns are rejected outright — user wants full-time only.
 // "II", "III", "IV", "V" as standalone tokens mean mid+ — reject.
 // "Senior/Sr/Staff/Principal/Lead/Director/Manager/Head/VP" — reject.
+// Exception: bare "Staff" at the employers in STAFF_NOT_SENIOR_EMPLOYERS, and
+// in titles that name a new-grad track (see looksSeniorReject).
 const INTERN_REJECT = [
   /\bintern(ship)?s?\b/, /\bco-?op\b/, /\bsummer\s+20\d\d\b/,
 ];
@@ -446,8 +448,43 @@ function looksIntern(title) {
 // sponsoring — while keeping their unlabelled twins.
 const IC_BAND_LABEL = /\([^)]*,\s*ic\s*\)/g;
 
-function looksSeniorReject(title) {
-  const t = (title || '').toLowerCase().replace(IC_BAND_LABEL, ' ');
+// "Staff" is a senior rung at most employers (Google and Stripe ask 8+ years),
+// so SENIOR_REJECT drops it by title. Palo Alto Networks' ladder runs Software
+// Engineer → Staff → Senior Staff → Principal, and it hires new grads into
+// "Staff Software Engineer". The generic rule threw those roles away before
+// their descriptions, and the years they ask for, were ever read (on 2026-11-23,
+// all of its plain-Staff US software postings).
+//
+// At an employer listed here the bare word is not a seniority marker. The title
+// passes, the collector fetches the description, and the 0-2 year cap (MAX_YOE
+// in experience.js) decides, so a Staff role asking for 5+ years is still
+// dropped. "Senior Staff" still fails on "senior", and "Principal" on its own
+// rule. Matched against the start of the employer name, so an aggregator's
+// "Palo Alto Networks, Inc." counts too.
+const STAFF_NOT_SENIOR_EMPLOYERS = [/^palo alto networks\b/i];
+
+// A title that names its own new-grad / early-career track outranks the bare
+// "Staff" level word at any employer: "Staff Software Engineer (New Grad)" is the
+// new-grad role, whatever the ladder calls it. Narrower than ENTRY_POSITIVE on
+// purpose: "Associate" or "Engineer I" says nothing about a Staff title.
+const NEW_GRAD_TRACK =
+  /\b(?:new\s+(?:college\s+)?grad(?:uate)?s?|recent\s+grad(?:uate)?s?|university\s+(?:grad(?:uate)?s?|hire|program)|early[\s-]career|entry[\s-]level|campus\s+hire)\b/;
+
+// The same word SENIOR_REJECT matches. "Member of Technical Staff" is already
+// level-less, so it is left alone here as well.
+const BARE_STAFF = /(?<!technical\s+)\bstaff\b/g;
+
+function staffIsSeniority(lowerTitle, company) {
+  if (NEW_GRAD_TRACK.test(lowerTitle)) return false;
+  const c = String(company || '').trim();
+  return !STAFF_NOT_SENIOR_EMPLOYERS.some((r) => r.test(c));
+}
+
+// `company` is optional. Callers that know the employer pass it so the
+// exceptions above apply; without it the generic rules run unchanged.
+function looksSeniorReject(title, company) {
+  let t = (title || '').toLowerCase().replace(IC_BAND_LABEL, ' ');
+  if (!staffIsSeniority(t, company)) t = t.replace(BARE_STAFF, ' ');
   return SENIOR_REJECT.some((r) => r.test(t));
 }
 
@@ -461,11 +498,11 @@ function looksMidLevel(title) {
   return MID_POSITIVE.some((r) => r.test(t));
 }
 
-function passesLevel(title, mode) {
+function passesLevel(title, mode, company) {
   // Always drop internships — user is looking for full-time roles.
   if (looksIntern(title)) return false;
   if (mode === 'off') return true;
-  if (looksSeniorReject(title)) return false;
+  if (looksSeniorReject(title, company)) return false;
   if (mode === 'strict') return looksExplicitEntry(title);
   return true; // 'permissive'
 }
@@ -527,7 +564,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   const role_type = classifyRole(job_title, raw.source);
   if (filterSoftwareOnly && role_type === 'OTHER') return null;
   if (filterUSOnly && !inUS(location, raw.countries)) return null;
-  if (!passesLevel(job_title, entryLevelMode || 'permissive')) return null;
+  if (!passesLevel(job_title, entryLevelMode || 'permissive', company_name)) return null;
 
   // Years of experience stated in the description, e.g. "3+ years of
   // professional android development experience". Titles alone leave most rows

@@ -57,7 +57,7 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'flexport', displayName: 'Flexport' }, // YC Winter 2014
   { source: 'greenhouse', slug: 'foundry', displayName: 'Foundry' }, // YC F24
   { source: 'greenhouse', slug: 'generalproximity', displayName: 'General Proximity' }, // YC Winter 2020
-  { source: 'greenhouse', slug: 'gigs', displayName: 'Gigs' }, // YC Winter 2021
+  { source: 'ashby', slug: 'gigs', displayName: 'Gigs' }, // YC Winter 2021; was greenhouse:gigs (404 since at least 2026-11-22)
   { source: 'greenhouse', slug: 'ginkgobioworks', displayName: 'Ginkgo Bioworks' }, // YC S14
   { source: 'greenhouse', slug: 'givecampus', displayName: 'GiveCampus' }, // YC S15
   { source: 'greenhouse', slug: 'gusto', displayName: 'Gusto' }, // YC Winter 2012
@@ -1352,6 +1352,21 @@ const COMPANIES = [
   { source: 'getro', slug: 'true-ventures', networkId: 646, boardHost: 'jobs.trueventures.com', displayName: 'True Ventures' }, // 495 US rows
   { source: 'getro', slug: 'scale-venture-partners', networkId: 776, boardHost: 'jobs.scalevp.com', displayName: 'Scale Venture Partners' }, // 428 US rows
   { source: 'getro', slug: 'freestyle', networkId: 108, boardHost: 'jobs.freestyle.vc', displayName: 'Freestyle Capital' }, // 218 US rows
+
+  // ── Security / networking employers (2026-11-23) ────────────────────────────
+  // Found by `scripts/probe-boards.js names` for employers in Palo Alto
+  // Networks' space that no board covered. None had a posting the filters keep
+  // on the day (all senior or 3+ years), so these wait for entry-level openings
+  // at one request per board per run. Not added: Teleport, Keeper Security,
+  // Dragos and Cato Networks, each with 0-1 H-1B approvals, whose rows would
+  // land UNKNOWN and stay out of the default view.
+  { source: 'ashby', slug: 'gen-digital', displayName: 'Gen Digital' },  // 6 US software of 89 postings, 108 H-1B approvals
+  { source: 'lever', slug: 'extremenetworks', displayName: 'Extreme Networks' },  // 13 US software of 71, 49 approvals
+  { source: 'greenhouse', slug: 'cribl', displayName: 'Cribl' },  // 12 US software of 86, 26 approvals
+  { source: 'greenhouse', slug: 'coalition', displayName: 'Coalition' },  // 7 US software of 43, 22 approvals
+  { source: 'greenhouse', slug: 'pingidentity', displayName: 'Ping Identity' },  // 3 US software of 69, 16 approvals
+  { source: 'greenhouse', slug: 'knowbe4', displayName: 'KnowBe4' },  // 2 US software of 57, 8 approvals
+  { source: 'greenhouse', slug: 'beyondtrust', displayName: 'BeyondTrust Corporation' },  // 8 US software of 41, 4 approvals; the USCIS key's name
 ];
 
 const CONFIG = {

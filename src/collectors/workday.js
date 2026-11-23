@@ -138,17 +138,33 @@ async function fetchDetail(company, externalPath) {
   return data?.jobPostingInfo?.jobDescription || '';
 }
 
-// "Posted 3 Days Ago" → approximate ISO date, else null.
+// Workday's recency label → approximate ISO date, else null.
+//
+// The labels are "Posted Today", "Posted Yesterday", "Posted 5 Days Ago" and,
+// for anything older, "Posted 30+ Days Ago". Only the "N days ago" form used to
+// be read, so the other three arrived undated, and an undated row is dated by
+// the run that first sees it. A posting open for months therefore showed as new,
+// was deleted when that first-seen date left the 14-day retention window, and
+// showed as new again on the next run, every two weeks for as long as it stayed
+// open. "30+" is dated at its lower bound, 30 days ago: the most recent date the
+// label allows, and still past the retention window, so normalize drops it.
 function parsePostedOn(s) {
   if (!s) return null;
-  const m = /(\d+)\s+(day|days|hour|hours|month|months)\s+ago/i.exec(s);
+  const t = String(s).toLowerCase();
+  const d = new Date();
+  if (/\btoday\b|just posted/.test(t)) return d.toISOString();
+  if (/\byesterday\b/.test(t)) {
+    d.setDate(d.getDate() - 1);
+    return d.toISOString();
+  }
+  const m = /(\d+)\s*\+?\s*(hour|day|week|month)s?\s+ago/.exec(t);
   if (!m) return null;
   const n = Number(m[1]);
-  const unit = m[2].toLowerCase();
-  const d = new Date();
-  if (unit.startsWith('hour')) d.setHours(d.getHours() - n);
-  else if (unit.startsWith('day')) d.setDate(d.getDate() - n);
-  else if (unit.startsWith('month')) d.setMonth(d.getMonth() - n);
+  const unit = m[2];
+  if (unit === 'hour') d.setHours(d.getHours() - n);
+  else if (unit === 'day') d.setDate(d.getDate() - n);
+  else if (unit === 'week') d.setDate(d.getDate() - n * 7);
+  else d.setMonth(d.getMonth() - n);
   return d.toISOString();
 }
 
@@ -158,7 +174,12 @@ function parsePostedOn(s) {
 // after (a third of Capital One's candidates were). Newest first, so when the cap
 // bites it is the oldest rows that go without — and those keep the description
 // they got when they were new (see upsertJob).
-function pickCandidates(list) {
+//
+// The employer goes to the level gate too: Palo Alto Networks' "Staff" titles
+// are not senior (see looksSeniorReject), and they need their description read
+// here, since it is the stated years that decide whether they stay.
+function pickCandidates(list, company = {}) {
+  const employer = company.displayName || company.slug;
   return list
     .filter(
       (j) =>
@@ -169,7 +190,7 @@ function pickCandidates(list) {
         // "Visa Sponsorship through PayPal is not available" went unread.
         looksUSLocation(resolveLocation(j)) &&
         (!CONFIG.filterSoftwareOnly || looksSoftware(j.title)) &&
-        passesLevel(j.title, CONFIG.entryLevelMode || 'permissive')
+        passesLevel(j.title, CONFIG.entryLevelMode || 'permissive', employer)
     )
     .sort((a, b) => postedAgeDays(a.postedOn) - postedAgeDays(b.postedOn));
 }
@@ -195,7 +216,7 @@ async function fetchCompany(company) {
 
   const list = await fetchList(company);
 
-  const candidates = pickCandidates(list);
+  const candidates = pickCandidates(list, company);
   const enrichTargets = candidates.slice(0, DEFAULT_ENRICH_MAX);
 
   const descByPath = new Map();
@@ -225,4 +246,4 @@ async function fetchCompany(company) {
   }));
 }
 
-module.exports = { fetchCompany, detailUrl, pickCandidates, postedAgeDays, source: 'workday' };
+module.exports = { fetchCompany, detailUrl, pickCandidates, postedAgeDays, parsePostedOn, source: 'workday' };

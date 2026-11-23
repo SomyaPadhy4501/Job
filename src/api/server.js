@@ -7,6 +7,7 @@ const { queryJobs, queryCompanies, queryNewestJobs, getJobById, statsSummary, up
 const { jobsCache } = require('./cache');
 const { collectAll } = require('../services/collect');
 const { normalizeJob } = require('../services/normalize');
+const { dedupeBatch } = require('../services/dedupe');
 const log = require('../logger');
 
 // Filter parsing shared by /jobs and /companies, so the grouped view and the
@@ -186,7 +187,10 @@ function createApp() {
     }
 
     try {
-      const result = await bulkUpsert(toUpsert);
+      // The same in-batch dedupe a collect run applies: one copy per posting,
+      // and separate openings that share a title and location kept apart.
+      // Without it the upsert merged a batch's same-key rows into one.
+      const result = await bulkUpsert(dedupeBatch(toUpsert));
       inserted = result.inserted;
       updated = result.updated;
       jobsCache.clear();

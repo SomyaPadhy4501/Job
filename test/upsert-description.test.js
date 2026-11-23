@@ -112,3 +112,22 @@ test('a re-listed job keeps its original posting date', () => {
   upsertJob(job({ dedupe_key: 'repost-1', apply_url: 'https://example.com/repost-1-new', date_posted: '2026-09-20T12:00:00.000Z' }));
   assert.strictEqual(datePosted('repost-1'), '2026-09-20T12:00:00.000Z');
 });
+
+// Separate openings under one company|title|location are keyed "<key>#<opening>"
+// while there are several (dedupe.js), and a lone one goes back to the plain
+// key. Here opening a held the plain key alone, b joined under its own key, then
+// a closed. When b came back under the plain key, matching the key first rewrote
+// a's row with b and left b's own row as a duplicate. The link is matched first.
+test('a row is matched by its link before its key', () => {
+  const rows = () =>
+    getDb()
+      .prepare("SELECT dedupe_key, apply_url FROM jobs WHERE dedupe_key LIKE 'openings-1%' ORDER BY dedupe_key")
+      .all();
+  upsertJob(job({ dedupe_key: 'openings-1', external_id: 'a', apply_url: 'https://example.com/openings-1/a' }));
+  upsertJob(job({ dedupe_key: 'openings-1#b', external_id: 'b', apply_url: 'https://example.com/openings-1/b' }));
+  upsertJob(job({ dedupe_key: 'openings-1', external_id: 'b', apply_url: 'https://example.com/openings-1/b' }));
+  assert.deepStrictEqual(rows(), [
+    { dedupe_key: 'openings-1', apply_url: 'https://example.com/openings-1/a' },
+    { dedupe_key: 'openings-1#b', apply_url: 'https://example.com/openings-1/b' },
+  ]);
+});
