@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-// Finds where companies whose configured board went dead (404) hire now.
-// Input: the `collector.fail` lines from a collect log (one JSON object per
-// line: { source, slug, error }). For each "Not found" / 422 entry it tries:
+// Finds where companies whose configured board went dead hire now.
+// Input: `collector.fail` and/or `collector.ok` lines from a collect log (one
+// JSON object per line: { source, slug, error } or { source, slug, count }).
+// A board is dead when it fails "Not found" / 422, or answers with zero
+// postings — a company that changes ATS often leaves the old board up, empty.
+// For each dead entry it tries:
 //   1. every ATS with a collector, under slug variants of the company name —
 //      Greenhouse requires the board's registered name to match, since short
 //      slugs collide (scripts/verify-yc-ats.js has the same rule);
@@ -14,6 +17,7 @@
 // edit src/config.js.
 //
 //   gh run view <run-id> --log | grep collector.fail | sed 's/.*collector\.fail //' > fails.jsonl
+//   gh run view <run-id> --log | grep 'collector.ok.*"count":0}' | sed 's/.*collector\.ok //' >> fails.jsonl
 //   node scripts/reprobe-dead.js fails.jsonl
 
 const fs = require('fs');
@@ -104,7 +108,7 @@ async function main() {
   const file = process.argv[2];
   if (!file) throw new Error('usage: node scripts/reprobe-dead.js fails.jsonl');
   const fails = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
-    .filter((f) => /Not found|HTTP 422/.test(f.error));
+    .filter((f) => f.count === 0 || /Not found|HTTP 422/.test(f.error || ''));
   const bySlug = new Map(COMPANIES.map((c) => [`${c.source}:${c.slug}`, c]));
   const entries = fails.map((f) => ({ ...bySlug.get(`${f.source}:${f.slug}`), source: f.source, slug: f.slug }));
   process.stderr.write(`re-probing ${entries.length} dead entries…\n`);
