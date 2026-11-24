@@ -327,6 +327,10 @@ a { color: inherit; }
 .apply-btn {
   display: inline-flex;
   align-items: center;
+  /* Grid cells stretch the button to the column width: keep the label centered. */
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
   padding: 7px 14px;
   border-radius: var(--radius-md);
   background: var(--accent);
@@ -335,12 +339,12 @@ a { color: inherit; }
   font-weight: 600;
   font-size: 12.5px;
   transition: filter 120ms ease, transform 120ms ease, box-shadow 120ms ease;
-  box-shadow: 0 1px 2px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 1px 2px rgba(10, 101, 204, 0.25);
 }
 .apply-btn:hover {
   filter: brightness(1.06);
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.28);
+  box-shadow: 0 4px 10px rgba(10, 101, 204, 0.28);
 }
 
 /* ─── Pager ──────────────────────────────────────────────────────────────── */
