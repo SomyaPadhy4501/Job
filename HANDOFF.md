@@ -5,6 +5,83 @@ this codebase. It exists so you don't have to re-derive context.
 
 ---
 
+## Current state and next work (updated 2026-11-24) — START HERE
+
+**Live:** https://job-two-xi.vercel.app (Vercel project `job`, GitHub
+`SomyaPadhy4501/Job`). `main` = `fix/panw-staff-and-edge-cases` (both at
+`bb125ae`); the owner asked to push straight to `main` with no PRs. Push to
+`main` first, then the branch: pushing both at once makes Vercel build only
+a preview first.
+
+**What exists now** (details in "Rust backend" below):
+- Rust `/api/*` function (`crates/`, `api/server.rs`): Google sign-in,
+  sessions, resumes, encrypted profile + answer bank, extension tokens,
+  export/delete, `/api/autofill/*` (bearer), `/api/capture/jobs` (users share
+  listings → forwarded to Node `/admin/ingest`), daily cleanup cron. Node
+  still serves `/jobs`, `/companies`, `/stats`, `/admin/*`.
+- Web (`web/src`): sign-in is required for everything except `/privacy`
+  (`App.jsx` → `pages/Landing.jsx`). New accounts go to `/welcome`
+  (`pages/Welcome.jsx`: resume → about you → job-board defaults → extension).
+  Profile has `board` defaults (role/level/sponsorship/restriction/view,
+  validated in `crates/accounts/src/profile.rs`); `pages/Board.jsx` applies
+  them when the URL has no filters. Production builds redirect one-off
+  `*.vercel.app` deploy URLs to the main host (`web/src/site.js`,
+  `main.jsx`): Google sign-in only works on registered origins.
+- Extension (`extension/`, v1.10.0, served as a zip from `/autofill`, built
+  by `web/scripts/pack-extension.mjs`): autofill on Greenhouse/Lever/Ashby/
+  Workday automatically, any other site via popup "Autofill this page"
+  (per-site optional permission); resume picker; Ashby Yes/No clicked with
+  form submission blocked (`guardedClick` in `autofill-adapters.js`);
+  "this country"/"country where the job is located" = US; after the user
+  submits, unsaved custom answers are held per tab (`autofill:holdAnswers`/
+  `takeAnswers` in `autofill-api.js`, `chrome.storage.session`, 30 min) and
+  offered in a small card (`offerHeld` in `autofill.js`). Light UI in the
+  panel and popup.
+
+**Production config (done):** Vercel env has `GOOGLE_CLIENT_ID`, `DATA_KEYS`,
+`CRON_SECRET`, `STORAGE_DRIVER=s3` + `S3_ENDPOINT/REGION/BUCKET/ACCESS_KEY_ID/
+SECRET_ACCESS_KEY` (Backblaze B2, bucket `jobboard-resumes-7k3q9x`,
+`us-east-005`; R2 was rejected: the owner won't add a credit card anywhere),
+`SIGNUPS_OPEN=true`, `INGEST_URL`. Migration 004 applied to Neon. Google
+Cloud project "Job Board" (`job-board-515704`), client "Job board web",
+origins `https://job-two-xi.vercel.app` + `http://localhost:5173`; consent
+screen is still in **Testing** (only the owner's Gmail can sign in).
+
+**Not verified / open:**
+1. The last deploy (`bb125ae`, extension 1.10.0) was pushed but its
+   production deploy wasn't checked: confirm `/downloads/extension.json`
+   says 1.10.0 and `/api/health` is all true.
+2. The after-submit save offer was tested on a local fixture form (works,
+   incl. across the page change); not yet on a real Greenhouse confirmation
+   page or with Workday's multi-step flow.
+3. Ashby "Where are you currently located?" (location search combobox) and
+   "When can you start?" (date picker) are still left for the user.
+4. Owner to do: publish the Google consent screen when opening sign-ups;
+   move `C:\Users\aryan\job-board-secrets-BACKUP.txt` into a password
+   manager; enable Vercel 2FA.
+5. Not merged: TikTok/ByteDance collector branch
+   `claude/exciting-leavitt-975106`.
+6. Plan Part C (port Node backend to Rust) not started; server-side
+   `GET /api/autofill/form-schema` not built.
+
+**How to test locally (Windows, no MSVC):** `docker compose run --rm cargo
+test --workspace` (Rust + Postgres); `docker compose up -d api` (dev API on
+:4100, email-only dev sign-in, `.env` holds the Google client id); `cd web &&
+BOARD_API=https://job-two-xi.vercel.app npx vite` (board data from the live
+site). Node tests on Node 26 need the node:sqlite shim
+(`NODE_OPTIONS=--require <shim>`; better-sqlite3 has no Node 26 build);
+`npm ci --ignore-scripts` if better-sqlite3 fails to compile. Live extension
+checks: load `extension/` into Playwright Chromium from
+`scraper/node_modules/playwright` with `--load-extension`, connect with a
+token from the local API, fill real public forms with all network aborted
+after load and submits blocked. Never submit a real application.
+
+**Owner preferences:** never auto-submit applications or guess
+sponsorship/qualification answers; no credit cards on any service; prefers
+the agent to drive the browser for setup; communicates in English/Hinglish.
+
+---
+
 ## What this is
 
 Personal job aggregator for **Somya** (the owner). Pulls US-based,
