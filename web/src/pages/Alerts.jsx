@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, formatDate, usePrivateQuery } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
+import { GmailConnector } from '../components/GmailConnector.jsx';
 import { Link } from '../router.jsx';
 import { webHref } from '../safe-url.js';
 
-// Saved searches that send the new jobs matching them to the user's linked
-// Telegram chat. Filters are the board's own; the server checks every value
+// The Alerts & Connectors tab: linked accounts (Gmail for the extension's
+// codes, Telegram for alerts), then saved searches that send the new jobs
+// matching them to the user's linked Telegram chat. Filters are the board's own; the server checks every value
 // again, and refuses a new alert until Telegram is linked.
 
 const ROLES = [
@@ -56,7 +58,7 @@ const toList = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 export default function Alerts() {
   return (
-    <RequireAuth reason="Sign in to get new jobs on Telegram.">
+    <RequireAuth reason="Sign in to connect Gmail and Telegram and get new jobs as alerts.">
       <AlertsPage />
     </RequireAuth>
   );
@@ -72,13 +74,18 @@ function AlertsPage() {
   return (
     <>
       <div className="page-head">
-        <h2>Job alerts</h2>
-        <p className="muted">Get new jobs that match your search on Telegram.</p>
+        <h2>Alerts &amp; Connectors</h2>
+        <p className="muted">Link your accounts, then get new jobs that match your search on Telegram.</p>
       </div>
+      <section className="card section" id="connectors" aria-labelledby="connectors-title">
+        <h3 id="connectors-title">Connectors</h3>
+        <p className="muted small">Accounts you link so the site and the extension can do more for you. Disconnect any time.</p>
+        <GmailConnector />
+        <TelegramConnector status={chat} />
+      </section>
       {chat.data && ready && !linked && (
-        <p className="notice">Link Telegram below first. Alerts are sent to your Telegram chat.</p>
+        <p className="notice">Link Telegram above first. Alerts are sent to your Telegram chat.</p>
       )}
-      <TelegramCard status={chat} />
       <section className="card section">
         <div className="section-head-row">
           <h3>Your alerts</h3>
@@ -263,7 +270,7 @@ function AlertForm({ initial, onDone }) {
   );
 }
 
-function TelegramCard({ status }) {
+function TelegramConnector({ status }) {
   const qc = useQueryClient();
   const [code, setCode] = useState(null);
   const tg = status.data?.telegram;
@@ -280,8 +287,11 @@ function TelegramCard({ status }) {
   });
 
   return (
-    <section className="card section">
-      <h3>Telegram</h3>
+    <div className="connector">
+      <div className="connector-head">
+        <strong>Telegram</strong>
+        {tg?.linked && <span className="pill pill-entry">Connected</span>}
+      </div>
       {status.isLoading ? (
         <div className="skeleton skeleton-row" />
       ) : status.error ? (
@@ -331,6 +341,6 @@ function TelegramCard({ status }) {
       <p className="muted small">
         Jobs you send to the bot with <code>/apply</code> land in your <Link to="/queue">apply queue</Link>.
       </p>
-    </section>
+    </div>
   );
 }

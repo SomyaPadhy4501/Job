@@ -398,12 +398,12 @@ test("Gmail: the portal's own message reaches the page", async () => {
   const api = load({
     gmail: box.self.AutofillGmail,
     routes: {
-      'POST /api/autofill/gmail/code': json({ error: 'Connect Gmail in Settings → Connectors on the job board to fill codes.', code: 'conflict' }, 409),
+      'POST /api/autofill/gmail/code': json({ error: 'Connect Gmail in Alerts & Connectors on the job board to fill codes.', code: 'conflict' }, 409),
     },
   });
   await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
   const gh = { id: 'ext', url: 'https://job-boards.greenhouse.io/acme/jobs/1', tab: { id: 4 }, frameId: 3 };
-  assert.match((await api.send({ type: 'autofill:findCode', length: 6 }, gh)).error, /Settings → Connectors/);
+  assert.match((await api.send({ type: 'autofill:findCode', length: 6 }, gh)).error, /Alerts & Connectors/);
   const call = api.calls.find((c) => c.url.endsWith('/api/autofill/gmail/code'));
   assert.equal(call.init.headers.Authorization, 'Bearer tok');
   assert.equal(call.init.credentials, 'omit');

@@ -351,7 +351,7 @@ $('gmailManage').onclick = async () => {
   const { portalUrl } = await chrome.storage.local.get({ portalUrl: defaults.portalUrl });
   const base = new URL(portalUrl);
   if (base.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(base.hostname)) return;
-  chrome.tabs.create({ url: base.origin + '/settings#connectors' });
+  chrome.tabs.create({ url: base.origin + '/alerts#connectors' });
 };
 showGmail();
 

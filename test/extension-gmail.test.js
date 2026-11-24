@@ -128,7 +128,7 @@ test('status, and the old in-extension token is cleared', async () => {
 test('the portal saying "not connected" reaches the caller', async () => {
   const { G } = load({});
   const request = async () => {
-    throw new Error('Connect Gmail in Settings → Connectors on the job board to fill codes.');
+    throw new Error('Connect Gmail in Alerts & Connectors on the job board to fill codes.');
   };
-  await assert.rejects(G.findCode(request, 'workday', 'acme', {}), /Settings → Connectors/);
+  await assert.rejects(G.findCode(request, 'workday', 'acme', {}), /Alerts & Connectors/);
 });

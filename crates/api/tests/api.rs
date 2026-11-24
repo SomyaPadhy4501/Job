@@ -2786,8 +2786,8 @@ async fn callback(b: &mut Browser<'_>, query: &str) -> String {
         .to_str()
         .unwrap()
         .to_owned();
-    assert!(loc.starts_with("/settings?gmail="), "{loc}");
-    loc.trim_start_matches("/settings?gmail=")
+    assert!(loc.starts_with("/alerts?gmail="), "{loc}");
+    loc.trim_start_matches("/alerts?gmail=")
         .trim_end_matches("#connectors")
         .to_owned()
 }
@@ -2971,7 +2971,7 @@ async fn gmail_codes_for_the_extension() {
         res.json()["error"]
             .as_str()
             .unwrap()
-            .contains("Settings → Connectors")
+            .contains("Alerts & Connectors")
     );
 
     let q = start_gmail(&mut web, &fake).await;

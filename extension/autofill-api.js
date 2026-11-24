@@ -144,7 +144,7 @@
       return { password: saved.password, autoSignIn: !entry.failed };
     }
     // ─── Gmail: codes and verify links (gmail.js) ───────────────────────
-    // Gmail is connected on the portal (Settings → Connectors); here only the
+    // Gmail is connected on the portal (Alerts & Connectors); here only the
     // job page asking is checked, then the portal is asked for the code.
     let gmailAsk = null;
     if (msg.type === 'autofill:gmailStatus') {
@@ -205,7 +205,7 @@
       throw new Error('Connect the autofill token for this portal in the extension popup.');
     if (msg.binding && msg.binding !== auth.binding) throw new Error('Account changed. Reopen Autofill.');
     // `say`: show the portal's own error message (short, plain text), for
-    // answers the user can act on ("Connect Gmail in Settings → Connectors").
+    // answers the user can act on ("Connect Gmail in Alerts & Connectors").
     async function request(path, init, optional = false, say = false) {
       const res = await fetch(auth.origin + '/api/autofill/' + path, {
         ...init,

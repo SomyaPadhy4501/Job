@@ -1,6 +1,6 @@
 //! Connectors: outside accounts a user links to theirs. Gmail today.
 //!
-//! Connecting (Settings -> Connectors -> Connect Gmail), OAuth 2.0
+//! Connecting (Alerts & Connectors -> Connect Gmail), OAuth 2.0
 //! authorization code with PKCE plus OpenID Connect (`accounts::gmail`):
 //! - `POST /api/me/connectors/gmail/start` (session + CSRF) makes the PKCE
 //!   verifier, `state` and `nonce`, seals them with the user's id in an
@@ -55,11 +55,10 @@ pub const STARTS_PER_DAY: i64 = 20;
 pub const READS_PER_DAY: i64 = 600;
 /// Message ids the extension may say it already used.
 pub const MAX_SKIP: usize = 50;
-const SETTINGS: &str = "/settings";
+const CONNECTORS_PAGE: &str = "/alerts";
 
-const NOT_CONNECTED: &str =
-    "Connect Gmail in Settings → Connectors on the job board to fill codes.";
-const RECONNECT: &str = "Gmail access was removed. Reconnect it in Settings → Connectors.";
+const NOT_CONNECTED: &str = "Connect Gmail in Alerts & Connectors on the job board to fill codes.";
+const RECONNECT: &str = "Gmail access was removed. Reconnect it in Alerts & Connectors.";
 
 /// A connect in progress, sealed in the flow cookie.
 #[derive(Serialize, Deserialize)]
@@ -129,7 +128,7 @@ fn gmail_error(e: GmailError) -> ApiError {
         GmailError::Refused(why) => {
             eprintln!("gmail: refused: {why}");
             ApiError::Unavailable(
-                "Gmail refused the request. Reconnect it in Settings → Connectors.".into(),
+                "Gmail refused the request. Reconnect it in Alerts & Connectors.".into(),
             )
         }
         GmailError::BadResponse => {
@@ -140,7 +139,7 @@ fn gmail_error(e: GmailError) -> ApiError {
 }
 
 // ---------------------------------------------------------------------------
-// Settings -> Connectors (session)
+// Alerts & Connectors (session)
 
 /// `GET /api/me/connectors`
 pub async fn list(State(state): State<AppState>, signed: Signed) -> ApiResult<Json<Value>> {
@@ -238,7 +237,7 @@ pub async fn gmail_callback(
         [
             (
                 header::LOCATION,
-                format!("{SETTINGS}?gmail={result}#connectors"),
+                format!("{CONNECTORS_PAGE}?gmail={result}#connectors"),
             ),
             (header::SET_COOKIE, flow_cookie(&state, "", 0)),
             // The callback URL holds the code: never pass it on as a referrer.

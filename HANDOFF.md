@@ -40,7 +40,7 @@ this codebase. It exists so you don't have to re-derive context.
 
 ### Done 2026-11-24 (Gmail connector)
 - Settings → **Connectors** → Connect Gmail (`web/src/pages/Settings.jsx`). Replaces the extension's own implicit-flow Gmail sign-in (`response_type=token`, no PKCE, no refresh token), which never shipped because `gmailClientId` was empty.
-- Server side, OAuth 2.0 authorization code + **PKCE (S256)** + **OIDC**: `crates/accounts/src/gmail.rs` (client, PKCE, Gmail reading, code/link picking) and `crates/api/src/connectors.rs` (routes). `POST /api/me/connectors/gmail/start` seals `{state, verifier, nonce, exp}` with AES-GCM bound to the user id into `__Host-jb_gmail` (HttpOnly, SameSite=Lax, 10 min; the session cookie is Strict so it isn't sent on Google's redirect). `GET /api/connectors/gmail/callback` checks the cookie, `state` (constant time), trades code + verifier + client secret, verifies the ID token (Google keys, `aud` = Gmail client, nonce), requires `gmail.readonly` in the granted scopes (else revokes), and redirects to `/settings?gmail=<word>#connectors` with `Referrer-Policy: no-referrer`. A reconnect revokes the replaced grant.
+- Server side, OAuth 2.0 authorization code + **PKCE (S256)** + **OIDC**: `crates/accounts/src/gmail.rs` (client, PKCE, Gmail reading, code/link picking) and `crates/api/src/connectors.rs` (routes). `POST /api/me/connectors/gmail/start` seals `{state, verifier, nonce, exp}` with AES-GCM bound to the user id into `__Host-jb_gmail` (HttpOnly, SameSite=Lax, 10 min; the session cookie is Strict so it isn't sent on Google's redirect). `GET /api/connectors/gmail/callback` checks the cookie, `state` (constant time), trades code + verifier + client secret, verifies the ID token (Google keys, `aud` = Gmail client, nonce), requires `gmail.readonly` in the granted scopes (else revokes), and redirects to `/alerts?gmail=<word>#connectors` with `Referrer-Policy: no-referrer`. A reconnect revokes the replaced grant.
 - `gmail_connections` (migration 009): refresh token and Gmail account encrypted (`Field::GmailGrant`), access token cached encrypted (`Field::GmailAccess`) until a minute before expiry. `invalid_grant` on refresh deletes the row (Settings shows Not connected). Disconnect and account deletion revoke at Google. Export lists the connected address only.
 - Extension 1.20.0: `gmail.js` asks `POST /api/autofill/gmail/code` / `/verify-link` with the autofill token (skip list of used message ids stays in `chrome.storage.session`), re-checks the code shape and the link (https, this tenant, verify path). `identity` permission, Google host permissions and `config.js` removed. Popup card links to Connectors.
 - Limits: 20 connect starts and 600 Gmail lookups per user per day. Tests: `cargo test -p accounts gmail`, `crates/api/tests/api.rs` `gmail_*` (fake Google: PKCE, state, nonce, scope, cross-browser, revocation), `test/extension-gmail.test.js`.
@@ -166,7 +166,7 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
     IndexedDB; ledger in `chrome.storage.session` (≤3 fills/company/10 min, no
     auto attempt after a failure until the password changes).
   - Gmail (`gmail.js`, `autofill-codes.js`): codes and Workday verify links,
-    asked from the portal's Gmail connector (Settings → Connectors); **off
+    asked from the portal's Gmail connector (Alerts & Connectors tab); **off
     until `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` are set on Vercel**.
 
 **Done 2026-11-24 (fourth session):**
@@ -196,7 +196,7 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
    the in-app browser; Google's popup only opens from the owner's own click):
    resume upload/download/delete on Backblaze, the cleanup cron (run it once
    from Vercel -> Settings -> Cron Jobs), and listing sharing end to end.
-2. Gmail setup (owner) — the connector is built (Settings → Connectors, see
+2. Gmail setup (owner) — the connector is built (Alerts & Connectors tab, see
    "Done 2026-11-24 (Gmail connector)"); it stays off until:
    a. A **separate** Google Cloud project (so the sign-in consent screen can
       still be published without restricted-scope review): enable the Gmail

@@ -3,7 +3,7 @@
 // Gmail, for the codes and links job sites email mid-application (Greenhouse
 // "security code", Workday "verify your account"). Imported by the worker.
 //
-// - Gmail is connected on the job board (Settings → Connectors), with
+// - Gmail is connected on the job board (Alerts & Connectors), with
 //   Google's authorization-code flow, PKCE and OpenID Connect. The Gmail
 //   grant stays on the server; this extension never holds a Google token.
 // - The worker asks the portal (with the autofill token) for one code or one

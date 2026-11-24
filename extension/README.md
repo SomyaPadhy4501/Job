@@ -136,7 +136,7 @@ and click Create Account.
 
 ### Codes from Gmail
 
-**Connect Gmail** on the job board, in Settings → Connectors (read-only,
+**Connect Gmail** on the job board, in Alerts & Connectors (read-only,
 Google's consent screen; authorization-code flow with PKCE and OpenID Connect,
 run by the server). The extension then fills the security / verification codes
 Greenhouse and Workday email mid-application, and opens Workday's "verify your

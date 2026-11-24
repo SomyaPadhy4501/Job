@@ -7,7 +7,7 @@ const NAV = [
   ['/resumes', 'Resumes'],
   ['/profile', 'Profile'],
   ['/autofill', 'Autofill', 'signed-in'],
-  ['/alerts', 'Alerts', 'signed-in'],
+  ['/alerts', 'Alerts & Connectors', 'signed-in'],
   ['/queue', 'Queue', 'signed-in'],
   ['/settings', 'Settings'],
 ];

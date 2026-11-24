@@ -35,7 +35,7 @@ export default function Privacy() {
           storage and used only on Workday sign-in pages. This site never receives it.
         </li>
         <li>
-          <strong>Codes from Gmail.</strong> If you connect Gmail in Settings → Connectors, Google's own consent screen
+          <strong>Codes from Gmail.</strong> If you connect Gmail in Alerts & Connectors, Google's own consent screen
           asks you to allow read-only Gmail access. This site then keeps that permission (a Google refresh token,
           encrypted) so the extension can ask for the security code or Workday verification link a job site just emailed
           you. Only mail from Workday and Greenhouse received in the last 15 minutes is looked at, and only the code or
