@@ -4,9 +4,9 @@ import { api, formatDate, usePrivateQuery } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
 import { webHref } from '../safe-url.js';
 
-// The apply queue: jobs the user means to apply to. Jobs arrive from alert
-// emails ("Add to my apply queue"), the Telegram bot (/apply) or a pasted
-// link. Nothing here, or anywhere, submits an application: the user opens
+// The apply queue: jobs the user means to apply to. Jobs arrive from the
+// board's "Add to queue" button, alert emails ("Add to my apply queue"), the
+// Telegram bot (/apply) or a pasted link. Nothing here, or anywhere, submits an application: the user opens
 // the job and submits it, then marks it applied.
 
 const STATUS = {
@@ -45,7 +45,7 @@ function QueuePage() {
         ) : error ? (
           <p className="error">{error.message}</p>
         ) : open.length === 0 ? (
-          <p className="muted small">Nothing queued. Add jobs from alert emails, the Telegram bot, or a link above.</p>
+          <p className="muted small">Nothing queued. Press “Add to queue” on any job on the board, or add one from an alert email, the Telegram bot, or a link above.</p>
         ) : (
           <ul className="queue-list">
             {open.map((item) => (

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { webHref } from '../safe-url.js';
 import { api, useAccount } from '../account.js';
+import { Link } from '../router.jsx';
 
 const ROLE_LABEL = {
   SWE: 'SWE',
@@ -159,6 +160,12 @@ function QueueButton({ jobId }) {
       >
         {label}
       </button>
+      {add.isSuccess && (
+        // The span stops the click from also toggling a company group open.
+        <span className="small" onClick={(e) => e.stopPropagation()}>
+          <Link to="/queue">See your queue →</Link>
+        </span>
+      )}
       {add.isError && (
         <span className="error small" role="alert">
           {add.error.message}
