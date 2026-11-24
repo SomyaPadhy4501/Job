@@ -1,0 +1,75 @@
+# Local toolchain for the Rust backend (crates/, api/server.rs): Rust and
+# Postgres in containers, so building needs no Visual Studio Build Tools on
+# Windows, and it builds on Linux like Vercel does.
+#
+#   docker compose run --rm cargo test --workspace     # all Rust tests
+#   docker compose run --rm cargo clippy --workspace
+#   docker compose up api                              # dev API on :4100
+#
+# The Vite dev server proxies /api to :4100 (web/vite.config.js). Postgres is
+# published on localhost:5433. On first start it applies every
+# migrations/*.sql in order, the same files migrate.yml runs against Neon.
+# `docker compose down -v` deletes the data and the build cache.
+#
+# The Node backend uses none of this: it still runs on SQLite, or on
+# DATABASE_URL, as before.
+
+x-rust: &rust
+  image: rust:1.96-slim-bookworm
+  working_dir: /work
+  volumes:
+    - .:/work
+    - cargo-registry:/usr/local/cargo/registry
+    - cargo-target:/target
+  depends_on:
+    pg:
+      condition: service_healthy
+
+services:
+  pg:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jobboard
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "jobboard"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  cargo:
+    <<: *rust
+    entrypoint: ["cargo"]
+    command: ["test", "--workspace"]
+    environment:
+      CARGO_TARGET_DIR: /target
+      DATABASE_URL: postgres://postgres:postgres@pg:5432/jobboard
+
+  api:
+    <<: *rust
+    command: ["cargo", "run", "-p", "api", "--bin", "dev"]
+    environment:
+      CARGO_TARGET_DIR: /target
+      DATABASE_URL: postgres://postgres:postgres@pg:5432/jobboard
+      API_ADDR: 0.0.0.0:4100
+      # Local development only. This key is public (it is the test key in
+      # crates/accounts/src/testing.rs); production uses its own DATA_KEYS.
+      DATA_KEYS: "1:AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+      # Resume files go to the build-cache volume, not the repository.
+      STORAGE_DRIVER: fs
+      STORAGE_FS_ROOT: /target/blobs
+      # Set this to try real Google sign-in locally (the dev server also
+      # offers an email-only sign-in).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    ports:
+      - "127.0.0.1:4100:4100"
+
+volumes:
+  pgdata:
+  cargo-registry:
+  cargo-target:

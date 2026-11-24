@@ -1,0 +1,2 @@
+# THROWAWAY TEST KEY. It signs fake Google ID tokens in tests and is trusted
+# nowhere else; production verifies against Google's published keys only.

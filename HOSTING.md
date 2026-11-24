@@ -297,14 +297,47 @@ clean.
 |------------------|------------------------------------|---------------------------------------------------|
 | `DATABASE_URL`   | Vercel env + GitHub Actions secret | Neon connection string (use the pooled one)       |
 | `COLLECT_TOKEN`  | Vercel env + GitHub Actions secret | Random 32-byte hex, gates `/admin/*` routes       |
-| `INGEST_URL`     | GitHub Actions secret (scraper)    | `https://<vercel-domain>/api/admin/ingest`        |
+| `INGEST_URL`     | GitHub Actions secret (scraper)    | `https://<vercel-domain>/admin/ingest`            |
 | `FILTER_US`      | Vercel env + Actions env           | `true`                                            |
 | `FILTER_SOFTWARE`| Vercel env + Actions env           | `true`                                            |
 | `ENTRY_LEVEL_MODE`| Vercel env + Actions env          | `permissive` (see `src/config.js`)                |
-| `RETENTION_DAYS` | Vercel env + Actions env           | `30` (drops rows older than N days at collect end)|
+| `RETENTION_DAYS` | Vercel env + Actions env           | default `14` (drops rows older than N days at collect end)|
+| `VISIBLE_DAYS`   | Vercel env + Actions env           | default `7` (how far back the board shows postings)|
 
 **Do not** commit any of these. Vercel has an env-var UI; GitHub Actions has
 repo Settings → Secrets and variables → Actions.
+
+### Accounts and autofill (the Rust `/api` function)
+
+All **Vercel only**, marked Sensitive. Never put `DATA_KEYS` or the R2 keys in
+GitHub Actions: Actions also holds `DATABASE_URL`, and the two together would
+decrypt everything. Give preview deployments their own values (a Neon branch,
+their own `DATA_KEYS` and bucket).
+
+| Name                 | Value |
+|----------------------|-------|
+| `GOOGLE_CLIENT_ID`   | OAuth client id (Google Cloud → Credentials → Web client). Authorized JavaScript origins: the Vercel URL and `http://localhost:5173`. |
+| `DATA_KEYS`          | `1:<base64 of 32 random bytes>` (`openssl rand -base64 32`). To rotate, add `2:<new key>`; old values stay readable and are re-encrypted on their next write. Losing every key loses every profile and answer. |
+| `DATA_KEY_CURRENT`   | Optional: the key version new writes use (default: the highest). |
+| `STORAGE_DRIVER`     | `r2` |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | A **private** R2 bucket and an API token scoped to that bucket only (Object Read & Write). |
+| `SIGNUPS_OPEN`       | `false` at launch. `true` lets anyone create an account (publish the privacy page first). |
+| `SIGNUP_ALLOWLIST`   | Comma-separated Google `sub` ids that may sign up while sign-ups are closed (your own). Find yours in the `users` table after one dev sign-in, or decode your Google ID token. |
+| `OWNER_SUBS`         | Comma-separated Google `sub` ids that see the usage panel in Settings. |
+| `MAX_USERS`          | Default `500`. |
+| `CRON_SECRET`        | At least 16 random characters. Vercel Cron sends it to `/api/cron/cleanup` daily (see `vercel.json`). |
+| `INGEST_URL`, `COLLECT_TOKEN` | Also on the Rust function, for "Share job listings I browse": `INGEST_URL=https://<site>/admin/ingest` and the same `COLLECT_TOKEN` the Node backend checks. Users never see the token; their extension token is checked, listings are filtered and capped, then forwarded server to server. Without both, sharing answers 503. |
+| `SHARING_OPEN`       | Default on. `false` turns listing sharing off for everyone. |
+| `SHARES_PER_USER_PER_DAY` | Default `3000` listings per user per day. |
+| Optional limits      | `MAX_RESUMES` (10), `MAX_USER_BYTES` (12 MB), `UPLOADS_PER_DAY` (5), `UPLOADS_PER_MONTH` (3000, all users), `R2_MAX_BYTES` (9 GB, all users), `SIGNINS_PER_IP_PER_DAY` (40). |
+
+Without `DATA_KEYS`, R2 or `GOOGLE_CLIENT_ID`, the matching account routes
+answer 503 and the public board keeps working. `GET /api/health` reports which
+pieces are configured.
+
+Neon's free plan is 1 GB (not 0.5 GB as written above) and 100 compute-hours a
+month shared with the collector. Anonymous visitors never touch the accounts
+tables: the web app calls `/api/auth/me` only when the `jb_li` cookie is set.
 
 ---
 

@@ -1,0 +1,32 @@
+[package]
+name = "accounts"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+description = "Accounts logic with no HTTP or SQL: encryption, tokens, Google sign-in, profile schema, resume parsing, file storage."
+
+[features]
+# Helpers for other crates' tests: a fixed RSA key to sign fake Google ID tokens.
+test-util = []
+
+[dependencies]
+aes-gcm = "0.10"
+base64 = { workspace = true }
+getrandom = "0.3"
+hmac = "0.12"
+jsonwebtoken = "9"
+miniz_oxide = "0.8"
+pdf-extract = "0.12"
+regex = "1"
+reqwest = { workspace = true }
+rusty-s3 = { version = "0.12", default-features = false, features = ["rustcrypto"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+subtle = "2"
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+url = "2"
+uuid = { workspace = true }
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }

@@ -69,3 +69,8 @@ jobs:
              WHERE table_name='jobs'
                AND column_name IN ('restriction','yoe_min')
              ORDER BY column_name;"
+          echo "--- accounts tables (004) ---"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -t -c "
+            SELECT t, to_regclass('public.' || t) IS NOT NULL AS present
+              FROM unnest(ARRAY['users','sessions','api_tokens','resumes','profiles','answers',
+                                'usage_counters','audit_events','object_deletions']) AS t;"

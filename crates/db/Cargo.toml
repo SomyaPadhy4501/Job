@@ -1,0 +1,18 @@
+[package]
+name = "db"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+description = "Postgres queries for the accounts tables (migrations/004_accounts.sql)."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+sqlx = { workspace = true, features = ["migrate"] }
+tokio = { workspace = true }

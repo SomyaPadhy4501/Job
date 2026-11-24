@@ -3,3 +3,7 @@ node_modules/
 *.log
 .DS_Store
 .env
+/target/
+# Built from extension/ by web/scripts/pack-extension.mjs
+/web/public/downloads/
+/web/dist/downloads/

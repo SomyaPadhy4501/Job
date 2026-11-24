@@ -25,15 +25,24 @@ collect after the merge also triggers a one-shot dedupe migration that
 removes existing `apply_url` duplicates (kept oldest row, ran cleanly on
 2026-04-24 removing 25 dupes).
 
-**Current state (2026-11-23):** `COMPANIES` holds **1,171 boards**: 1,057
+**Current state (2026-11-23):** `COMPANIES` holds **1,183 boards**: 1,057
 after merging the two branches below, 7 security boards, 96 employers mined
-from the new-grad lists, speedyapply's AI list, 9 Jibe career sites and one
-Pinpoint board (Confluence Technologies). The live board showed 904 visible rows with
+from the new-grad lists, speedyapply's AI list, 9 Jibe career sites, one
+Pinpoint board (Confluence Technologies) and 12 boards moved off the browser
+extension. The live board showed 904 visible rows with
 every filter off (783 in the default view), from 16,480 stored.
 
 **Changed 2026-11-23 (branch `fix/panw-staff-and-edge-cases`):**
 - Merged `feat/expand-ats-coverage` (179 more boards, including Cisco on Workday, Okta, Zscaler, SentinelOne, Tenable, Wiz, Snyk, Tanium and 1Password; 5 repointed and 22 dead ones dropped) and `claude/dreamy-leakey-8f1afb` (USCIS sponsor data refreshed to FY2025–26). Both were finished on 2026-11-02 but never merged into `main`. `fix/ci-and-strict-yoe` is an older branch that `main` superseded (d720b24 ported what it kept), so it was not merged.
-- **Palo Alto Networks "Staff" titles are no longer dropped as senior** (owner's call). Its ladder runs Software Engineer → Staff → Senior Staff → Principal, and it hires new grads into "Staff Software Engineer"; the generic `staff` rule dropped all of them before their descriptions were read. (The board held 0 Palo Alto Networks rows that day. The rest of the gap was the date and dedupe issues below: its 20 plain "Software Engineer" postings had collapsed into one undated row that cycled in and out of the 7-day window.) `STAFF_NOT_SENIOR_EMPLOYERS` in `normalize.js` lists the employers where bare "Staff" isn't a level; the 0-2 year cap still decides from the description. A title that names a new-grad track ("Staff Software Engineer (New Grad)") also passes at any employer. `passesLevel(title, mode, company)` now takes the employer, and every caller passes it: collectors, `normalizeJob`, `prune-rejected.js` and SQLite's boot pass. Add an employer to that list rather than loosening `SENIOR_REJECT`.
+- **Level comes from what the posting says, not the title alone** (owner's call; replaced a first, Palo-Alto-only exception the same day). Titles mean different things at different employers: Palo Alto Networks hires new grads as "Staff Software Engineer", Walmart's "Software Engineer III" asks for 2 years, and startups call a 2-year role "Senior". The generic `staff` rule had dropped every such posting before its description was read; the board held 0 Palo Alto Networks rows that day. (The rest of that gap was the date and dedupe issues below: its 20 plain "Software Engineer" postings had collapsed into one undated row that cycled in and out of the 7-day window.) Now, in `normalize.js`:
+  - `MANAGEMENT_REJECT` (manager, director, head of, VP, chief, supervisor, distinguished) and internships are rejected whatever the posting says.
+  - `SENIORITY_WORDS` (senior, sr, staff, principal, lead, architect, III+) are kept only if `levelVerdict` finds the posting puts the role in range: a new-grad track in the title (`NEW_GRAD_TRACK`) or text (`NEW_GRAD_TEXT`: "new grad", "recent graduates", "graduating in 2027", "class of 2027"…, not boilerplate like "early career programs"), or a main requirement of at most 2 years with nothing of 5+ years anywhere. The main requirement is the one tied to a bachelor's or master's degree when given, else the highest stated: Palantir's "3+ years of professional development; 1+ years of networking" is 3, not 1.
+  - Plain titles keep the lowest stated minimum, as before.
+  - `passesLevel(title, mode)` is the title-only gate collectors use before per-job description requests. It now passes seniority words so their descriptions get read, and `levelRank` puts them last in each collector's capped detail budget. `prune-rejected.js` judges stored rows with the same verdict against their stored description.
+  - Replayed on 13,083 live postings from 39 boards (retention off): 443 kept before, 447 after. Added: Pinterest "Sr. MLE", Rivian "Sr. Power Electronics" and Cloudflare "Senior SWE", whose postings ask for 2+ years; Databricks "Staff MLE", whose posting says "2-8 years"; Linear "Product Engineer", a plain title the old reader misread. Dropped: Perplexity's "Member of Technical Staff", which asks for 3+ years.
+- **The years reader** (`experience.js`) had three bugs, which hit plain titles too. "What we're looking for: 8+ years of … experience" and "more than 5 years of experience" were read as company history ("for 8 years, Scale has been…"), so the requirement was dropped. A lead-in followed by experience now counts (`EXPERIENCE_AFTER`). A range's upper end was also counted as a second minimum ("2-4 years" read 2 and 4); it now asks for 2. `experienceProfile` returns `{ min, max, top, degree }`, and `extractExperience` still returns `{ min, max }`.
+- **Escaped HTML.** Greenhouse's `content=true` sends the markup escaped (`&lt;p&gt;8+&amp;nbsp;years`), and `stripHtml` stripped tags before unescaping. Stored Greenhouse descriptions kept literal `<p>` tags, and "8+&nbsp;years" never read as a number. Escaped markup is now unescaped first, and numeric entities are decoded.
+- **Boards moved off the browser extension**, so they run in GitHub Actions with the computer off. The Phenom career sites are front ends over Workday: their public `/widgets` search names each job's Workday apply link. That moved Fiserv, Truist, Southwest, Asurion (2 sites), Blue Yonder, Warner Bros. Discovery, Blizzard and Bose to Workday boards. AmEx (5 kept rows, all sponsorship YES, 1,321 approvals), Nokia and Navy Federal moved to `oracle_hcm`, whose API sits on an oraclecloud.com host behind the vanity domain. Aliases `fiserv`, `bose` and `warner-bros-discovery` were added to `EMPLOYER_ALIASES` so those boards resolve under their brand names. The extension's `STARTER_BOARDS` is now just what a server can't read: Tesla and Wayfair (they block automated clients), Yelp (iCIMS), Corning (no apply link in its API) and AutoZone (its tech roles sit past the 500 newest postings `oracle_hcm` reads).
 - **Workday dates.** `parsePostedOn` read only "Posted N Days Ago", so "Posted Today", "Posted Yesterday" and "Posted 30+ Days Ago" arrived undated and were dated by the first run that saw them. A posting open for months showed as new, was deleted when that date left the 14-day window, then showed as new again on the next run. "30+" is now dated 30 days back, so retention drops it. On 2026-11-23, 48 of the 139 visible Workday rows were undated.
 - **Separate openings get separate rows** (owner's call). The company|title|location key also merged *different* openings that share a title and location, so Palo Alto Networks' 20 headquarters "Software Engineer" reqs showed as one. When one direct source lists several openings under a key, `dedupeBatch` (`src/services/dedupe.js`) now keeps each, keyed `<key>#<opening>`. Two rows are one opening if they share the source's posting id or the link, so a req posted on two of an employer's Workday sites stays one row. Aggregators (`AGGREGATORS`) keep collapsing, because Getro tags one job with a different id in each VC network. An aggregator's copy joins the opening it links to, and an unmatched copy is dropped. `upsertJob` (both backends) now matches `apply_url` before `dedupe_key`. Matching the key first let an opening whose group had shrunk back to the plain key overwrite another opening's row. `/admin/ingest` now runs `dedupeBatch` too.
 - 7 security / networking boards found by `probe-boards.js names`: Gen Digital, Extreme Networks, Cribl, Coalition, Ping Identity, KnowBe4 and BeyondTrust (end of `COMPANIES`). Probed and not added: Teleport, Keeper Security, Dragos and Cato Networks (0-1 H-1B approvals). Workday tenants weren't probed because Workday was rate-limiting the machine (HTTP 429). F5, Fortinet and Akamai came in with the coverage audit below. Dell, HPE, Proofpoint, Synopsys, DocuSign, Seagate, CyberArk, Rapid7, Trellix, Nutanix and American Express (Oracle HCM) are still to check. AMD posts on a Jibe site no collector reads.
@@ -103,7 +112,7 @@ Other ways to run individual pieces:
 ## User's priorities (ranked; don't re-litigate)
 
 1. **US-based, full-time** (interns and co-ops are rejected globally in `normalize.js`; don't suggest re-enabling them)
-2. **Entry-level OR mid-level (1-2 YOE)**. `II` is mid, `III`+ is senior. Senior/staff/principal/lead/manager/architect are rejected. **Exception (owner's call, 2026-11-23):** a bare "Staff" passes at the employers in `STAFF_NOT_SENIOR_EMPLOYERS` (Palo Alto Networks, whose Staff rung includes new grads) and in titles that name a new-grad track. The 0-2 year cap then decides from the description.
+2. **Entry-level OR mid-level (0-2 YOE), judged from the posting itself** (owner's call, 2026-11-23). Manager / director / VP / chief titles and internships are rejected outright. Senior / staff / lead / principal / architect / III+ titles stay only when the posting puts the role in range (a stated main requirement of at most 2 years, or a new-grad track). Everything else stays unless the posting asks for more than 2 years. `II` is mid-level. See `levelVerdict` in `normalize.js`.
 3. **Role types:** SWE/SDE, MLE, AI/Research, Data Scientist, Data Engineer, DevOps/SRE/Platform, Security, Mobile
 4. **Visa sponsorship tracking.** Classifier is rule-based (`src/services/classifier.js`). Some sources pre-label sponsorship — their labels win over the classifier via `sponsorship_override`. **Roles a visa holder can't take are hidden by default** (owner's call, 2026-10-31): `deriveRestriction()` in `src/services/clearance.js` adds title rules (Cleared / TS/SCI / Federal / US Government…), explicit no-sponsorship (`NO_SPONSORSHIP`), and a defense/ITAR employer list applied only when a row has no description (`DEFENSE_EMPLOYER`). All stay in the DB; `?restriction=all` shows them. After changing these rules, run the `backfill-derived` workflow so existing Neon rows are reclassified.
 5. **Newest first.** Date sort with ISO normalization (`normalize.js::parseDateToIso`).
@@ -615,7 +624,7 @@ Response body for `GET /jobs`:
 
 ## Running tests / verifying state
 
-`npm test` runs the suite in `test/` (Node's built-in runner, 155 tests on
+`npm test` runs the suite in `test/` (Node's built-in runner, 164 tests on
 2026-11-23), and CI runs it on every push. Live verification still matters for
 collector changes. To verify one:
 
@@ -632,6 +641,49 @@ curl -s 'http://localhost:4000/jobs?role=MLE&level=mid&limit=5' | node -e 'let d
 # Scrape a single target (debug)
 cd scraper && node src/run-one.js meta
 ```
+
+---
+
+## Rust backend: accounts, resumes and autofill (`crates/`, `api/server.rs`)
+
+Everything under `/api/*` is one Rust function (axum on Vercel's Rust
+runtime); `/jobs`, `/companies`, `/stats` and `/admin/*` are still the Node
+function. Plan and design review: `~/.claude/plans/quiet-baking-duckling.md`.
+
+- `crates/accounts`: no HTTP or SQL. Field encryption (AES-256-GCM bound to
+  table, column, owner and key version; JSON deflated first), tokens, Google
+  ID-token checks, the profile schema and its merge-by-source rules, tags,
+  upload checks, the rule-based resume parser, resume ranking, R2/folder storage.
+- `crates/db`: every query for the `migrations/004_accounts.sql` tables, each
+  scoped to the owning user.
+- `crates/api`: the Router. `auth` (Google sign-in with a nonce, `__Host-jb_sid`
+  sessions: 30 days rolling, 90 days absolute, re-auth for tokens/export/delete),
+  `resumes`, `profile` (versioned, 409 on a stale write), `answers`, `account`
+  (tokens, export, delete), `autofill` (bearer token, for the extension),
+  `housekeeping` (daily cleanup, owner usage). CSRF: writes need
+  `X-Requested-With: fetch`, a same-site `Sec-Fetch-Site` and a matching `Origin`.
+  Every response is `private, no-store`.
+- Web pages: `web/src/pages/{Resumes,Profile,Settings,Privacy}.jsx`, a small
+  router in `web/src/router.jsx`, the client in `web/src/account.js`.
+- Extension autofill (JS) talks only to `/api/autofill/*`; see `extension/README.md`.
+
+Run it locally (needs Docker Desktop; no Visual Studio tools on Windows):
+
+```bash
+docker compose run --rm cargo test --workspace   # all Rust tests, against the pg container
+docker compose up api                            # dev API on :4100 (email-only dev sign-in)
+cd web && npm run dev                            # http://localhost:5173, proxies /api to :4100
+```
+
+Production rollout: apply migration 004 (`migrate.yml`, verify then apply),
+set the Vercel env in HOSTING.md → "Accounts and autofill", deploy a preview
+first and check `GET /api/health` (Rust) and `/jobs` (Node) both answer, then
+sign in, upload, edit the profile, create a token, export, and delete a test
+account. Launch with `SIGNUPS_OPEN=false` and your own `sub` in `SIGNUP_ALLOWLIST`.
+
+Not done yet: a real Vercel preview deploy of the Rust function (the runtime is
+in beta), the server-side `form-schema` endpoint, and Part C (porting the Node
+backend to Rust) in the plan.
 
 ---
 
@@ -666,7 +718,7 @@ cd scraper && node src/run-one.js meta
 - Don't globally set `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 - Don't add features the user didn't ask for. They've been specific.
 - Don't add interns. The user explicitly rejected them.
-- Don't add senior/staff/principal titles. Level filter is load-bearing. The one exception is bare "Staff" at the employers in `STAFF_NOT_SENIOR_EMPLOYERS` and in new-grad-track titles (owner's call, 2026-11-23). Extend that list; don't loosen `SENIOR_REJECT`.
+- Don't let senior titles through on the title alone. The level filter is load-bearing. Seniority words need evidence in the posting (`levelVerdict`), and that rule is general: don't add per-employer exceptions (owner's call, 2026-11-23).
 - Don't write tests unless the user asks — they haven't.
 - Don't delete `scraper/src/debug-urls.js`. It's a shipped diagnostic, not dev scaffolding.
 - Don't try workatastartup.com again. No public API, endpoints 404 / gate on YC candidate session. `hn_hiring` + the ATS probe cover YC.
