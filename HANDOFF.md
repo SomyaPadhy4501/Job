@@ -83,8 +83,9 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
    move `C:\Users\aryan\job-board-secrets-BACKUP.txt` into a password
    manager; enable Vercel 2FA; decide on server-side gating of `/jobs` and on
    `SHARING_OPEN` / `OWNER_SUBS` / `MAX_USERS` (see doubts below).
-4. Plan Part C (port the Node backend and collectors to Rust) not started.
-   It's a multi-week rewrite; scope it in its own session first.
+4. Plan Part C (port the Node backend and collectors to Rust) is dropped
+   (owner's call, 2026-11-24): Node keeps the job API and the collectors.
+   Don't propose it again.
 5. `.claude/worktrees/priceless-leakey-117b83` still holds an uncommitted,
    abandoned `extension-autofill/` draft; delete it once the owner agrees.
 
@@ -860,9 +861,8 @@ first and check `GET /api/health` (Rust) and `/jobs` (Node) both answer, then
 sign in, upload, edit the profile, create a token, export, and delete a test
 account. Launch with `SIGNUPS_OPEN=false` and your own `sub` in `SIGNUP_ALLOWLIST`.
 
-Not done yet: a real Vercel preview deploy of the Rust function (the runtime is
-in beta), the server-side `form-schema` endpoint, and Part C (porting the Node
-backend to Rust) in the plan.
+The Rust function now runs in production, and `form-schema` exists. Part C
+(porting the Node backend to Rust) is dropped (owner's call, 2026-11-24).
 
 ---
 
