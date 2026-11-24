@@ -229,3 +229,47 @@ chrome.storage.local.get({ shareListings: false }).then(({ shareListings }) => {
   $('shareListings').checked = shareListings;
 });
 $('shareListings').onchange = () => chrome.storage.local.set({ shareListings: $('shareListings').checked });
+
+// "Job site password": kept in the service worker's storage only.
+async function showSitePassword(message) {
+  try {
+    const { set, updatedAt } = await autofill('sitePasswordStatus');
+    $('sitePasswordState').textContent =
+      message || (set ? 'Saved' + (updatedAt ? ' on ' + new Date(updatedAt).toLocaleDateString() : '') + '.' : 'Not set: Workday sign-in is left to you.');
+  } catch (err) {
+    $('sitePasswordState').textContent = err.message;
+  }
+}
+$('saveSitePassword').onclick = async () => {
+  const a = $('sitePassword').value,
+    b = $('sitePassword2').value;
+  if (!a) return showSitePassword('Type a password first.');
+  if (a !== b) return showSitePassword("The two passwords don't match.");
+  try {
+    await autofill('setSitePassword', { password: a });
+    $('sitePassword').value = $('sitePassword2').value = '';
+    $('sitePassword').type = $('sitePassword2').type = 'password';
+    showSitePassword('Saved. Workday sign-in pages will use it.');
+  } catch (err) {
+    showSitePassword(err.message);
+  }
+};
+$('generateSitePassword').onclick = () => {
+  // 20 characters from each class, shuffled; shown so it can be saved elsewhere too.
+  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%^&*-_=+?'];
+  const all = sets.join('');
+  const pick = (chars) => chars[crypto.getRandomValues(new Uint32Array(1))[0] % chars.length];
+  const chars = [...sets.map(pick), ...Array.from({ length: 16 }, () => pick(all))];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  $('sitePassword').value = $('sitePassword2').value = chars.join('');
+  $('sitePassword').type = 'text';
+  showSitePassword('Generated. Copy it somewhere safe (a password manager), then click Save.');
+};
+$('clearSitePassword').onclick = async () => {
+  await autofill('setSitePassword', { password: '' }).catch(() => {});
+  showSitePassword('Removed.');
+};
+showSitePassword();

@@ -264,3 +264,66 @@ test("a refused share reports the portal's reason", async () => {
   await api.send({ type: 'autofill:configure', token: 't' }, FROM_POPUP);
   await assert.rejects(api.share('https://www.tesla.com/', [{}]), /3000 listings today/);
 });
+
+const WORKDAY = (extra = {}) => ({
+  id: 'ext',
+  url: 'https://acme.wd5.myworkdayjobs.com/en-US/External/job/Boston/SWE_1/apply',
+  tab: { id: 7 },
+  frameId: 0,
+  documentLifecycle: 'active',
+  ...extra,
+});
+
+test('job site password: set from the popup only, with real rules', async () => {
+  const api = load();
+  assert.match((await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, WORKDAY())).error, /popup/);
+  assert.match((await api.send({ type: 'autofill:setSitePassword', password: 'short' }, FROM_POPUP)).error, /12 characters/);
+  assert.match((await api.send({ type: 'autofill:setSitePassword', password: 'alllowercase1234!' }, FROM_POPUP)).error, /upper and lower/);
+  assert.equal((await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP)).ok, true);
+  const status = await api.send({ type: 'autofill:sitePasswordStatus' }, FROM_POPUP);
+  assert.equal(status.data.set, true);
+  assert.match((await api.send({ type: 'autofill:sitePasswordStatus' }, WORKDAY())).error, /popup/);
+  // Nothing about it is in storage content scripts can read.
+  assert.ok(!JSON.stringify(api.local.data).includes('Str0ng'));
+  assert.ok(!JSON.stringify(api.session.data).includes('Str0ng'));
+});
+
+test('job site password: only the top frame of a Workday page gets it', async () => {
+  const api = load({ granted: ['https://careers.example/*'] });
+  await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP);
+  const ok = await api.send({ type: 'autofill:sitePassword' }, WORKDAY());
+  assert.deepEqual(ok, { ok: true, data: { password: 'Str0ng!Password', autoSignIn: true } });
+  for (const sender of [
+    ATS_TAB, // Lever
+    { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, // a site allowed with "Autofill this page"
+    WORKDAY({ frameId: 2 }), // a frame inside the Workday page
+    WORKDAY({ documentLifecycle: 'prerender' }),
+    FROM_POPUP,
+  ]) {
+    const r = await api.send({ type: 'autofill:sitePassword' }, sender);
+    assert.equal(r.ok, false, sender.url);
+  }
+});
+
+test('job site password: a failed sign-in stops automatic attempts; a new password resets it', async () => {
+  const api = load();
+  await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP);
+  assert.equal((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data.autoSignIn, true);
+  await api.send({ type: 'autofill:loginResult', result: 'failed' }, WORKDAY());
+  assert.equal((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data.autoSignIn, false);
+  // Another company is unaffected.
+  const other = WORKDAY({ url: 'https://other.wd1.myworkdayjobs.com/x/job/1' });
+  assert.equal((await api.send({ type: 'autofill:sitePassword' }, other)).data.autoSignIn, true);
+  // Three fills per company per 10 minutes.
+  assert.equal((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).ok, true);
+  assert.match((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).error, /Too many/);
+  await api.send({ type: 'autofill:setSitePassword', password: 'An0ther!Password' }, FROM_POPUP);
+  assert.deepEqual((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data, { password: 'An0ther!Password', autoSignIn: true });
+});
+
+test('Workday companies are told apart on both Workday hosts', () => {
+  assert.equal(pages.workdayTenant('https://nvidia.wd5.myworkdayjobs.com/en-US/X/job/1'), 'nvidia');
+  assert.equal(pages.workdayTenant('https://wd1.myworkdaysite.com/en-US/recruiting/Acme/External/job/1'), 'acme');
+  assert.equal(pages.workdayTenant('https://wd1.myworkdaysite.com/recruiting/beta/x'), 'beta');
+  assert.equal(pages.workdayTenant('https://jobs.lever.co/acme/1'), '');
+});

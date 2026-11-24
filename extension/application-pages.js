@@ -40,7 +40,24 @@
     if (site === 'ashby') return ['ApiJobBoard', 'ApiJobBoardWithTeams'].includes(url.searchParams.get('op'));
     return /^\/(?:v0\/postings\/[^/]+|v1\/boards\/[^/]+\/jobs)$/.test(url.pathname);
   }
-  const api = Object.freeze({ ats, privatePage, publicResponse });
+  // The Workday company a page belongs to: the host's first label on
+  // myworkdayjobs.com ("nvidia" in nvidia.wd5.myworkdayjobs.com), the path on
+  // myworkdaysite.com (wd1.myworkdaysite.com/en-US/recruiting/<tenant>/...).
+  function workdayTenant(href) {
+    let url;
+    try {
+      url = new URL(href);
+    } catch {
+      return '';
+    }
+    if (/(?:^|\.)myworkdayjobs\.com$/.test(url.hostname)) return url.hostname.split('.')[0].toLowerCase();
+    if (/(?:^|\.)myworkdaysite\.com$/.test(url.hostname)) {
+      const m = /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?recruiting\/([^/]+)/i.exec(url.pathname);
+      return m ? m[1].toLowerCase() : '';
+    }
+    return '';
+  }
+  const api = Object.freeze({ ats, privatePage, publicResponse, workdayTenant });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JobApplicationPages = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

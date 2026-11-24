@@ -168,6 +168,8 @@
     let generic = null;
     function inScope(el) {
       if (ats === 'generic') return !!generic && generic.contains(el) && !el.closest(pageChrome);
+      // Workday's sign-in panel belongs to autofill-login.js alone.
+      if (ats === 'workday' && el.closest('[data-automation-id="signInContent"]')) return false;
       if (el.closest(scope)) return true;
       // Some Workday tenants use their own section IDs throughout the form.
       return (

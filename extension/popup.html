@@ -72,6 +72,18 @@
       </details>
     </section>
 
+    <section class="card" aria-labelledby="sitepw-title">
+      <h2 id="sitepw-title">Job site password</h2>
+      <p class="muted">One password for every company's Workday site. The extension signs you in with it and fills it when you create an account (you still tick “I agree” and click Create Account). It stays in this browser only.</p>
+      <p id="sitePasswordState" role="status" class="muted"></p>
+      <label for="sitePassword">Password</label>
+      <input type="password" id="sitePassword" autocomplete="new-password" minlength="12">
+      <label for="sitePassword2">Same password again</label>
+      <input type="password" id="sitePassword2" autocomplete="new-password">
+      <div class="row"><button id="saveSitePassword">Save</button><button id="generateSitePassword">Generate one</button><button id="clearSitePassword">Remove</button></div>
+      <p class="muted">12+ characters with upper and lower case, a number and a symbol. Don't reuse a password from another site.</p>
+    </section>
+
     <details class="card">
       <summary>Advanced: job collection (site owner)</summary>
       <label class="check"><input type="checkbox" id="enabled"> Capture listings on careers pages</label>

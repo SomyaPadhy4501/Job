@@ -380,6 +380,73 @@ async function live() {
         await page.close();
       }
     }
+    // Workday sign-in with the job site password (fixture with Workday's
+    // markup: "Sign in with email", a click_filter overlay over Sign In, and
+    // the create-account form). Nothing leaves the machine.
+    {
+      await popup.reload();
+      await popup.locator('#sitePassword').fill('Str0ng!Password-x');
+      await popup.locator('#sitePassword2').fill('Str0ng!Password-x');
+      await popup.locator('#saveSitePassword').click();
+      await popup.getByText('Saved. Workday sign-in pages will use it.').waitFor();
+      const page = await context.newPage();
+      try {
+        await page.route('https://login.myworkdayjobs.com/**', (r) =>
+          r.fulfill({
+            contentType: 'text/html',
+            body:
+              '<div data-automation-id="applyFlowPage"><div data-automation-id="signInContent" id="panel">' +
+              '<button data-automation-id="SignInWithEmailButton" id="byEmail">Sign in with email</button></div></div><script>' +
+              'const panel=document.getElementById("panel");' +
+              'function signInForm(){panel.innerHTML=`<form data-automation-id="signInFormo"><div data-automation-id="formField-email"><label for="e">Email Address</label><input id="e" data-automation-id="email"></div>' +
+              '<div data-automation-id="formField-password"><label for="p">Password</label><input id="p" type="password" data-automation-id="password"></div>' +
+              '<div data-automation-id="noCaptchaWrapper" style="position:relative;width:120px;height:40px"><button data-automation-id="signInSubmitButton" style="width:120px;height:40px">Sign In</button>' +
+              '<div data-automation-id="click_filter" id="filter" style="position:absolute;inset:0"></div></div>' +
+              '<button type="button" data-automation-id="createAccountLink" id="createLink">Create Account</button></form>`;' +
+              'document.getElementById("filter").addEventListener("click",()=>{window.__signedIn={email:document.getElementById("e").value,password:document.getElementById("p").value};setTimeout(()=>panel.remove(),100)});}' +
+              'document.getElementById("byEmail").onclick=signInForm;</script>',
+          })
+        );
+        await page.goto('https://login.myworkdayjobs.com/en-US/External/job/Boston/SWE_1/apply/applyManually', { waitUntil: 'domcontentloaded' });
+        await page.mouse.click(5, 5); // the user has interacted with the page
+        await page.waitForFunction(() => window.__signedIn, null, { timeout: 15000 });
+        assert.deepEqual(await page.evaluate(() => window.__signedIn), { email: 'pat@example.invalid', password: 'Str0ng!Password-x' });
+        console.log('Workday sign-in: ok');
+
+        // Create-account form: both password boxes filled, "I agree" and the
+        // Create Account button left alone.
+        await page.route('https://create.myworkdayjobs.com/**', (r) =>
+          r.fulfill({
+            contentType: 'text/html',
+            body:
+              '<div data-automation-id="applyFlowPage"><div data-automation-id="signInContent">' +
+              '<form><div data-automation-id="formField-email"><label for="e">Email Address</label><input id="e" data-automation-id="email"></div>' +
+              '<div data-automation-id="formField-password"><label for="p">Password</label><input id="p" type="password" data-automation-id="password"></div>' +
+              '<div data-automation-id="formField-verifyPassword"><label for="v">Verify New Password</label><input id="v" type="password" data-automation-id="verifyPassword"></div>' +
+              '<label for="beecatcher">Enter website. This input is for robots only</label><input id="beecatcher" data-automation-id="beecatcher">' +
+              '<div data-automation-id="formField-"><input type="checkbox" id="agree" data-automation-id="createAccountCheckbox"><label for="agree">I agree</label></div>' +
+              '<button data-automation-id="createAccountSubmitButton" id="create" onclick="window.__created=true;return false">Create Account</button></form></div></div>',
+          })
+        );
+        await page.goto('https://create.myworkdayjobs.com/en-US/External/job/1/apply', { waitUntil: 'domcontentloaded' });
+        await page.mouse.click(5, 5);
+        await page.waitForFunction(() => document.getElementById('v').value, null, { timeout: 15000 });
+        assert.deepEqual(
+          await page.evaluate(() => ({
+            e: document.getElementById('e').value,
+            p: document.getElementById('p').value,
+            v: document.getElementById('v').value,
+            bot: document.getElementById('beecatcher').value,
+            agree: document.getElementById('agree').checked,
+            created: !!window.__created,
+          })),
+          { e: 'pat@example.invalid', p: 'Str0ng!Password-x', v: 'Str0ng!Password-x', bot: '', agree: false, created: false }
+        );
+        console.log('Workday create account: ok');
+      } finally {
+        await page.close();
+      }
+    }
     await popup.locator('#autofillToken').fill('invalid-test-token');
     await popup.locator('#connect').click();
     await popup.getByText('Token rejected.', { exact: false }).waitFor();

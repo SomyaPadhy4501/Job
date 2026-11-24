@@ -21,8 +21,20 @@
     return u.origin;
   }
 
-  // Extension-origin IndexedDB is separate from the content script's origin.
-  function credentials(update) {
+  // Per-company sign-in attempts (session storage: content scripts can't read it).
+  const LEDGER = 'workdayLogins';
+  // Workday's usual rules, plus length: one password opens many accounts.
+  function sitePasswordProblem(p) {
+    if (p.length < 12) return 'Use at least 12 characters.';
+    if (p.length > 128) return 'Use at most 128 characters.';
+    if (!/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/\d/.test(p) || !/[^A-Za-z0-9]/.test(p))
+      return 'Use upper and lower case letters, a number and a symbol.';
+    return '';
+  }
+
+  // Extension-origin IndexedDB is separate from the content script's origin:
+  // no page or content script can read what's kept here.
+  function credentials(update, key = 'account') {
     return new Promise((resolve, reject) => {
       const open = indexedDB.open('job-autofill', 1);
       open.onupgradeneeded = () => open.result.createObjectStore('connection');
@@ -31,7 +43,7 @@
         const db = open.result,
           tx = db.transaction('connection', update ? 'readwrite' : 'readonly');
         const store = tx.objectStore('connection');
-        const req = update ? store.put(update, 'account') : store.get('account');
+        const req = update ? store.put(update, key) : store.get(key);
         tx.oncomplete = () => {
           db.close();
           resolve(req.result);
@@ -68,6 +80,56 @@
       revision++;
       await chrome.storage.session.remove(CACHE);
       return {};
+    }
+    // ─── The job site password (one, chosen by the user) ─────────────────
+    // Kept only here, in this worker's IndexedDB. Set from the popup; given
+    // only to the top frame of a Workday page, never to other sites.
+    if (msg.type === 'autofill:sitePasswordStatus') {
+      if (!isPopup) throw new Error('Use the extension popup.');
+      const saved = await credentials(undefined, 'sitePassword');
+      return { set: !!saved?.password, updatedAt: saved?.updatedAt || null };
+    }
+    if (msg.type === 'autofill:setSitePassword') {
+      if (!isPopup) throw new Error('Use the extension popup.');
+      const password = String(msg.password ?? '');
+      if (password) {
+        const problem = sitePasswordProblem(password);
+        if (problem) throw new Error(problem);
+      }
+      await credentials(password ? { password, updatedAt: new Date().toISOString() } : { password: '' }, 'sitePassword');
+      // A new password may work where the old one failed.
+      await chrome.storage.session.remove(LEDGER);
+      return {};
+    }
+    if (msg.type === 'autofill:sitePassword' || msg.type === 'autofill:loginResult') {
+      const tenant = JobApplicationPages.workdayTenant(sender.url);
+      if (
+        isPopup ||
+        JobApplicationPages.ats(url.hostname) !== 'workday' ||
+        !tenant ||
+        sender.frameId !== 0 ||
+        (sender.documentLifecycle && sender.documentLifecycle !== 'active')
+      )
+        throw new Error('The job site password is only for Workday sign-in pages.');
+      const ledger = (await chrome.storage.session.get(LEDGER))[LEDGER] || {};
+      const entry = ledger[tenant] || { grants: [], failed: false };
+      const now = Date.now();
+      if (msg.type === 'autofill:loginResult') {
+        entry.failed = msg.result === 'failed';
+        ledger[tenant] = entry;
+        await chrome.storage.session.set({ [LEDGER]: ledger });
+        return {};
+      }
+      const saved = await credentials(undefined, 'sitePassword');
+      if (!saved?.password) return { password: null };
+      // At most 3 fills per company per 10 minutes; after a failed sign-in,
+      // no automatic attempt until the password changes.
+      entry.grants = entry.grants.filter((t) => now - t < 10 * 60_000);
+      if (entry.grants.length >= 3) throw new Error('Too many sign-in attempts here. Sign in yourself.');
+      entry.grants.push(now);
+      ledger[tenant] = entry;
+      await chrome.storage.session.set({ [LEDGER]: ledger });
+      return { password: saved.password, autoSignIn: !entry.failed };
     }
     // Answers typed into an application, held between steps and "submit" and
     // the next page, so the save prompt survives a page change and a
