@@ -163,7 +163,12 @@
       } else {
         const length = Number.isInteger(msg.length) && msg.length >= 4 && msg.length <= 10 ? msg.length : 0;
         const charset = msg.charset === 'digits' ? 'digits' : 'alnum';
-        gmailAsk = { kind: 'code', site, tenant, shape: { length, charset } };
+        // Greenhouse: the board from the page's own address, and the company
+        // name the page shows, so only that company's code is used.
+        const board = site === 'greenhouse' ? JobApplicationPages.greenhouseBoard(sender.url) : tenant;
+        const company =
+          site === 'greenhouse' && typeof msg.company === 'string' ? msg.company.replace(/\s+/g, ' ').trim().slice(0, 100) : '';
+        gmailAsk = { kind: 'code', site, tenant: board, company, shape: { length, charset } };
       }
     }
     // Answers typed into an application, held between steps and "submit" and
@@ -231,7 +236,7 @@
     if (gmailAsk?.kind === 'status') return AutofillGmail.status(request);
     if (gmailAsk?.kind === 'link') return { opened: await AutofillGmail.openVerifyLink(request, gmailAsk.tenant) };
     if (gmailAsk?.kind === 'code')
-      return { code: await AutofillGmail.findCode(request, gmailAsk.site, gmailAsk.tenant, gmailAsk.shape) };
+      return { code: await AutofillGmail.findCode(request, gmailAsk.site, gmailAsk.tenant, gmailAsk.shape, gmailAsk.company) };
     if (msg.type === 'autofill:getProfile') {
       const version = revision;
       const cached = (await chrome.storage.session.get(CACHE))[CACHE];

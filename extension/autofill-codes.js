@@ -19,6 +19,15 @@
   let stopped = false;
   let note = null;
 
+  // The company the page is for, so only its code is used: Greenhouse titles
+  // its forms "Job Application for <role> at <Company>".
+  function company() {
+    const title = (document.title || '').replace(/\s+/g, ' ').trim();
+    const at = / at ([^|–—-]{2,100})$/.exec(title);
+    const meta = document.querySelector('meta[property="og:site_name"]')?.content;
+    return (at ? at[1] : meta || '').trim().slice(0, 100);
+  }
+
   async function ask(type, params = {}) {
     const r = await chrome.runtime.sendMessage({ type: 'autofill:' + type, ...params });
     if (!r?.ok) throw new Error(r?.error || 'The extension could not answer.');
@@ -112,7 +121,9 @@
       const length = boxes.length > 1 ? boxes.length : Number(one.getAttribute('maxlength')) || 0;
       const digits = boxes.length === 1 && (one.inputMode === 'numeric' || one.type === 'number');
       poll(
-        async () => (await ask('findCode', { length: length >= 4 && length <= 10 ? length : undefined, charset: digits ? 'digits' : 'alnum' })).code,
+        async () =>
+          (await ask('findCode', { length: length >= 4 && length <= 10 ? length : undefined, charset: digits ? 'digits' : 'alnum', company: company() }))
+            .code,
         (code) => {
           if (boxes.length > 1) [...code].forEach((c, i) => boxes[i] && set(boxes[i], c));
           else set(one, code);

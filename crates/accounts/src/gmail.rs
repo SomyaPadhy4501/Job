@@ -33,8 +33,9 @@ pub const SCOPE_GMAIL: &str = "https://www.googleapis.com/auth/gmail.readonly";
 pub const SCOPES: &str = "openid email https://www.googleapis.com/auth/gmail.readonly";
 /// Mail older than this is never used: a code is for the application open now.
 pub const MAX_AGE_MINUTES: i64 = 15;
-/// Messages looked at per search.
-pub const SEARCH_MAX: usize = 5;
+/// Messages looked at per search. Greenhouse sends every company's mail
+/// (codes, "thanks for applying") from the same address, so a few spare.
+pub const SEARCH_MAX: usize = 10;
 const MAX_TEXT: usize = 200 * 1024;
 const MAX_DEPTH: usize = 12;
 
@@ -405,13 +406,15 @@ impl Site {
         }
     }
 
-    /// The Gmail search: this site's own senders, from the last day (the
-    /// 15-minute cut is applied to each message's own date).
-    pub fn query(self) -> &'static str {
-        match self {
-            Site::Workday => "from:myworkday.com newer_than:1d",
-            Site::Greenhouse => "from:(greenhouse.io OR greenhouse-mail.io) newer_than:1d",
-        }
+    /// The Gmail search: this site's own senders, received after `since`
+    /// (Unix seconds; Gmail's `after:` takes them). Each message's own date
+    /// is checked again after fetching.
+    pub fn query(self, since: i64) -> String {
+        let from = match self {
+            Site::Workday => "from:myworkday.com",
+            Site::Greenhouse => "from:(greenhouse.io OR greenhouse-mail.io)",
+        };
+        format!("{from} after:{since}")
     }
 }
 
@@ -422,6 +425,7 @@ pub struct Message {
     /// Milliseconds since the epoch, Gmail's `internalDate`.
     pub received_ms: i64,
     pub from: String,
+    pub subject: String,
     pub text: String,
     pub hrefs: Vec<String>,
 }
@@ -466,18 +470,22 @@ pub fn parse_message(id: &str, raw: &Value) -> Message {
         text = crate::truncate_chars(&text, MAX_TEXT).to_owned();
     }
     hrefs.extend(TEXT_URL.find_iter(&text).map(|m| m.as_str().to_owned()));
-    let from = raw["payload"]["headers"]
-        .as_array()
-        .and_then(|hs| {
-            hs.iter().find(|h| {
-                h["name"]
-                    .as_str()
-                    .is_some_and(|n| n.eq_ignore_ascii_case("from"))
+    let header = |name: &str| {
+        raw["payload"]["headers"]
+            .as_array()
+            .and_then(|hs| {
+                hs.iter().find(|h| {
+                    h["name"]
+                        .as_str()
+                        .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                })
             })
-        })
-        .and_then(|h| h["value"].as_str())
-        .unwrap_or_default()
-        .to_owned();
+            .and_then(|h| h["value"].as_str())
+            .unwrap_or_default()
+            .to_owned()
+    };
+    let from = header("from");
+    let subject = header("subject");
     Message {
         id: id.to_owned(),
         received_ms: raw["internalDate"]
@@ -485,6 +493,7 @@ pub fn parse_message(id: &str, raw: &Value) -> Message {
             .and_then(|d| d.parse().ok())
             .unwrap_or(0),
         from,
+        subject,
         text,
         hrefs,
     }
@@ -513,6 +522,53 @@ fn walk(part: &Value, depth: usize, texts: &mut Vec<String>, hrefs: &mut Vec<Str
             walk(p, depth + 1, texts, hrefs);
         }
     }
+}
+
+static APPLICATION_TO: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(?:application|applying|applied)\s+(?:to|at|for|with)\s+(.+?)\s*$").unwrap()
+});
+
+/// Lowercase letters and digits only: "Anduril Industries, Inc." and the
+/// board slug "andurilindustries" compare equal.
+fn squash(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// Whether a Greenhouse email is for the company being applied to. Every
+/// Greenhouse company sends from the same addresses, so the company has to
+/// come from the mail itself: its subject ("Security code for your
+/// application to Discord") or the start of its text. `board` is the job
+/// board's slug (`job-boards.greenhouse.io/<board>/...`), `company` the name
+/// on the page; either one matching is enough. With neither known, any
+/// Greenhouse mail is taken (the old behaviour).
+pub fn greenhouse_company_matches(m: &Message, board: &str, company: &str) -> bool {
+    let hints: Vec<String> = [board, company]
+        .iter()
+        .map(|h| squash(h))
+        .filter(|h| h.len() >= 2)
+        .collect();
+    if hints.is_empty() {
+        return true;
+    }
+    let head: String = m.text.chars().take(600).collect();
+    let hay = squash(&format!("{} {}", m.subject, head));
+    if hints.iter().any(|h| hay.contains(h.as_str())) {
+        return true;
+    }
+    // The subject names a company: ours if one name holds the other
+    // ("Stripe" on the mail, "Stripe, Inc." on the page).
+    APPLICATION_TO
+        .captures(&m.subject)
+        .map(|c| squash(&c[1]))
+        .filter(|named| named.len() >= 2)
+        .is_some_and(|named| {
+            hints
+                .iter()
+                .any(|h| h.contains(&named) || named.contains(h.as_str()))
+        })
 }
 
 /// The Workday company a sender belongs to: `<tenant>@myworkday.com`.
@@ -723,7 +779,8 @@ mod tests {
             "internalDate": "1700000000000",
             "payload": {
                 "mimeType": "multipart/alternative",
-                "headers": [{"name": "From", "value": "Acme <acme@myworkday.com>"}],
+                "headers": [{"name": "From", "value": "Acme <acme@myworkday.com>"},
+                    {"name": "Subject", "value": "Verify your account"}],
                 "parts": [
                     {"mimeType": "text/plain", "body": {"data": b64("plain part https://example.com/a")}},
                     {"mimeType": "text/html", "body": {"data": b64(html)}},
@@ -734,6 +791,7 @@ mod tests {
         let m = parse_message("abc123", &raw);
         assert_eq!(m.received_ms, 1_700_000_000_000);
         assert_eq!(workday_sender(&m.from).as_deref(), Some("acme"));
+        assert_eq!(m.subject, "Verify your account");
         assert!(m.text.contains("Your code is 778899"));
         assert!(!m.text.contains(".x{}"));
         assert!(m.hrefs.contains(
@@ -780,6 +838,60 @@ mod tests {
             Some("other")
         );
         assert_eq!(workday_sender("x@greenhouse.io"), None);
+    }
+
+    #[test]
+    fn greenhouse_mail_must_name_the_company() {
+        let mail = |subject: &str, text: &str| Message {
+            subject: subject.into(),
+            text: text.into(),
+            ..Default::default()
+        };
+        let discord = mail(
+            "Security code for your application to Discord",
+            "Copy and paste this code: A1B2C3D4",
+        );
+        assert!(greenhouse_company_matches(&discord, "discord", ""));
+        assert!(greenhouse_company_matches(&discord, "", "Discord"));
+        assert!(
+            !greenhouse_company_matches(&discord, "openai", "OpenAI"),
+            "another company's code"
+        );
+        // The slug runs the words together; the mail spells them out.
+        let anduril = mail(
+            "Security code for your application to Anduril Industries",
+            "",
+        );
+        assert!(greenhouse_company_matches(
+            &anduril,
+            "andurilindustries",
+            ""
+        ));
+        // The page says "Stripe, Inc.", the mail just "Stripe".
+        let stripe = mail("Security code for your application to Stripe", "");
+        assert!(greenhouse_company_matches(&stripe, "", "Stripe, Inc."));
+        // The company only in the text.
+        let body = mail(
+            "Your security code",
+            "Hi Pat, thanks for applying to Figma. Your code is 12345678",
+        );
+        assert!(greenhouse_company_matches(&body, "figma", ""));
+        assert!(!greenhouse_company_matches(&body, "notion", "Notion"));
+        // Nothing known about the page: any Greenhouse mail.
+        assert!(greenhouse_company_matches(&discord, "", ""));
+    }
+
+    #[test]
+    fn searches_only_this_sites_recent_mail() {
+        assert_eq!(
+            Site::Workday.query(1_700_000_000),
+            "from:myworkday.com after:1700000000"
+        );
+        assert!(
+            Site::Greenhouse
+                .query(5)
+                .starts_with("from:(greenhouse.io OR greenhouse-mail.io) after:5")
+        );
     }
 
     #[test]

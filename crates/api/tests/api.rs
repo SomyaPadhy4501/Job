@@ -3020,6 +3020,30 @@ async fn gmail_codes_for_the_extension() {
             "Copy this code into the security code field:\n\nA1B2C3D4\n",
         ),
     ];
+    // Greenhouse mail names the company in its subject.
+    {
+        let mut f = fake.lock().unwrap();
+        let subject = |m: &mut Value, s: &str| {
+            m["payload"]["headers"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"name": "Subject", "value": s}));
+        };
+        let mut other = gmail_message(
+            "ghother",
+            "Greenhouse <no-reply@us.greenhouse-mail.io>",
+            0,
+            "text/plain",
+            "Copy this code into the security code field:\n\nZZ99ZZ99\n",
+        );
+        subject(&mut other, "Security code for your application to OpenAI");
+        subject(
+            f.messages.last_mut().unwrap(),
+            "Security code for your application to Discord",
+        );
+        // Newest first, as Gmail lists them: the other company's code is newer.
+        f.messages.insert(0, other);
+    }
     assert_eq!(
         ext.get("/api/autofill/gmail").await.json()["email"],
         "pat@gmail.example"
@@ -3049,10 +3073,22 @@ async fn gmail_codes_for_the_extension() {
     );
     let r = code(json!({"site": "workday", "tenant": "acme", "length": 6, "charset": "digits", "skip": ["mine"]})).await.json();
     assert_eq!(r["code"], Value::Null, "a used email isn't read again");
-    let r = code(json!({"site": "greenhouse", "length": 8}))
+    let r =
+        code(json!({"site": "greenhouse", "tenant": "discord", "company": "Discord", "length": 8}))
+            .await
+            .json();
+    assert_eq!(
+        r["code"], "A1B2C3D4",
+        "this company's code, not the newer one for OpenAI"
+    );
+    let r = code(json!({"site": "greenhouse", "tenant": "openai", "length": 8}))
         .await
         .json();
-    assert_eq!(r["code"], "A1B2C3D4");
+    assert_eq!(r["code"], "ZZ99ZZ99");
+    let r = code(json!({"site": "greenhouse", "tenant": "figma", "company": "Figma", "length": 8}))
+        .await
+        .json();
+    assert_eq!(r["code"], Value::Null, "no mail for this company yet");
     assert_eq!(
         code(json!({"site": "lever"})).await.status,
         StatusCode::BAD_REQUEST
@@ -3080,7 +3116,7 @@ async fn gmail_codes_for_the_extension() {
 
     // The access token expires: refreshed once, then reading carries on.
     fake.lock().unwrap().refuse_first_token = true;
-    let r = code(json!({"site": "greenhouse", "length": 8}))
+    let r = code(json!({"site": "greenhouse", "tenant": "discord", "length": 8}))
         .await
         .json();
     assert_eq!(r["code"], "A1B2C3D4");

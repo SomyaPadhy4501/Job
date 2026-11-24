@@ -57,7 +57,23 @@
     }
     return '';
   }
-  const api = Object.freeze({ ats, privatePage, publicResponse, workdayTenant });
+  // The Greenhouse job board a page belongs to: the first path segment on
+  // (job-)boards.greenhouse.io/<board>/jobs/..., or `for` on the embedded form
+  // (job-boards.greenhouse.io/embed/job_app?for=<board>). Codes are matched to
+  // the company with it, since every Greenhouse company mails from one address.
+  function greenhouseBoard(href) {
+    let url;
+    try {
+      url = new URL(href);
+    } catch {
+      return '';
+    }
+    if (ats(url.hostname) !== 'greenhouse') return '';
+    const first = url.pathname.split('/').filter(Boolean)[0] || '';
+    const board = (first === 'embed' || !first ? url.searchParams.get('for') || '' : first).toLowerCase();
+    return /^[a-z0-9_-]{1,64}$/.test(board) ? board : '';
+  }
+  const api = Object.freeze({ ats, greenhouseBoard, privatePage, publicResponse, workdayTenant });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JobApplicationPages = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -346,6 +346,14 @@ test('job site password: a failed sign-in stops automatic attempts; a new passwo
   assert.deepEqual((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data, { password: 'An0ther!Password', autoSignIn: true });
 });
 
+test('Greenhouse boards come from the page address, embedded forms included', () => {
+  assert.equal(pages.greenhouseBoard('https://job-boards.greenhouse.io/discord/jobs/123'), 'discord');
+  assert.equal(pages.greenhouseBoard('https://boards.greenhouse.io/AndurilIndustries/jobs/9?gh_src=x'), 'andurilindustries');
+  assert.equal(pages.greenhouseBoard('https://job-boards.greenhouse.io/embed/job_app?for=stripe&token=1'), 'stripe');
+  assert.equal(pages.greenhouseBoard('https://job-boards.greenhouse.io/embed/job_app?for=../x'), '');
+  assert.equal(pages.greenhouseBoard('https://jobs.lever.co/acme/1'), '');
+});
+
 test('Workday companies are told apart on both Workday hosts', () => {
   assert.equal(pages.workdayTenant('https://nvidia.wd5.myworkdayjobs.com/en-US/X/job/1'), 'nvidia');
   assert.equal(pages.workdayTenant('https://wd1.myworkdaysite.com/en-US/recruiting/Acme/External/job/1'), 'acme');
@@ -357,7 +365,8 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
   const asked = [];
   const gmail = {
     status: async (request) => (asked.push({ status: typeof request }), { available: true, connected: true, email: 'pat@gmail.example' }),
-    findCode: async (request, site, tenant, shape) => (asked.push({ site, tenant, shape, request: typeof request }), '123456'),
+    findCode: async (request, site, tenant, shape, company) =>
+      (asked.push({ site, tenant, shape, company, request: typeof request }), '123456'),
     openVerifyLink: async (request, tenant) => (asked.push({ verify: tenant }), true),
   };
   const api = load({ gmail, granted: ['https://careers.example/*'] });
@@ -376,11 +385,16 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
   for (const sender of [ATS_TAB, { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, FROM_POPUP]) {
     assert.equal((await api.send({ type: 'autofill:findCode', length: 6 }, sender)).ok, false, sender.url);
   }
-  assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 8, charset: 'whatever' }, gh)).data, { code: '123456' });
+  assert.deepEqual(
+    (await api.send({ type: 'autofill:findCode', length: 8, charset: 'whatever', company: '  Acme \n Corp ' }, gh)).data,
+    { code: '123456' }
+  );
   assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 99 }, WORKDAY())).data, { code: '123456' });
   assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(1, 3))), [
-    { site: 'greenhouse', tenant: '', shape: { length: 8, charset: 'alnum' }, request: 'function' },
-    { site: 'workday', tenant: 'acme', shape: { length: 0, charset: 'alnum' }, request: 'function' },
+    // Greenhouse: the board from the page's address and the company it shows.
+    { site: 'greenhouse', tenant: 'acme', company: 'Acme Corp', shape: { length: 8, charset: 'alnum' }, request: 'function' },
+    // Workday: the tenant; a company name from the page is never sent.
+    { site: 'workday', tenant: 'acme', company: '', shape: { length: 0, charset: 'alnum' }, request: 'function' },
   ]);
   // Verify links: Workday's top frame only.
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, gh)).ok, false);
@@ -407,7 +421,7 @@ test("Gmail: the portal's own message reaches the page", async () => {
   const call = api.calls.find((c) => c.url.endsWith('/api/autofill/gmail/code'));
   assert.equal(call.init.headers.Authorization, 'Bearer tok');
   assert.equal(call.init.credentials, 'omit');
-  assert.deepEqual(JSON.parse(call.init.body), { site: 'greenhouse', length: 6, charset: 'alnum', skip: [] });
+  assert.deepEqual(JSON.parse(call.init.body), { site: 'greenhouse', tenant: 'acme', length: 6, charset: 'alnum', skip: [] });
 });
 
 test('apply queue: the popup reads it, a job page may not, links are http(s) only', async () => {

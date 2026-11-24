@@ -92,6 +92,11 @@ test('codes: only the shape the page asked for, whatever the portal answers', as
   const { G, request, asked } = load({ 'gmail/code': { code: 'A1B2C3D4', messageId: 'g1' } });
   assert.equal(await G.findCode(request, 'greenhouse', '', { length: 8, charset: 'alnum' }), 'A1B2C3D4');
   assert.equal('tenant' in asked[0].body, false);
+  assert.equal('company' in asked[0].body, false);
+  // With the board and the company on the page: both go to the portal.
+  await G.findCode(request, 'greenhouse', 'discord', { length: 8, charset: 'alnum' }, 'Discord');
+  assert.equal(asked[1].body.tenant, 'discord');
+  assert.equal(asked[1].body.company, 'Discord');
 });
 
 test('verify links: this company only, https, opened by the worker', async () => {

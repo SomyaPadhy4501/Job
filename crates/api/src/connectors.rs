@@ -465,19 +465,27 @@ async fn access_token(state: &AppState, user_id: Uuid, force: bool) -> ApiResult
 
 /// This site's unused mail from the last 15 minutes, newest first. Workday
 /// mail only from this company (`<tenant>@myworkday.com`).
+/// Which company's mail: the Workday tenant, or the Greenhouse board slug
+/// and the company name on the page.
+struct For<'a> {
+    tenant: &'a str,
+    company: &'a str,
+}
+
 async fn recent(
     state: &AppState,
     user_id: Uuid,
     site: Site,
-    tenant: &str,
+    who: For<'_>,
     skip: &[String],
 ) -> ApiResult<Vec<Message>> {
     let gmail = client(state)?;
     let mut access = access_token(state, user_id, false).await?;
-    let ids = match gmail.search(&access, site.query()).await {
+    let query = site.query(now() - MAX_AGE_MINUTES * 60);
+    let ids = match gmail.search(&access, &query).await {
         Err(GmailError::Unauthorized) => {
             access = access_token(state, user_id, true).await?;
-            gmail.search(&access, site.query()).await
+            gmail.search(&access, &query).await
         }
         other => other,
     }
@@ -489,7 +497,12 @@ async fn recent(
         if m.received_ms < cutoff {
             continue;
         }
-        if site == Site::Workday && gmail::workday_sender(&m.from).as_deref() != Some(tenant) {
+        let ours = match site {
+            Site::Workday => gmail::workday_sender(&m.from).as_deref() == Some(who.tenant),
+            // One sender for every Greenhouse company: the mail must name ours.
+            Site::Greenhouse => gmail::greenhouse_company_matches(&m, who.tenant, who.company),
+        };
+        if !ours {
             continue;
         }
         out.push(m);
@@ -508,7 +521,17 @@ fn parse_tenant(site: Site, tenant: Option<&str>) -> ApiResult<String> {
     {
         return Err(ApiError::bad("Unknown Workday company."));
     }
-    Ok(tenant)
+    // A Greenhouse board slug is optional; anything odd is dropped.
+    let plain = tenant.len() <= 64
+        && tenant
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    Ok(if plain { tenant } else { String::new() })
+}
+
+/// The company name the page shows, as plain short text.
+fn parse_company(company: Option<&str>) -> String {
+    accounts::truncate_chars(&accounts::clean_line(company.unwrap_or("")), 100).to_owned()
 }
 
 fn parse_skip(skip: &[String]) -> Vec<String> {
@@ -554,8 +577,12 @@ pub async fn ext_status(State(state): State<AppState>, who: TokenUser) -> ApiRes
 #[serde(rename_all = "camelCase")]
 pub struct CodeBody {
     site: String,
+    /// The Workday tenant, or the Greenhouse board slug.
     #[serde(default)]
     tenant: Option<String>,
+    /// The company name on the page (Greenhouse).
+    #[serde(default)]
+    company: Option<String>,
     #[serde(default)]
     length: Option<usize>,
     #[serde(default)]
@@ -575,13 +602,18 @@ pub async fn ext_code(
     let site = Site::parse(&body.site)
         .ok_or_else(|| ApiError::bad("Codes are read only for Workday and Greenhouse."))?;
     let tenant = parse_tenant(site, body.tenant.as_deref())?;
+    let company = parse_company(body.company.as_deref());
     let shape = CodeShape {
         length: body.length.filter(|l| (4..=10).contains(l)),
         digits_only: body.charset.as_deref() == Some("digits"),
     };
     client(&state)?;
     count_read(&state, who.user.id).await?;
-    for m in recent(&state, who.user.id, site, &tenant, &parse_skip(&body.skip)).await? {
+    let mail_for = For {
+        tenant: &tenant,
+        company: &company,
+    };
+    for m in recent(&state, who.user.id, site, mail_for, &parse_skip(&body.skip)).await? {
         if let Some(code) = gmail::pick_code(&m.text, shape) {
             return Ok(Json(json!({ "code": code, "messageId": m.id })));
         }
@@ -611,7 +643,10 @@ pub async fn ext_verify_link(
         &state,
         who.user.id,
         Site::Workday,
-        &tenant,
+        For {
+            tenant: &tenant,
+            company: "",
+        },
         &parse_skip(&body.skip),
     )
     .await?

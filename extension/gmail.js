@@ -39,10 +39,13 @@
   }
 
   // `request` is autofill-api.js's authenticated call to the portal.
-  async function findCode(request, site, tenant, { length, charset }) {
+  // `tenant`: the Workday tenant or Greenhouse board; `company`: the name on
+  // the page (Greenhouse), so the portal only takes that company's mail.
+  async function findCode(request, site, tenant, { length, charset }, company = '') {
     const r = await ask(request, 'code', {
       site,
       ...(tenant ? { tenant } : {}),
+      ...(company ? { company } : {}),
       ...(length ? { length } : {}),
       charset,
       skip: await used(),
