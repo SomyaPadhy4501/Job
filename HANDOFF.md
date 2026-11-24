@@ -8,8 +8,8 @@ this codebase. It exists so you don't have to re-derive context.
 ## Current state and next work (updated 2026-11-24) — START HERE
 
 **Live:** https://job-two-xi.vercel.app (Vercel project `job`, GitHub
-`SomyaPadhy4501/Job`). `main` = `fix/panw-staff-and-edge-cases` (both at
-`bb125ae`); the owner asked to push straight to `main` with no PRs. Push to
+`SomyaPadhy4501/Job`). `main` = `fix/panw-staff-and-edge-cases` (kept in
+step); the owner asked to push straight to `main` with no PRs. Push to
 `main` first, then the branch: pushing both at once makes Vercel build only
 a preview first.
 
@@ -27,7 +27,7 @@ a preview first.
   them when the URL has no filters. Production builds redirect one-off
   `*.vercel.app` deploy URLs to the main host (`web/src/site.js`,
   `main.jsx`): Google sign-in only works on registered origins.
-- Extension (`extension/`, v1.10.0, served as a zip from `/autofill`, built
+- Extension (`extension/`, v1.11.0, served as a zip from `/autofill`, built
   by `web/scripts/pack-extension.mjs`): autofill on Greenhouse/Lever/Ashby/
   Workday automatically, any other site via popup "Autofill this page"
   (per-site optional permission); resume picker; Ashby Yes/No clicked with
@@ -47,22 +47,46 @@ Cloud project "Job Board" (`job-board-515704`), client "Job board web",
 origins `https://job-two-xi.vercel.app` + `http://localhost:5173`; consent
 screen is still in **Testing** (only the owner's Gmail can sign in).
 
+**Done 2026-11-24 (second session):**
+- Deploy of `bb125ae` confirmed: `/downloads/extension.json` said 1.10.0 and
+  `/api/health` was all true.
+- Merged the TikTok/ByteDance collector (`src/collectors/bytedance.js`); its
+  title gate now passes "Senior" titles so `levelVerdict` reads the posting,
+  like every other collector.
+- Added Caterpillar (`cat`/wd5), Verizon (`verizon`/wd12) and WEX
+  (`wexinc`/wd5) on Workday. TD Bank was already wired.
+- Extension 1.11.0: location search boxes (Ashby "Where are you currently
+  located?", Greenhouse "Location (City)") type the city and pick the one
+  suggestion matching city + state + country (`pickPlace` in
+  `autofill-fields.js`; ambiguous = nothing picked, box cleared). Date
+  pickers (Ashby "When can you start?") get the earliest start date as
+  MM/DD/YYYY. Verified live on OpenAI's Ashby and Figma's Greenhouse forms.
+- Save-your-answers: no longer needs the panel opened. Answers are held on
+  every step ("Next", "Save and continue") and on submit, merged per tab,
+  and offered once the page confirms (new confirmation text, or the form
+  gone) or on the next page. Nothing is held unless the extension is
+  connected. `test/extension-autofill-live.cjs` has a two-step fixture for
+  it (and no longer clicks the popup's removed portal "Save" button).
+- `GET /api/autofill/form-schema?url=` (`crates/api/src/form_schema.rs`):
+  Greenhouse board API + Ashby `ApiJobPosting` -> `{fields:[{name,label,
+  required}]}`, cached an hour per instance. The extension passes it to the
+  adapter when the panel opens.
+- `web/dist` is no longer tracked; merged worktrees removed.
+
 **Not verified / open:**
-1. The last deploy (`bb125ae`, extension 1.10.0) was pushed but its
-   production deploy wasn't checked: confirm `/downloads/extension.json`
-   says 1.10.0 and `/api/health` is all true.
-2. The after-submit save offer was tested on a local fixture form (works,
-   incl. across the page change); not yet on a real Greenhouse confirmation
-   page or with Workday's multi-step flow.
-3. Ashby "Where are you currently located?" (location search combobox) and
-   "When can you start?" (date picker) are still left for the user.
-4. Owner to do: publish the Google consent screen when opening sign-ups;
+1. Production smoke tests still not run (they need the owner signed in):
+   resume upload/download/delete on Backblaze, the cleanup cron (run it once
+   from Vercel -> Settings -> Cron Jobs), and listing sharing end to end.
+2. Extension 1.11.0 and form-schema were pushed this session; check
+   `/downloads/extension.json` says 1.11.0.
+3. Owner to do: publish the Google consent screen when opening sign-ups;
    move `C:\Users\aryan\job-board-secrets-BACKUP.txt` into a password
-   manager; enable Vercel 2FA.
-5. Not merged: TikTok/ByteDance collector branch
-   `claude/exciting-leavitt-975106`.
-6. Plan Part C (port Node backend to Rust) not started; server-side
-   `GET /api/autofill/form-schema` not built.
+   manager; enable Vercel 2FA; decide on server-side gating of `/jobs` and on
+   `SHARING_OPEN` / `OWNER_SUBS` / `MAX_USERS` (see doubts below).
+4. Plan Part C (port the Node backend and collectors to Rust) not started.
+   It's a multi-week rewrite; scope it in its own session first.
+5. `.claude/worktrees/priceless-leakey-117b83` still holds an uncommitted,
+   abandoned `extension-autofill/` draft; delete it once the owner agrees.
 
 **How to test locally (Windows, no MSVC):** `docker compose run --rm cargo
 test --workspace` (Rust + Postgres); `docker compose up -d api` (dev API on
@@ -83,8 +107,6 @@ the agent to drive the browser for setup; communicates in English/Hinglish.
 ### Doubts, risks and known gaps (honest list, most important first)
 
 **Not verified live**
-- Extension 1.10.0 deploy: last check still served 1.9.0 (deploy was in
-  progress). Check `/downloads/extension.json`.
 - Listing sharing end to end in production (extension → Rust
   `/api/capture/jobs` → Node `/admin/ingest` over the public URL with
   `COLLECT_TOKEN`): only tested locally with a fake ingest server.
@@ -98,12 +120,10 @@ the agent to drive the browser for setup; communicates in English/Hinglish.
 **Autofill doubts**
 - Save-after-submit detection is a heuristic (`onSubmitLike` in
   `extension/autofill.js`): a `submit` event, or a click on a button whose
-  text says submit/send/apply. It misses forms that submit from JS with other
-  button text ("Finish", "Complete", "Next" on the last step) and can fire
-  on an "Apply" button that isn't the final submit. It only works if the
-  user opened the Autofill panel on that page (needs `account`).
-- Workday is multi-step: only the step visible at submit is read, so
-  answers from earlier steps are never offered for saving.
+  text starts with submit/send/apply/finish/complete. A final button with
+  other wording ("Next" on the last step) is only held, and offered on the
+  next page load. A failed submit followed by leaving for another job in the
+  same tab can offer that unsubmitted form's answers.
 - Held answers are keyed by tab id; a confirmation page in a new tab, or
   after 30 min, loses them.
 - "This country" / "the country where the job is located" is read as the
@@ -115,9 +135,7 @@ the agent to drive the browser for setup; communicates in English/Hinglish.
   (`savedAnswer` in `autofill-fields.js`); reworded questions won't match.
 - Company scope uses a URL slug (Ashby/Lever path, Greenhouse `for=`, the
   Workday subdomain), so the same company on two ATSs gets two names.
-- Still left for the user: location search comboboxes (Ashby "Where are
-  you located?", Greenhouse "Location (City)"), date pickers (Ashby
-  "When can you start?"), Greenhouse phone (the form doesn't keep the
+- Still left for the user: Greenhouse phone (the form doesn't keep the
   value), school/degree dropdowns, EEO unless set.
 - Generic (company-built) forms are only tested on a fixture page; Tesla
   blocks headless browsers and Amazon needs a login, so both are untested.
@@ -153,20 +171,13 @@ the agent to drive the browser for setup; communicates in English/Hinglish.
   updates). The Chrome Web Store ($5 once) would fix both.
 
 **Code / repo hygiene**
-- `web/dist` is committed although Vercel rebuilds it. It's noisy in
-  diffs; consider removing it from git.
 - Profile page: for an account saved before the `board` field existed, the
   Save button can show as enabled before any edit (the draft adds empty
   board defaults). Harmless; clears after one save.
 - The Welcome step 1 embeds the full Resumes page, so its heading repeats.
-- Old worktrees under `.claude/worktrees/` (incl. an abandoned separate
-  `extension-autofill/` draft in `priceless-leakey-117b83`) can be removed.
 - The level rework (`6e70b61`: seniority read from posting text, 12 boards
   moved to cloud collectors) is now live on `main`; watch the next collect
   runs for count changes.
-- The TikTok/ByteDance collector (`claude/exciting-leavitt-975106`) is still
-  unmerged and was cut from an older `main`; expect conflicts in
-  `src/config.js`.
 - The live extension test scripts used during setup weren't saved in the
   repo (only `test/extension-autofill-live.cjs`, which uses a stub API).
   Recreate them from the "How to test locally" notes above.
