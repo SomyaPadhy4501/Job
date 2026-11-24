@@ -1,7 +1,7 @@
 'use strict';
 
-// Workday's sign-in and create-account step, with the one Workday password saved on the job board
-// the user set in the extension popup. Runs only on Workday hosts, in the top
+// Workday's sign-in and create-account step, with the one Workday email and
+// password the user saved on the job board (Autofill page). Runs only on Workday hosts, in the top
 // frame (its own manifest entry; never injected on other sites).
 //
 // - "Sign in with email" is chosen when Workday asks how to sign in.

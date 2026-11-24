@@ -119,15 +119,11 @@ test('verify links: this company only, https, opened by the worker', async () =>
   assert.deepEqual(plain(session.data.gmailUsed), ['v1']);
 });
 
-test('status, and the old in-extension token is cleared', async () => {
-  const { G, request, session, local } = load({ gmail: { available: true, connected: true, email: 'pat@gmail.example' } });
+test('the old in-extension token is cleared', async () => {
+  const { session, local } = load({});
   await new Promise((r) => setImmediate(r));
   assert.equal(session.data.gmailToken, undefined);
   assert.equal(local.data.gmailEmail, undefined);
-  assert.deepEqual(plain(await G.status(request)), { available: true, connected: true, email: 'pat@gmail.example' });
-  // An older portal without the connector.
-  const old = load({});
-  assert.deepEqual(plain(await old.G.status(old.request)), { available: false, connected: false, email: null });
 });
 
 test('the portal saying "not connected" reaches the caller', async () => {

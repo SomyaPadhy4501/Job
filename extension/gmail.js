@@ -90,17 +90,5 @@
     return true;
   }
 
-  // For the popup. A portal without the connector answers 404: not available.
-  async function status(request) {
-    const res = await request('gmail', undefined, true);
-    if (!res) return { available: false, connected: false, email: null };
-    const d = await res.json();
-    return {
-      available: d?.available === true,
-      connected: d?.connected === true,
-      email: typeof d?.email === 'string' ? d.email.slice(0, 200) : null,
-    };
-  }
-
-  self.AutofillGmail = { findCode, openVerifyLink, status };
+  self.AutofillGmail = { findCode, openVerifyLink };
 })();

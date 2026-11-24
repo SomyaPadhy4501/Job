@@ -384,7 +384,6 @@ test('Workday companies are told apart on both Workday hosts', () => {
 test('Gmail: asked through the portal; codes only for Workday and Greenhouse pages', async () => {
   const asked = [];
   const gmail = {
-    status: async (request) => (asked.push({ status: typeof request }), { available: true, connected: true, email: 'pat@gmail.example' }),
     findCode: async (request, site, tenant, shape, company) =>
       (asked.push({ site, tenant, shape, company, request: typeof request }), '123456'),
     openVerifyLink: async (request, tenant) => (asked.push({ verify: tenant }), true),
@@ -396,12 +395,8 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
   await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
   // Connecting happens on the portal now, never in the extension.
   assert.equal((await api.send({ type: 'autofill:gmailConnect' }, FROM_POPUP)).ok, false);
-  assert.match((await api.send({ type: 'autofill:gmailStatus' }, WORKDAY())).error, /popup/);
-  assert.deepEqual((await api.send({ type: 'autofill:gmailStatus' }, FROM_POPUP)).data, {
-    available: true,
-    connected: true,
-    email: 'pat@gmail.example',
-  });
+  // The popup no longer shows Gmail; status lives on the job board.
+  assert.equal((await api.send({ type: 'autofill:gmailStatus' }, FROM_POPUP)).ok, false);
   for (const sender of [ATS_TAB, { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, FROM_POPUP]) {
     assert.equal((await api.send({ type: 'autofill:findCode', length: 6 }, sender)).ok, false, sender.url);
   }
@@ -410,7 +405,7 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
     { code: '123456' }
   );
   assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 99 }, WORKDAY())).data, { code: '123456' });
-  assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(1, 3))), [
+  assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(0, 2))), [
     // Greenhouse: the board from the page's address and the company it shows.
     { site: 'greenhouse', tenant: 'acme', company: 'Acme Corp', shape: { length: 8, charset: 'alnum' }, request: 'function' },
     // Workday: the tenant; a company name from the page is never sent.
@@ -420,7 +415,7 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, gh)).ok, false);
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY({ frameId: 1 }))).ok, false);
   assert.deepEqual((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY())).data, { opened: true });
-  assert.deepEqual(JSON.parse(JSON.stringify(asked[3])), { verify: 'acme' });
+  assert.deepEqual(JSON.parse(JSON.stringify(asked[2])), { verify: 'acme' });
 });
 
 test("Gmail: the portal's own message reaches the page", async () => {
@@ -442,33 +437,4 @@ test("Gmail: the portal's own message reaches the page", async () => {
   assert.equal(call.init.headers.Authorization, 'Bearer tok');
   assert.equal(call.init.credentials, 'omit');
   assert.deepEqual(JSON.parse(call.init.body), { site: 'greenhouse', tenant: 'acme', length: 6, charset: 'alnum', skip: [] });
-});
-
-test('apply queue: the popup reads it, a job page may not, links are http(s) only', async () => {
-  const api = load({
-    routes: {
-      'GET /api/autofill/queue': json({
-        items: [
-          { id: 'q-1', company: 'Acme', title: 'Backend Engineer', status: 'queued', applyUrl: 'https://jobs.example/1' },
-          { id: 'q-2', company: 'Evil', title: 'Bad link', status: 'prepared', applyUrl: 'javascript:alert(1)' },
-          { title: 'no id' },
-        ],
-      }),
-    },
-  });
-  await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
-  const fromPage = await api.send({ type: 'autofill:applyQueue' });
-  assert.equal(fromPage.ok, false);
-  const r = await api.send({ type: 'autofill:applyQueue' }, FROM_POPUP);
-  assert.equal(r.ok, true, r.error);
-  assert.deepEqual(r.data.items, [
-    { id: 'q-1', company: 'Acme', title: 'Backend Engineer', status: 'queued', applyUrl: 'https://jobs.example/1' },
-    { id: 'q-2', company: 'Evil', title: 'Bad link', status: 'prepared', applyUrl: null },
-  ]);
-  assert.equal(api.calls.filter((c) => c.url === 'https://portal.example/api/autofill/queue').length, 1, 'read once');
-  assert.ok(api.calls.every((c) => (c.init.method || 'GET') === 'GET'), 'never writes');
-
-  const old = load({});
-  await old.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
-  assert.deepEqual(await old.send({ type: 'autofill:applyQueue' }, FROM_POPUP), { ok: true, data: { items: null } });
 });

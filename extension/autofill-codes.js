@@ -7,7 +7,7 @@
 //   to 3 minutes, then fill the code. Never presses submit.
 // - Workday asks to verify the email after Create Account: the worker opens
 //   this company's verify link from Gmail in a background tab.
-// Nothing happens until Gmail is connected in the extension popup.
+// Nothing happens until Gmail is connected on the job board (Alerts & Connectors).
 (() => {
   if (globalThis.__jobCodes) return;
   globalThis.__jobCodes = true;

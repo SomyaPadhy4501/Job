@@ -114,10 +114,6 @@
     // Gmail is connected on the portal (Alerts & Connectors); here only the
     // job page asking is checked, then the portal is asked for the code.
     let gmailAsk = null;
-    if (msg.type === 'autofill:gmailStatus') {
-      if (!isPopup) throw new Error('Use the extension popup.');
-      gmailAsk = { kind: 'status' };
-    }
     if (msg.type === 'autofill:findCode' || msg.type === 'autofill:openVerifyLink') {
       const site = JobApplicationPages.ats(url.hostname);
       if (isPopup || !['workday', 'greenhouse'].includes(site))
@@ -191,7 +187,7 @@
       if (optional && res.status === 404) return null;
       if (res.status === 401) {
         await chrome.storage.session.remove(CACHE);
-        throw new Error('Token rejected. Reconnect autofill in the extension popup with a new token from the portal Settings page.');
+        throw new Error('Token rejected. Reconnect in the extension popup with a new token from the job board’s Autofill page.');
       }
       if (!res.ok) {
         const said = say ? await res.json().then((d) => d?.error, () => null) : null;
@@ -217,7 +213,6 @@
       const email = typeof saved.email === 'string' && saved.email.includes('@') ? saved.email.slice(0, 254) : null;
       return { email, password: saved.password, autoSignIn: !entry.failed };
     }
-    if (gmailAsk?.kind === 'status') return AutofillGmail.status(request);
     if (gmailAsk?.kind === 'link') return { opened: await AutofillGmail.openVerifyLink(request, gmailAsk.tenant) };
     if (gmailAsk?.kind === 'code')
       return { code: await AutofillGmail.findCode(request, gmailAsk.site, gmailAsk.tenant, gmailAsk.shape, gmailAsk.company) };
@@ -241,27 +236,6 @@
         });
       }
       return { ...data, binding: auth.binding };
-    }
-    // The apply queue, read only, for the popup. A job page can't ask: which
-    // jobs you plan to apply to is nobody else's business. Older portals
-    // without the route give no list.
-    if (msg.type === 'autofill:applyQueue') {
-      if (!isPopup) throw new Error('Unsupported sender.');
-      const res = await request('queue', undefined, true);
-      const data = res ? await res.json() : null;
-      if (!data) return { items: null };
-      const web = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
-      const items = (Array.isArray(data.items) ? data.items : [])
-        .filter((i) => typeof i?.id === 'string' && typeof i.title === 'string')
-        .slice(0, 50)
-        .map((i) => ({
-          id: i.id,
-          company: String(i.company || '').slice(0, 200),
-          title: i.title.slice(0, 300),
-          status: String(i.status || ''),
-          applyUrl: web(i.applyUrl),
-        }));
-      return { items };
     }
     if (msg.binding !== auth.binding) throw new Error('Reopen Autofill to refresh your connection.');
     // Optional server-side ranking. A portal without the route answers 404 and
