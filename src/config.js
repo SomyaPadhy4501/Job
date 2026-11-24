@@ -1285,12 +1285,23 @@ const COMPANIES = [
   // already in the DB (Roblox, HelloFresh, Home Depot, KLA, Snap…). Its ~50
   // TikTok rows are 77-106 days old, so retention drops them — expected.
   // jobright-ai's lists were checked and skipped: every link goes through
-  // jobright.ai rather than to the employer.
+  // jobright.ai rather than to the employer. Zapply's lists (zapplyjobs/*-2027)
+  // link through zapply.jobs the same way. Both are mined for employers instead
+  // (the 2026-11-23 block at the end of COMPANIES).
+  // speedyapply renamed its repo 2026-SWE-College-Jobs → 2027-SWE-College-Jobs
+  // (GitHub redirects the old name). Its AI list has the same layout; on
+  // 2026-11-23 it gave 69 kept rows from 48 employers.
   {
     source: 'mdtable',
     slug: 'speedyapply-newgrad-usa',
-    displayName: 'speedyapply/2026-SWE-College-Jobs',
-    url: 'https://raw.githubusercontent.com/speedyapply/2026-SWE-College-Jobs/main/NEW_GRAD_USA.md',
+    displayName: 'speedyapply/2027-SWE-College-Jobs',
+    url: 'https://raw.githubusercontent.com/speedyapply/2027-SWE-College-Jobs/main/NEW_GRAD_USA.md',
+  },
+  {
+    source: 'mdtable',
+    slug: 'speedyapply-ai-newgrad-usa',
+    displayName: 'speedyapply/2027-AI-College-Jobs',
+    url: 'https://raw.githubusercontent.com/speedyapply/2027-AI-College-Jobs/main/NEW_GRAD_USA.md',
   },
 
   // ─── YC startups via HN "Who is hiring?" ─────────────────────────────────
@@ -1367,6 +1378,129 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'pingidentity', displayName: 'Ping Identity' },  // 3 US software of 69, 16 approvals
   { source: 'greenhouse', slug: 'knowbe4', displayName: 'KnowBe4' },  // 2 US software of 57, 8 approvals
   { source: 'greenhouse', slug: 'beyondtrust', displayName: 'BeyondTrust Corporation' },  // 8 US software of 41, 4 approvals; the USCIS key's name
+  // ── Employers from the curated new-grad lists (2026-11-23) ─────────────────
+  // Mined from SimplifyJobs, vanshb03, speedyapply (SWE + AI), Zapply and
+  // jobright-ai: US software postings at H-1B sponsors (3+ approvals) that no
+  // board here covered. Universities, hospitals, government, law firms,
+  // clearance-bound contractors, xAI and PNC were left out. Non-Workday
+  // boards were run through their collector and normalizeJob on the day
+  // ("kept" = rows a collect keeps now; most post senior roles between
+  // new-grad cycles). Workday tenant / shard / site come from the lists' live
+  // posting links and were not probed: Workday was rate-limiting the machine.
+  { source: 'oracle_hcm', slug: 'honeywell-aerospace', apiHost: 'icfcjb.fa.ocs.oraclecloud.com', siteNumber: 'Aerospace', uiBaseUrl: 'https://icfcjb.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/Aerospace', displayName: 'Honeywell Aerospace' },  // 6 kept, 18 US software of 500, 14 approvals
+  { source: 'oracle_hcm', slug: 'texas-instruments', apiHost: 'edbz.fa.us2.oraclecloud.com', siteNumber: 'CX', uiBaseUrl: 'https://edbz.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX', displayName: 'Texas Instruments' },  // 3 kept, 11 US software of 500, 389 approvals
+  { source: 'oracle_hcm', slug: 'fortinet', apiHost: 'edel.fa.us2.oraclecloud.com', siteNumber: 'CX_2001', uiBaseUrl: 'https://edel.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_2001', displayName: 'Fortinet' },  // 3 kept, 20 US software of 500, 282 approvals
+  { source: 'oracle_hcm', slug: 'emerson-electric', apiHost: 'hdjq.fa.us2.oraclecloud.com', siteNumber: 'CX_1', uiBaseUrl: 'https://hdjq.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1', displayName: 'Emerson Electric' },  // 3 kept, 12 US software of 500, 19 approvals
+  { source: 'oracle_hcm', slug: 'akamai-technologies', apiHost: 'fa-extu-saasfaprod1.fa.ocs.oraclecloud.com', siteNumber: 'CX_1', uiBaseUrl: 'https://fa-extu-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1', displayName: 'Akamai Technologies' },  // 0 kept, 28 US software of 298, 360 approvals
+  { source: 'oracle_hcm', slug: 'eclerx', apiHost: 'fa-ewji-saasfaprod1.fa.ocs.oraclecloud.com', siteNumber: 'CX_1', uiBaseUrl: 'https://fa-ewji-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1', displayName: 'eClerx' },  // 0 kept, 3 US software of 500, 17 approvals
+  { source: 'greenhouse', slug: 'lilasciences', displayName: 'Lila Sciences' },  // 5 kept, 34 US software of 113, 36 approvals
+  { source: 'greenhouse', slug: 'twitch', displayName: 'Twitch' },  // 3 kept, 14 US software of 50, 67 approvals
+  { source: 'greenhouse', slug: 'koddi', displayName: 'Koddi' },  // 3 kept, 3 US software of 16, 8 approvals
+  { source: 'greenhouse', slug: 'formlabs', displayName: 'Formlabs' },  // 1 kept, 12 US software of 271, 33 approvals
+  { source: 'greenhouse', slug: 'cmt', displayName: 'Cambridge Mobile Telematics' },  // 1 kept, 3 US software of 4, 28 approvals
+  { source: 'greenhouse', slug: 'acuitymd', displayName: 'AcuityMD' },  // 1 kept, 3 US software of 10, 8 approvals
+  { source: 'greenhouse', slug: 'selffinancial', displayName: 'Self Financial' },  // 1 kept, 8 US software of 10, 4 approvals
+  { source: 'greenhouse', slug: 'harbingermotors', displayName: 'Harbinger Motors' },  // 0 kept, 4 US software of 85, 73 approvals
+  { source: 'greenhouse', slug: 'thebrattlegroup', displayName: 'The Brattle Group' },  // 0 kept, 2 US software of 44, 46 approvals
+  { source: 'greenhouse', slug: 'addepar1', displayName: 'Addepar' },  // 0 kept, 18 US software of 119, 45 approvals
+  { source: 'greenhouse', slug: 'clearstreet', displayName: 'Clear Street' },  // 0 kept, 13 US software of 33, 33 approvals
+  { source: 'greenhouse', slug: 'scopely', displayName: 'Scopely' },  // 0 kept, 6 US software of 169, 29 approvals
+  { source: 'greenhouse', slug: 'truveta', displayName: 'Truveta' },  // 0 kept, 5 US software of 36, 24 approvals
+  { source: 'greenhouse', slug: 'teletrackingtechnologiesinc', displayName: 'TeleTracking Technologies' },  // 0 kept, 6 US software of 14, 20 approvals
+  { source: 'greenhouse', slug: 'grahamcapitalmanagement', displayName: 'Graham Capital Management' },  // 0 kept, 2 US software of 13, 18 approvals
+  { source: 'greenhouse', slug: 'datacor', displayName: 'Datacor' },  // 0 kept, 4 US software of 12, 8 approvals
+  { source: 'greenhouse', slug: 'precisionmedicinegroup', displayName: 'Precision Medicine Group' },  // 0 kept, 1 US software of 145, 8 approvals
+  { source: 'greenhouse', slug: 'nisc', displayName: 'National Information Solutions Cooperative' },  // 0 kept, 1 US software of 29, 6 approvals
+  { source: 'greenhouse', slug: 'perpay', displayName: 'Perpay' },  // 0 kept, 8 US software of 15, 6 approvals
+  { source: 'greenhouse', slug: 'nuancelabs', displayName: 'Nuance Labs' },  // 0 kept, 3 US software of 6, 6 approvals
+  { source: 'greenhouse', slug: 'garnerhealth', displayName: 'Garner Health' },  // 0 kept, 15 US software of 58, 5 approvals
+  { source: 'greenhouse', slug: 'theweathercompany', displayName: 'The Weather Company' },  // 0 kept, 5 US software of 36, 5 approvals
+  { source: 'greenhouse', slug: 'evolver', displayName: 'Evolver' },  // 0 kept, 5 US software of 20, 5 approvals
+  { source: 'greenhouse', slug: 'instalilyai', displayName: 'InstaLILY' },  // 0 kept, 4 US software of 24, 4 approvals
+  { source: 'greenhouse', slug: 'sirenopt', displayName: 'SirenOpt' },  // 0 kept, 1 US software of 2, 3 approvals
+  { source: 'ashby', slug: 'Commure', displayName: 'Commure' },  // 2 kept, 25 US software of 74, 66 approvals
+  { source: 'ashby', slug: 'graymatter-robotics', displayName: 'GrayMatter Robotics' },  // 1 kept, 2 US software of 15, 17 approvals
+  { source: 'ashby', slug: 'rivianvw.tech', displayName: 'Rivian' },  // 0 kept, 43 US software of 179, 68 approvals
+  { source: 'ashby', slug: 'marianaminerals', displayName: 'Mariana Minerals' },  // 0 kept, 8 US software of 99, 16 approvals
+  { source: 'ashby', slug: 'zefr', displayName: 'Zefr' },  // 0 kept, 2 US software of 7, 9 approvals
+  { source: 'ashby', slug: 'ntt-data-aivista', displayName: 'NTT DATA AIVista' },  // 0 kept, 7 US software of 8, 9 approvals
+  { source: 'ashby', slug: 'periodic-labs', displayName: 'Periodic Labs' },  // 0 kept, 10 US software of 30, 9 approvals
+  { source: 'ashby', slug: 'old-mission-capital', displayName: 'Old Mission' },  // 0 kept, 12 US software of 39, 8 approvals
+  { source: 'ashby', slug: 'rhoda-ai', displayName: 'Rhoda AI' },  // 0 kept, 13 US software of 42, 7 approvals
+  { source: 'ashby', slug: 'qumulo', displayName: 'Qumulo' },  // 0 kept, 3 US software of 26, 5 approvals
+  { source: 'ashby', slug: 'madhive', displayName: 'Madhive' },  // 0 kept, 1 US software of 6, 4 approvals
+  { source: 'ashby', slug: 'cylake-inc', displayName: 'Cylake' },  // 0 kept, 6 US software of 15, 3 approvals
+  { source: 'lever', slug: 'crosscountry-consulting', displayName: 'CrossCountry Consulting' },  // 3 kept, 5 US software of 99, 13 approvals
+  { source: 'lever', slug: 'brillio-2', displayName: 'Brillio' },  // 0 kept, 10 US software of 215, 340 approvals
+  { source: 'lever', slug: 'veeva', displayName: 'Veeva Systems' },  // 0 kept, 17 US software of 865, 133 approvals
+  { source: 'lever', slug: 'plus-2', displayName: 'PlusAI' },  // 0 kept, 22 US software of 43, 30 approvals
+  { source: 'lever', slug: 'glsllc', displayName: 'Global Lending Services' },  // 0 kept, 1 US software of 39, 19 approvals
+  { source: 'lever', slug: 'revenueanalytics', displayName: 'Revenue Analytics' },  // 0 kept, 2 US software of 2, 10 approvals
+  { source: 'lever', slug: 'genovatech', displayName: 'Genova Technologies' },  // 0 kept, 2 US software of 5, 6 approvals
+  { source: 'lever', slug: 'hive', displayName: 'Hive' },  // 0 kept, 21 US software of 73, 5 approvals
+  { source: 'lever', slug: 'artera', displayName: 'Artera' },  // 0 kept, 2 US software of 6, 5 approvals
+  { source: 'lever', slug: 'kitware', displayName: 'Kitware' },  // 0 kept, 8 US software of 24, 4 approvals
+  { source: 'lever', slug: 'datalabusa', displayName: 'DataLab USA' },  // 0 kept, 5 US software of 15, 3 approvals
+  { source: 'workable', slug: 'multimediallc', displayName: 'Multi Media' },  // 1 kept, 1 US software of 3, 7 approvals
+  { source: 'smartrecruiters', slug: 'Mirantis', displayName: 'Mirantis' },  // 1 kept, 2 US software of 2, 4 approvals
+  { source: 'smartrecruiters', slug: 'MarlabsInc1', displayName: 'Marlabs' },  // 0 kept, 2 US software of 2, 136 approvals
+  { source: 'workable', slug: 'flexcompute', displayName: 'Flexcompute' },  // 0 kept, 5 US software of 28, 8 approvals
+  { source: 'workday', slug: 'walmart-walmartexternal', tenant: 'walmart', wd: '5', site: 'WalmartExternal', displayName: 'Walmart' },  // 1 list link, 5625 approvals
+  { source: 'workday', slug: 'ghr-lateral-us', tenant: 'ghr', wd: '1', site: 'lateral-us', displayName: 'Bank of America' },  // 2 list links, 1151 approvals
+  { source: 'workday', slug: 'ghr-us-emplsv', tenant: 'ghr', wd: '1', site: 'us-emplsv', displayName: 'Bank of America' },  // 2 list links, 1151 approvals
+  { source: 'workday', slug: 'snapchat-snap', tenant: 'snapchat', wd: '1', site: 'snap', displayName: 'Snap' },  // 1 list link, 565 approvals
+  { source: 'workday', slug: 'chewy-external', tenant: 'chewy', wd: '5', site: 'external', displayName: 'Chewy' },  // 3 list links, 410 approvals
+  { source: 'workday', slug: 'thermofisher-thermofishercareers', tenant: 'thermofisher', wd: '5', site: 'thermofishercareers', displayName: 'Thermo Fisher Scientific' },  // 1 list link, 386 approvals
+  { source: 'workday', slug: 'fmr-fidelitycareers', tenant: 'fmr', wd: '1', site: 'fidelitycareers', displayName: 'Fidelity Investments' },  // 5 list links, 299 approvals
+  { source: 'workday', slug: 'fmr-targeted', tenant: 'fmr', wd: '1', site: 'targeted', displayName: 'Fidelity Investments' },  // 8 list links, 299 approvals
+  { source: 'workday', slug: 'ffive-f5jobs', tenant: 'ffive', wd: '5', site: 'f5jobs', displayName: 'F5' },  // 1 list link, 266 approvals
+  { source: 'workday', slug: 'northwesternmutual-corporate-careers', tenant: 'northwesternmutual', wd: '5', site: 'corporate-careers', displayName: 'Northwestern Mutual' },  // 1 list link, 204 approvals
+  { source: 'workday', slug: 'mtb-campus', tenant: 'mtb', wd: '5', site: 'Campus', displayName: 'M&T Bank' },  // 5 list links, 166 approvals
+  { source: 'workday', slug: 'mtb-mtb', tenant: 'mtb', wd: '5', site: 'mtb', displayName: 'M&T Bank' },  // 1 list link, 166 approvals
+  { source: 'workday', slug: 'abb-external_career_page', tenant: 'abb', wd: '3', site: 'external_career_page', displayName: 'ABB' },  // 1 list link, 158 approvals
+  { source: 'workday', slug: 'relx-risksolutions', tenant: 'relx', wd: '3', site: 'risksolutions', displayName: 'LexisNexis Risk Solutions' },  // 11 list links, 134 approvals
+  { source: 'workday', slug: 'sbdinc-stanley_black_decker_career_site', tenant: 'sbdinc', wd: '1', site: 'Stanley_Black_Decker_Career_Site', displayName: 'Stanley Black & Decker' },  // 2 list links, 121 approvals
+  { source: 'workday', slug: 'earlywarning-earlywarningcareers', tenant: 'earlywarning', wd: '5', site: 'earlywarningcareers', displayName: 'Early Warning' },  // 2 list links, 74 approvals
+  { source: 'workday', slug: 'choicehotels-external', tenant: 'choicehotels', wd: '5', site: 'external', displayName: 'Choice Hotels' },  // 1 list link, 56 approvals
+  { source: 'workday', slug: 'silabs-siliconlabscareers', tenant: 'silabs', wd: '1', site: 'SiliconlabsCareers', displayName: 'Silicon Laboratories' },  // 1 list link, 56 approvals
+  { source: 'workday', slug: 'chamberlain-chamberlain_group', tenant: 'chamberlain', wd: '1', site: 'chamberlain_group', displayName: 'Chamberlain Group' },  // 1 list link, 53 approvals
+  { source: 'workday', slug: 'globusmedical-gmed_careers', tenant: 'globusmedical', wd: '5', site: 'gmed_careers', displayName: 'Globus Medical' },  // 2 list links, 53 approvals
+  { source: 'workday', slug: 'itw-external', tenant: 'itw', wd: '5', site: 'external', displayName: 'Illinois Tool Works' },  // 1 list link, 52 approvals
+  { source: 'workday', slug: 'onto-onto_careers', tenant: 'onto', wd: '1', site: 'onto_careers', displayName: 'Onto Innovation' },  // 1 list link, 42 approvals
+  { source: 'workday', slug: 'viavisolutions-careers', tenant: 'viavisolutions', wd: '1', site: 'careers', displayName: 'Viavi Solutions' },  // 1 list link, 42 approvals
+  { source: 'workday', slug: 'vrtx-vertex_careers', tenant: 'vrtx', wd: '501', site: 'vertex_careers', displayName: 'Vertex' },  // 1 list link, 42 approvals
+  { source: 'workday', slug: 'nextracker-nextpower_careers', tenant: 'nextracker', wd: '5', site: 'nextpower_careers', displayName: 'Nextpower' },  // 1 list link, 37 approvals
+  { source: 'workday', slug: 'r1rcm-r1rcm', tenant: 'r1rcm', wd: '1', site: 'R1RCM', displayName: 'R1 RCM' },  // 1 list link, 34 approvals
+  { source: 'workday', slug: 'ercot-ercot_careers', tenant: 'ercot', wd: '1', site: 'ercot_careers', displayName: 'Electric Reliability Council of Texas' },  // 1 list link, 28 approvals
+  { source: 'workday', slug: 'gevernova-vernova_externalsite', tenant: 'gevernova', wd: '5', site: 'vernova_externalsite', displayName: 'GE Vernova' },  // 1 list link, 27 approvals
+  { source: 'workday', slug: 'bmo-external', tenant: 'bmo', wd: '3', site: 'external', displayName: 'Bank of Montreal' },  // 1 list link, 20 approvals
+  { source: 'workday', slug: 'axos-axos', tenant: 'axos', wd: '5', site: 'axos', displayName: 'Axos Bank' },  // 4 list links, 19 approvals
+  { source: 'workday', slug: 'pg-1000', tenant: 'pg', wd: '5', site: '1000', displayName: 'Procter & Gamble' },  // 2 list links, 15 approvals
+  { source: 'workday', slug: 'collegeboard-cbcareers', tenant: 'collegeboard', wd: '1', site: 'cbcareers', displayName: 'College Board' },  // 2 list links, 14 approvals
+  { source: 'workday', slug: 'tandemdiabetes-tandemdiabetes', tenant: 'tandemdiabetes', wd: '12', site: 'tandemdiabetes', displayName: 'Tandem Diabetes Care' },  // 1 list link, 13 approvals
+  { source: 'workday', slug: 'ascensushr-ascensuscareers', tenant: 'ascensushr', wd: '1', site: 'ascensuscareers', displayName: 'Ascensus' },  // 2 list links, 12 approvals
+  { source: 'workday', slug: 'rbi-rbi_external_career_site', tenant: 'rbi', wd: '3', site: 'rbi_external_career_site', displayName: 'Restaurant Brands International' },  // 1 list link, 10 approvals
+  { source: 'workday', slug: 'simmonsbank-simmonscareers', tenant: 'simmonsbank', wd: '5', site: 'simmonscareers', displayName: 'Simmons Bank' },  // 1 list link, 9 approvals
+  { source: 'workday', slug: 'tplink-external', tenant: 'tplink', wd: '503', site: 'External', displayName: 'TP-Link Systems' },  // 1 list link, 8 approvals
+  { source: 'workday', slug: 'directsupply-direct-supply-careers', tenant: 'directsupply', wd: '501', site: 'direct-supply-careers', displayName: 'Direct Supply' },  // 2 list links, 6 approvals
+  // ── Jibe career sites (src/collectors/jibe.js, 2026-11-23) ────────────────
+  // Employers that post only on an iCIMS Jibe site, found by the coverage audit.
+  // Dry run on the day: raw postings / US software / kept (sponsorship YES).
+  // AMD's kept rows all read NO, correctly: its postings say "This role is not
+  // eligible for visa sponsorship". Costco was left out: its keyword searches
+  // returned 826 postings and no US software role.
+  { source: 'jibe', slug: 'amd', displayName: 'AMD', baseUrl: 'https://careers.amd.com' },  // 1182 / 69 / 11 (0 YES), 1260 approvals
+  { source: 'jibe', slug: 'medpace', displayName: 'Medpace', baseUrl: 'https://careers.medpace.com' },  // 779 / 26 / 9 (9 YES), 48 approvals
+  { source: 'jibe', slug: 'keysight', displayName: 'Keysight Technologies', baseUrl: 'https://jobs.keysight.com' },  // 810 / 39 / 2 (1 YES), 137 approvals
+  { source: 'jibe', slug: 'rivian', displayName: 'Rivian Automotive', baseUrl: 'https://careers.rivian.com' },  // 995 / 63 / 1 (1 YES), 842 approvals
+  { source: 'jibe', slug: 'ice', displayName: 'Intercontinental Exchange', baseUrl: 'https://careers.ice.com' },  // 309 / 36 / 1 (1 YES), 261 approvals
+  { source: 'jibe', slug: 'sig', displayName: 'Susquehanna International Group', baseUrl: 'https://careers.sig.com' },  // 279 / 27 / 1 (1 YES), 111 approvals
+  { source: 'jibe', slug: 'viasat', displayName: 'Viasat', baseUrl: 'https://careers.viasat.com' },  // 264 / 35 / 1 (1 YES), 61 approvals
+  { source: 'jibe', slug: 'docusign', displayName: 'DocuSign', baseUrl: 'https://careers.docusign.com' },  // 239 / 28 / 0, 347 approvals
+  { source: 'jibe', slug: 'first-citizens', displayName: 'First Citizens Bank', baseUrl: 'https://jobs.firstcitizens.com' },  // 360 / 20 / 0, 274 approvals
+
+  // Pinpoint board named by a new-grad list link (2026-11-23): 2 kept, 2 US software of 14, 8 approvals.
+  { source: 'pinpoint', slug: 'confluence', displayName: 'Confluence Technologies' },
 ];
 
 const CONFIG = {
