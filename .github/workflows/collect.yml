@@ -88,14 +88,18 @@ jobs:
           ADZUNA_APP_KEY:    ${{ secrets.ADZUNA_APP_KEY }}
           # AI tagging of new postings through MINA (src/services/ai-tagger.js).
           # Off until the repository variable AI_TAGGING is 'true'. MINA_BASE_URL
-          # must be an HTTPS address the GitHub runner can reach (e.g.
-          # https://<host>/v1). If MINA is unreachable, or a run's budget runs
+          # is one HTTPS address the GitHub runner can reach (a PC's Tailscale
+          # Funnel URL, e.g. https://<pc>.tailefc5e0.ts.net/v1) or several,
+          # comma-separated, tried in order: an offline PC is skipped. Keys:
+          # MINA_API_KEY if every PC accepts the same key, or MINA_API_KEYS (one
+          # per address, same order). If no PC answers, or a run's budget runs
           # out, the run still finishes and those postings keep the rule-based
           # tags (they are not re-sent later unless their text changes).
           AI_TAGGING:        ${{ vars.AI_TAGGING }}
           MINA_BASE_URL:     ${{ vars.MINA_BASE_URL }}
           MINA_MODEL:        ${{ vars.MINA_MODEL }}
           MINA_API_KEY:      ${{ secrets.MINA_API_KEY }}
+          MINA_API_KEYS:     ${{ secrets.MINA_API_KEYS }}
           AI_TAG_LIMIT:      ${{ vars.AI_TAG_LIMIT }}
           AI_TAG_MINUTES:    ${{ vars.AI_TAG_MINUTES }}
           # COLLECT_TOKEN is only needed if you want to also hit /admin/collect.

@@ -25,6 +25,20 @@ async function main() {
   const fixture = mode === '--fixture';
   // eslint-disable-next-line global-require
   const options = fixture ? { model: 'fixture' } : require('../services/model-options').modelOptions();
+  // With several MINA addresses, check each in order and use the first PC
+  // that answers, as the collect run does.
+  if (!fixture && options.mina) {
+    // eslint-disable-next-line global-require
+    const { probeEndpoint } = require('../services/ai-tagger');
+    let chosen;
+    for (const ep of options.endpoints) {
+      const state = await probeEndpoint(ep, options.model);
+      console.log(`MINA ${ep.label}: ${state}`);
+      if (state === 'up') { chosen = ep; break; }
+    }
+    if (!chosen) throw new Error('No MINA address answered with this key and model.');
+    Object.assign(options, { endpoint: chosen.endpoint, key: chosen.key });
+  }
   const rows = examples.map((row) => ({ ...row, description: stripHtml(row.description || '') }));
   const byText = new Map(rows.map((row) => [row.description, row.expected]));
   const infer = fixture ? async (posting) => byText.get(posting.description) : undefined;

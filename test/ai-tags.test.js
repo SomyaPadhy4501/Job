@@ -141,3 +141,75 @@ test('Mina retries a rejected answer once and validates the replacement evidence
   assert.equal(tag.sponsorship, 'NO');
   await assert.rejects(classify(row, options, async () => wrong), /empty quote/);
 });
+
+test('MINA_BASE_URL takes an ordered list of PCs with a shared or per-PC key', () => {
+  const { modelOptions } = require('../src/services/model-options');
+  const urls = 'https://devarshi-pc.tailefc5e0.ts.net/v1/ ,  https://grafton-pc.tailefc5e0.ts.net/v1\nhttps://avis-pc-1.tailefc5e0.ts.net/v1';
+  const shared = modelOptions({ MINA_BASE_URL: urls, MINA_API_KEY: ' mina_shared\n' });
+  assert.deepEqual(shared.endpoints.map((e) => e.label), ['devarshi-pc', 'grafton-pc', 'avis-pc-1']);
+  assert.equal(shared.endpoints[1].endpoint, 'https://grafton-pc.tailefc5e0.ts.net/v1/chat/completions');
+  assert.equal(shared.endpoints[0].models, 'https://devarshi-pc.tailefc5e0.ts.net/v1/models');
+  assert.ok(shared.endpoints.every((e) => e.key === 'mina_shared'));
+  assert.equal(shared.endpoint, shared.endpoints[0].endpoint); // single-endpoint callers
+  const own = modelOptions({ MINA_BASE_URL: urls, MINA_API_KEYS: 'mina_a, mina_b, mina_c' });
+  assert.deepEqual(own.endpoints.map((e) => e.key), ['mina_a', 'mina_b', 'mina_c']);
+  assert.throws(() => modelOptions({ MINA_BASE_URL: urls, MINA_API_KEYS: 'mina_a,mina_b' }), /one key per address/);
+  assert.throws(() => modelOptions({ MINA_BASE_URL: urls + ',http://grafton-pc.tailefc5e0.ts.net/v1', MINA_API_KEY: 'k' }), /HTTPS/);
+  assert.throws(() => modelOptions({ MINA_BASE_URL: 'https://a.example/v1,https://a.example/v1/', MINA_API_KEY: 'k' }), /twice/);
+});
+
+test('when a PC is offline the same posting moves to the next PC', async () => {
+  const endpoints = ['pc1', 'pc2', 'pc3'].map((label) => ({ endpoint: `https://${label}/v1/chat/completions`, key: 'k', label }));
+  const options = { model: 'qwen3:8b', mina: true, endpoints };
+  const seen = [];
+  const switches = [];
+  const jobs = samples.map((s) => job(s));
+  const stats = await run(jobs, {
+    options,
+    probe: async (ep) => (ep.label === 'pc1' ? 'down' : 'up'), // pc1 is switched off
+    onSwitch: (c) => switches.push(c),
+    infer: async (posting, o) => {
+      seen.push(o.label);
+      if (o.label === 'pc2' && seen.filter((l) => l === 'pc2').length === 3) throw new Error('fetch failed'); // pc2 drops mid-run
+      return answer(posting);
+    },
+  });
+  assert.equal(stats.tagged, samples.length);
+  assert.equal(stats.failed, 0);
+  assert.equal(stats.requested, samples.length); // the retried posting is counted once
+  assert.deepEqual(stats.used, ['pc2', 'pc3']);
+  assert.equal(stats.endpoints.pc1.state, 'down');
+  assert.equal(stats.endpoints.pc1.requests, 0); // skipped by the probe, no 90 s timeout
+  assert.equal(stats.endpoints.pc2.state, 'down');
+  assert.equal(stats.endpoints.pc2.ok, 2);
+  assert.equal(stats.endpoints.pc3.ok, samples.length - 2);
+  assert.deepEqual(switches, [{ from: 'pc2', to: 'pc3', reason: 'unreachable' }]);
+});
+
+test('every PC down keeps rule tags; a key one PC refuses moves on; all refusing is an error', async () => {
+  const endpoints = ['pc1', 'pc2'].map((label) => ({ endpoint: `https://${label}/v1/chat/completions`, key: 'k', label }));
+  const options = { model: 'qwen3:8b', mina: true, endpoints };
+
+  const rules = samples.map((s) => job(s, { role_type: 'DS' }));
+  const down = await run(rules, { options, probe: async () => 'down', infer: () => assert.fail('model called') });
+  assert.equal(down.unavailable, true);
+  assert.equal(down.deferred, samples.length);
+  assert.ok(rules.every((j) => j.role_type === 'DS'));
+
+  const mixed = await run(samples.map((s) => job(s)), {
+    options, probe: async () => 'up',
+    infer: async (p, o) => { if (o.label === 'pc1') throw new Error('Model HTTP 401'); return answer(p); },
+  });
+  assert.equal(mixed.tagged, samples.length);
+  assert.deepEqual(mixed.used, ['pc1', 'pc2']);
+  assert.equal(mixed.endpoints.pc1.state, 'rejected');
+
+  await assert.rejects(run([job(samples[0])], { options, probe: async () => 'rejected' }), /MINA_API_KEY/);
+
+  // Nothing new to tag: no address is even probed.
+  let probes = 0;
+  const s = samples[0];
+  const stored = { apply_url: s.apply_url, job_title: s.job_title, description: s.description, role_type: 'SWE', sponsorship: 'YES', restriction: '' };
+  await run([job(s)], { options, lookup: async () => [stored], probe: async () => { probes++; return 'up'; } });
+  assert.equal(probes, 0);
+});

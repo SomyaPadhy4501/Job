@@ -127,6 +127,7 @@ async function collectAll({ companies = COMPANIES } = {}) {
         limit: Number.isFinite(limit) && limit >= 0 ? limit : 150,
         deadline: Date.now() + (Number.isFinite(minutes) && minutes > 0 ? minutes : 15) * 60_000,
         onError: (job, err) => log.debug('tags.error', { url: job.apply_url, error: err.message }),
+        onSwitch: (change) => log.warn('tags.switch', { runId, ...change }),
         onTag: (job, rules, tag) => log.debug('tags.verdict', {
           title: job.job_title, company: job.company_name,
           role: `${rules.role_type}->${job.role_type}`, sponsorship: `${rules.sponsorship}->${job.sponsorship}`,

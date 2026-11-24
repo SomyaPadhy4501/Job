@@ -47,9 +47,10 @@ covers that with room to spare.
 | Variable | Where | Meaning |
 |---|---|---|
 | `AI_TAGGING` | repo **variable** | `true` turns it on. Anything else = the old rule-only behavior. |
-| `MINA_BASE_URL` | repo **variable** | MINA's OpenAI-compatible base, e.g. `https://<host>/v1`. HTTPS required except `localhost`/`127.0.0.1`. |
-| `MINA_MODEL` | repo **variable** | Default `qwen3:8b`. |
-| `MINA_API_KEY` | repo **secret** | A MINA model API key (`mina_…`) scoped to that model. |
+| `MINA_BASE_URL` | repo **variable** | MINA's OpenAI-compatible base, e.g. `https://devarshi-pc.tailefc5e0.ts.net/v1`, or several separated by commas, tried in order (see "Several PCs"). HTTPS required except `localhost`/`127.0.0.1`. |
+| `MINA_MODEL` | repo **variable** | Default `qwen3:8b`. Every listed PC must offer it. |
+| `MINA_API_KEY` | repo **secret** | A MINA model API key (`mina_…`) scoped to that model, used for every address. |
+| `MINA_API_KEYS` | repo secret, optional | Instead of `MINA_API_KEY` when each PC has its own key: one per address, comma-separated, same order as `MINA_BASE_URL`. |
 | `AI_TAG_LIMIT` | repo variable, optional | Max model requests per collect (default 150). |
 | `AI_TAG_MINUTES` | repo variable, optional | Time budget per collect (default 15). |
 
@@ -70,13 +71,42 @@ DEBUG=1 npm run collect   # also logs every verdict: rule → AI, evidence quote
 ```
 
 Each collect logs `tags.review` with `reused`, `requested`, `tagged`, `failed`,
-`deferred`, `unavailable`, `roleChanged`, `sponsorshipChanged`.
+`deferred`, `unavailable`, `roleChanged`, `sponsorshipChanged`, plus `used` (the
+PCs that answered, in order) and `endpoints` (per PC: requests, ok, up/down/rejected).
+A `tags.switch` warning is logged when a run moves to the next PC.
+
+## Several PCs (failover)
+
+Every PC that runs MINA can serve the tagger. List them in `MINA_BASE_URL`,
+preferred first:
+
+```
+https://devarshi-pc.tailefc5e0.ts.net/v1,https://grafton-pc.tailefc5e0.ts.net/v1,https://avis-pc-1.tailefc5e0.ts.net/v1
+```
+
+- Before the first request, each address is checked in order (`GET /v1/models`,
+  8 s): the first PC that answers and offers the model is used. An offline PC costs
+  seconds, not a 90-second timeout.
+- If that PC goes offline mid-run, the same posting is retried on the next PC.
+- A PC that refuses the key is skipped. Only if every PC refuses does the run log
+  `tags.failed`; only if none answers does it keep rule tags (`unavailable`).
+- Adding or removing a PC is just editing the variable: no code change.
+
+Each PC needs: MINA's model gateway running (port 8091), `qwen3:8b` pulled
+(`ollama list`), Tailscale Funnel on for the gateway (`tailscale funnel --bg 8091`,
+check with `tailscale funnel status`), and a key that PC accepts. MINA keeps keys
+per install (`data/model_api_keys.sqlite3`, not synced between PCs): either copy
+that file to the other PCs so they accept the same key (then `MINA_API_KEY` is
+enough), or create a key on each PC and put them in `MINA_API_KEYS`.
+
+Quick check of a PC from anywhere: `https://<pc>.tailefc5e0.ts.net/v1/models`
+answers `401` without a key and `200` with one.
 
 ## Going live
 
-1. MINA must be reachable from GitHub's runners over HTTPS (the gateway listens on
-   `127.0.0.1:8091` only, so it needs a tunnel such as Tailscale Funnel or Cloudflare
-   Tunnel), and the PC running MINA must be on during the collect runs.
+1. MINA must be reachable from GitHub's runners over HTTPS. The gateway listens on
+   port 8091 on the PC, so each PC exposes it with Tailscale Funnel (free; no other
+   tunnel needed). At least one listed PC must be on during the collect runs.
 2. Set the variables and secret above in GitHub → Settings → Secrets and variables → Actions.
 3. Run **collect → Run workflow** once and check its `tags.review` log line.
 4. If something's wrong, set `AI_TAGGING` to anything but `true`: the next run is back to rules only.
