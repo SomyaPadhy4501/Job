@@ -5,6 +5,12 @@ this codebase. It exists so you don't have to re-derive context.
 
 ---
 
+### Done 2026-11-24 (CURSOR.md T2–T5, collector hardening)
+- T2: failed silent Gmail re-auth says "Reconnect Gmail in the extension popup to fill codes." once and stops; code-note colors updated (extension 1.17.2). T1 still waits for the owner's Gmail OAuth client ID.
+- T3: updater restarts browsers holding a pre-1.16 copy (`--restore-last-session`); fixed a one-process `Count` bug found in a Playwright sandbox test. macOS script not yet run on a Mac.
+- T4: resume-title words (+5) break ties between resumes of one family. T5: Profile Save off until an edit; Welcome uses `ResumesBody`.
+- Collector: `collectAll` now awaits the Postgres store (prune and run log never completed before); upserts in 250-row transactions with per-row fallback; runs exit 1 when nothing was fetched or `DATABASE_URL` is missing; first-page failures fail the company. Wayfair is collected via `jsonld` (sitemap + JSON-LD). Collect and scrape are triggered every 30 min and run when 170+ min have passed (`.github/scripts/due.sh`), i.e. every 3 hours.
+
 ## Current state and next work (updated 2026-11-24) — START HERE
 
 **Live:** https://job-two-xi.vercel.app (Vercel project `job`, GitHub
