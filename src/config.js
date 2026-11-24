@@ -713,6 +713,15 @@ const COMPANIES = [
   // from a public /api/pcsx/search endpoint. No auth, no TLS workaround
   // needed — the earlier 404s were because we were targeting the wrong path.
   { source: 'microsoft',    displayName: 'Microsoft' },
+  // TikTok and ByteDance: one careers platform behind both sites
+  // (src/collectors/bytedance.js). Most of their US postings stay open for
+  // months, so retention keeps only the ones published in the last 14 days.
+  { source: 'bytedance', slug: 'tiktok', displayName: 'TikTok',
+    apiBase: 'https://api.lifeattiktok.com/api/v1/public/supplier', websitePath: 'tiktok',
+    applyUrlBase: 'https://lifeattiktok.com/search' },
+  { source: 'bytedance', slug: 'bytedance', displayName: 'ByteDance',
+    apiBase: 'https://jobs.bytedance.com/api/v1/public/supplier', websitePath: 'en',
+    applyUrlBase: 'https://joinbytedance.com/search' },
 
   // ─── Eightfold AI tenants (see src/collectors/eightfold.js) ──────────────
   // Netflix is also Eightfold (src/collectors/netflix.js) but is no longer
