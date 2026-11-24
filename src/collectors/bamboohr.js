@@ -74,4 +74,6 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
   });
 }
 
-module.exports = { fetchCompany, mapPosting, buildLocation, source: 'bamboohr' };
+// The list call returns the whole board (detail calls only add text), so a
+// posting missing from it was closed (src/services/closed.js).
+module.exports = { fetchCompany, mapPosting, buildLocation, source: 'bamboohr', fullListing: true };

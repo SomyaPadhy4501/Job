@@ -33,6 +33,8 @@ test('collectAll awaits an async store: run id, prune and run log all complete',
     deleteByApplyUrls: async () => 0,
     pruneStaleJobs: async () => (await tick(), calls.push('prune'), 3),
     finishRun: async (id, stats) => (await tick(), calls.push(['finish', id, stats.jobs_inserted])),
+    jobsForCompanies: async () => (await tick(), []),
+    recordMisses: async () => (await tick(), 0),
   });
   stub('../src/collectors/index.js', {
     getCollector: () => ({

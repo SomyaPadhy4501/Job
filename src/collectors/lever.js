@@ -36,4 +36,6 @@ async function fetchCompany({ slug, displayName }) {
   });
 }
 
-module.exports = { fetchCompany, source: 'lever' };
+// One request returns the whole board, so a posting missing from it was closed
+// (src/services/closed.js).
+module.exports = { fetchCompany, source: 'lever', fullListing: true };

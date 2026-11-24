@@ -5,6 +5,13 @@ this codebase. It exists so you don't have to re-derive context.
 
 ---
 
+### Done 2026-11-24 (closed-job detection)
+- Closed postings now leave the board within ~6 hours instead of lingering until retention. `src/services/closed.js`, run from `collectAll` after the upsert.
+- Rule: when a company's fetch succeeds with a complete, non-empty listing, each stored row of that source and company that nothing listed this run gets `missed_runs + 1`. At 2 the row is deleted. A row counts as listed if its link is in *any* collector's answer this run, or anything updated it since the run started (another source's copy, a scraper or extension ingest). So a job another source still lists is never deleted, whichever source inserted it. Any sighting resets the count. Failed, empty or `partial` answers never count. Neither does a company where more than half its rows (and more than 2) would go missing at once: that's logged as `closed.suspicious` and left alone. Two boards with one name: if either fails, neither is judged.
+- Opt-in per collector with `fullListing: true`: greenhouse, lever, ashby, workable, recruitee, pinpoint, gem (one request returns the whole board); bamboohr, rippling (one list request has the whole board, details only add text); smartrecruiters (paged, but now marks a cut-short listing `partial`). Left out: workday, pcsx, microsoft, amazon, uber, oracle_hcm, capgemini, wipro, goldman_sachs, jibe, eightfold, netflix, bytedance (search, caps, or a failed page that keeps going), jsonld (lastmod filter, `maxDetail`), getro and the aggregators. Also apple and microsoft, which the scraper ingests under the same source name. A test checks that no opted-in source shares a name with a scraper target or `extension`.
+- Needs `migrations/006_missed_runs.sql` on Neon. Until it's applied, the step logs `closed.skipped` and the run carries on. SQLite adds the column at boot.
+- Known gap: if the only other source still listing a job fails two runs in a row while the employer's board drops it, the row goes. It comes back on that source's next good run.
+
 ### Done 2026-11-24 (CURSOR.md T2–T5, collector hardening)
 - T2: failed silent Gmail re-auth says "Reconnect Gmail in the extension popup to fill codes." once and stops; code-note colors updated (extension 1.17.2). T1 still waits for the owner's Gmail OAuth client ID.
 - T3: updater restarts browsers holding a pre-1.16 copy (`--restore-last-session`); fixed a one-process `Count` bug found in a Playwright sandbox test. macOS script not yet run on a Mac.

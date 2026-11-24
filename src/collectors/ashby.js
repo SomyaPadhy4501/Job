@@ -20,4 +20,6 @@ async function fetchCompany({ slug, displayName }) {
   }));
 }
 
-module.exports = { fetchCompany, source: 'ashby' };
+// One request returns the whole board, so a posting missing from it was closed
+// (src/services/closed.js).
+module.exports = { fetchCompany, source: 'ashby', fullListing: true };

@@ -133,4 +133,7 @@ function mapJob(j, { slug, displayName, detail }) {
   };
 }
 
-module.exports = { fetchCompany, mapJob, buildDescription, buildLocation, source: 'rippling' };
+// The list call returns the whole board (details add text and drop postings
+// hidden from search), so a posting missing from it was closed
+// (src/services/closed.js).
+module.exports = { fetchCompany, mapJob, buildDescription, buildLocation, source: 'rippling', fullListing: true };

@@ -105,6 +105,10 @@ function migrate(database) {
     // ("no experience required"). Both are meaningful, so don't collapse them.
     database.exec('ALTER TABLE jobs ADD COLUMN yoe_min INTEGER NOT NULL DEFAULT -1');
   }
+  if (!cols.includes('missed_runs')) {
+    // Closed-job detection's miss count (src/services/closed.js, migration 006).
+    database.exec('ALTER TABLE jobs ADD COLUMN missed_runs INTEGER NOT NULL DEFAULT 0');
+  }
   // Always ensure the category index exists — outside the ADD-COLUMN branch
   // so fresh DBs (where the column was created by initSchema) also get it.
   database.exec('CREATE INDEX IF NOT EXISTS idx_jobs_category ON jobs (category)');
@@ -450,6 +454,32 @@ function pruneStaleJobs(days) {
   return r.changes;
 }
 
+// See pg.js.
+function jobsForCompanies(source, names) {
+  const stmt = getDb().prepare(
+    'SELECT id, company_name, apply_url, last_seen_at, missed_runs FROM jobs WHERE source = ? AND company_name = ?'
+  );
+  return names.flatMap((n) => stmt.all(source, n));
+}
+
+// See pg.js. last_seen_at here is "YYYY-MM-DD HH:MM:SS" while `since` is ISO,
+// which compare wrongly as text; datetime() reads both.
+function recordMisses({ reset, missed, closed }, since) {
+  const database = getDb();
+  const zero = database.prepare('UPDATE jobs SET missed_runs = 0 WHERE id = ?');
+  const miss = database.prepare(
+    'UPDATE jobs SET missed_runs = missed_runs + 1 WHERE id = ? AND datetime(last_seen_at) < datetime(?)'
+  );
+  const del = database.prepare('DELETE FROM jobs WHERE id = ? AND datetime(last_seen_at) < datetime(?)');
+  let n = 0;
+  database.transaction(() => {
+    for (const id of reset) zero.run(id);
+    for (const id of missed) miss.run(id, since);
+    for (const id of closed) n += del.run(id, since).changes;
+  })();
+  return n;
+}
+
 function startRun() {
   return getDb().prepare('INSERT INTO collection_runs DEFAULT VALUES').run().lastInsertRowid;
 }
@@ -678,4 +708,6 @@ module.exports = {
   statsSummary,
   pruneStaleJobs,
   deleteByApplyUrls,
+  jobsForCompanies,
+  recordMisses,
 };

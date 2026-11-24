@@ -32,6 +32,14 @@ const mdtable = require('./mdtable');
 const jibe = require('./jibe');
 
 // Registry keyed by source. Adding a new source = drop a module here.
+//
+// `fullListing: true` on a module means one successful answer names every open
+// posting of that company, so closed-job detection (src/services/closed.js)
+// may delete stored rows it stops listing. Leave it off for anything that
+// searches, caps, filters by date or relays other sites: Workday, PCSX,
+// Microsoft, jsonld, Getro, the aggregators. Also for a source name the
+// scraper or extension ingests under (apple, microsoft, …): those rows share
+// the name but not the listing.
 const REGISTRY = {
   [greenhouse.source]: greenhouse,
   [lever.source]: lever,

@@ -92,6 +92,9 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
   const detailCap = maxDetail || DEFAULT_MAX_DETAIL;
 
   const postings = [];
+  // Paging that stopped short (a failed page, the safety stop) still returns
+  // what it read, marked partial so its missing rows aren't taken as closed.
+  let partial = true;
   for (let offset = 0; offset < MAX_POSTINGS; offset += PAGE_SIZE) {
     let data;
     try {
@@ -108,10 +111,16 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     }
 
     const content = Array.isArray(data?.content) ? data.content : [];
-    if (!content.length) break;
+    if (!content.length) {
+      partial = false;
+      break;
+    }
     postings.push(...content);
 
-    if (postings.length >= (data.totalFound || 0)) break;
+    if (postings.length >= (data.totalFound || 0)) {
+      partial = false;
+      break;
+    }
   }
 
   // Local filtering. Everything needed is already in the list response, so this
@@ -150,6 +159,7 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     out.push(mapPosting(candidates[i].posting, { slug, displayName, detail }));
   }
 
+  if (partial) out.partial = true;
   return out;
 }
 
@@ -185,4 +195,7 @@ module.exports = {
   buildLocation,
   buildDescription,
   source: 'smartrecruiters',
+  // Paged, but a listing cut short says so (`partial`), so a complete one can
+  // be trusted to name every open posting (src/services/closed.js).
+  fullListing: true,
 };

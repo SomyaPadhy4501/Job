@@ -4,7 +4,16 @@ const { COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob, parseDateToIso, stripTracking } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
-const { bulkUpsert, startRun, finishRun, pruneStaleJobs, deleteByApplyUrls } = require('../db');
+const { closableScopes, seenUrlsOf, planClosures } = require('./closed');
+const {
+  bulkUpsert,
+  startRun,
+  finishRun,
+  pruneStaleJobs,
+  deleteByApplyUrls,
+  jobsForCompanies,
+  recordMisses,
+} = require('../db');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -33,12 +42,54 @@ async function fetchCompanySafe(company) {
   }
 }
 
+// Closed postings (src/services/closed.js). Runs after the upsert, so this
+// run's sightings are already in last_seen_at. Returns the rows deleted.
+async function closeMissing(results, since, runId) {
+  const seenUrls = seenUrlsOf(results);
+  const bySource = new Map();
+  for (const s of closableScopes(results, getCollector)) {
+    if (!bySource.has(s.source)) bySource.set(s.source, []);
+    bySource.get(s.source).push(s.company_name);
+  }
+
+  const plan = { reset: [], missed: [], closed: [] };
+  try {
+    for (const [source, names] of bySource) {
+      const byName = new Map(names.map((n) => [n, []]));
+      for (const row of await jobsForCompanies(source, names)) byName.get(row.company_name)?.push(row);
+      for (const [name, rows] of byName) {
+        const p = planClosures(rows, { seenUrls, since });
+        if (p.suspicious) {
+          log.warn('closed.suspicious', { runId, source, company: name, stored: rows.length });
+          continue;
+        }
+        plan.reset.push(...p.reset);
+        plan.missed.push(...p.missed);
+        plan.closed.push(...p.closed);
+      }
+    }
+    const closed = await recordMisses(plan, since);
+    log.info('collection.closed', { runId, missed: plan.missed.length, closed });
+    return closed;
+  } catch (err) {
+    // The column comes from migrations/006_missed_runs.sql, which the owner
+    // applies by hand; until then this step is skipped, not the run failed.
+    if (err.code === '42703' || /no such column: missed_runs/.test(err.message)) {
+      log.warn('closed.skipped', { runId, reason: 'missed_runs column missing; run migrations/006_missed_runs.sql' });
+      return 0;
+    }
+    throw err;
+  }
+}
+
 async function collectAll({ companies = COMPANIES } = {}) {
   // The Postgres store is async and the SQLite one isn't; await works for both.
   // Without it the run id was a Promise, and prune / finishRun raced the
   // process exit in GitHub Actions.
   const runId = await startRun();
   const started = Date.now();
+  // Taken before any fetch: a row updated after this was seen during the run.
+  const since = new Date(started).toISOString();
   log.info('collection.start', { runId, companies: companies.length });
 
   // Each source gets its own pool, all running at once. One shared pool of 4
@@ -116,6 +167,8 @@ async function collectAll({ companies = COMPANIES } = {}) {
   const { inserted, updated, failed = 0 } = await bulkUpsert(deduped);
   if (failed > 0) log.warn('collection.rows_failed', { runId, failed });
 
+  const closed = await closeMissing(results, since, runId);
+
   // Retention sweep: delete rows older than the retention window. Hits both
   // dated rows that slipped past normalize (e.g. curated lists that re-publish
   // stale items) and null-dated rows whose last_seen_at has aged out (source
@@ -143,6 +196,7 @@ async function collectAll({ companies = COMPANIES } = {}) {
     inserted,
     updated,
     rowsFailed: failed,
+    closed,
     seconds: took,
   });
 
@@ -153,6 +207,7 @@ async function collectAll({ companies = COMPANIES } = {}) {
     inserted,
     updated,
     rowsFailed: failed,
+    closed,
     kept: deduped.length,
     errors,
   };

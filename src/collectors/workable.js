@@ -56,4 +56,6 @@ async function fetchCompany({ slug, displayName }) {
     .map((j) => mapPosting(j, { slug, displayName, accountName: data?.name }));
 }
 
-module.exports = { fetchCompany, mapPosting, buildLocation, source: 'workable' };
+// One request returns the whole board, so a posting missing from it was closed
+// (src/services/closed.js).
+module.exports = { fetchCompany, mapPosting, buildLocation, source: 'workable', fullListing: true };

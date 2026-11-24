@@ -258,6 +258,35 @@ async function deleteByApplyUrls(urls) {
   return n;
 }
 
+// Stored rows of one source's companies, for closed-job detection
+// (src/services/closed.js). Needs migrations/006_missed_runs.sql.
+async function jobsForCompanies(source, names) {
+  const { rows } = await getPool().query(
+    `SELECT id, company_name, apply_url, last_seen_at, missed_runs
+       FROM jobs
+      WHERE source = $1 AND company_name = ANY($2)`,
+    [source, names],
+  );
+  return rows;
+}
+
+// Applies a closed-job plan; returns the rows deleted. A row updated since the
+// run started (a scraper or extension ingest landing meanwhile) was just seen,
+// so it's neither counted nor deleted.
+async function recordMisses({ reset, missed, closed }, since) {
+  const db = getPool();
+  if (reset.length) await db.query('UPDATE jobs SET missed_runs = 0 WHERE id = ANY($1)', [reset]);
+  if (missed.length) {
+    await db.query('UPDATE jobs SET missed_runs = missed_runs + 1 WHERE id = ANY($1) AND last_seen_at < $2', [
+      missed,
+      since,
+    ]);
+  }
+  if (!closed.length) return 0;
+  const { rowCount } = await db.query('DELETE FROM jobs WHERE id = ANY($1) AND last_seen_at < $2', [closed, since]);
+  return rowCount;
+}
+
 async function startRun() {
   const { rows } = await getPool().query(
     `INSERT INTO collection_runs (started_at) VALUES ($1) RETURNING id`,
@@ -478,4 +507,6 @@ module.exports = {
   statsSummary,
   pruneStaleJobs,
   deleteByApplyUrls,
+  jobsForCompanies,
+  recordMisses,
 };
