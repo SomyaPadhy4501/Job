@@ -302,6 +302,37 @@ $('gmailDisconnect').onclick = async () => {
 };
 showGmail();
 
+// "Your apply queue": the next few jobs to apply to, read only. Hidden when
+// the account isn't connected, the queue is empty, or the portal is older.
+async function showQueue() {
+  try {
+    const { items } = await autofill('applyQueue');
+    const list = $('queueList');
+    list.replaceChildren();
+    for (const item of (items || []).slice(0, 5)) {
+      const li = document.createElement('li');
+      const text = item.company + ' — ' + item.title;
+      if (item.applyUrl) {
+        const a = document.createElement('a');
+        a.href = item.applyUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = text;
+        li.append(a);
+      } else {
+        li.textContent = text;
+      }
+      if (item.status === 'prepared') li.append(' (ready for you)');
+      if (item.status === 'needs_you') li.append(' (needs you)');
+      list.append(li);
+    }
+    $('queueCard').hidden = !list.children.length;
+  } catch {
+    $('queueCard').hidden = true;
+  }
+}
+showQueue();
+
 // "Version X is available": the one-line command for this computer.
 async function showUpdate() {
   const r = await chrome.runtime.sendMessage({ type: 'checkUpdate' }).catch(() => null);

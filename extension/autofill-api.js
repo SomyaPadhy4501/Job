@@ -243,6 +243,27 @@
       }
       return { ...data, binding: auth.binding };
     }
+    // The apply queue, read only, for the popup. A job page can't ask: which
+    // jobs you plan to apply to is nobody else's business. Older portals
+    // without the route give no list.
+    if (msg.type === 'autofill:applyQueue') {
+      if (!isPopup) throw new Error('Unsupported sender.');
+      const res = await request('queue', undefined, true);
+      const data = res ? await res.json() : null;
+      if (!data) return { items: null };
+      const web = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
+      const items = (Array.isArray(data.items) ? data.items : [])
+        .filter((i) => typeof i?.id === 'string' && typeof i.title === 'string')
+        .slice(0, 50)
+        .map((i) => ({
+          id: i.id,
+          company: String(i.company || '').slice(0, 200),
+          title: i.title.slice(0, 300),
+          status: String(i.status || ''),
+          applyUrl: web(i.applyUrl),
+        }));
+      return { items };
+    }
     if (msg.binding !== auth.binding) throw new Error('Reopen Autofill to refresh your connection.');
     // Optional server-side ranking. A portal without the route answers 404 and
     // the content script ranks by tags itself.

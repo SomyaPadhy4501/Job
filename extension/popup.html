@@ -40,6 +40,9 @@
   #sites .row { align-items: center; justify-content: space-between; margin-top: 6px; }
   .log { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 160px; overflow: auto; font-size: 12px; }
   .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .queue { margin: 0 0 6px; padding-left: 18px; font-size: 12.5px; }
+  .queue li { margin: 3px 0; }
+  .queue a { color: var(--accent); }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
   .update { border-color: #9ec2ec; background: #f3f8fd; }
   .cmd { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
@@ -91,6 +94,12 @@
       <input type="password" id="sitePassword2" autocomplete="new-password">
       <div class="row"><button id="saveSitePassword">Save</button><button id="generateSitePassword">Generate one</button><button id="clearSitePassword">Remove</button></div>
       <p class="muted">12+ characters with upper and lower case, a number and a symbol. Don't reuse a password from another site.</p>
+    </section>
+
+    <section class="card" id="queueCard" hidden aria-labelledby="queue-title">
+      <h2 id="queue-title">Your apply queue</h2>
+      <ul id="queueList" class="queue"></ul>
+      <p class="muted">Open a job, fill it with Autofill, and submit it yourself. Mark it applied on the site's Queue page.</p>
     </section>
 
     <section class="card" id="gmailCard" hidden aria-labelledby="gmail-title">
