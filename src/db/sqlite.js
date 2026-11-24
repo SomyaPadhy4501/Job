@@ -147,10 +147,13 @@ function migrate(database) {
   let reclassified = 0;
   const updRole = database.prepare('UPDATE jobs SET role_type = ? WHERE id = ?');
   const killIds = [];
+  // With AI tagging on, stored role / sponsorship may be the model's verdict
+  // (src/services/ai-tagger.js), which these rule passes must not overwrite.
+  const aiTags = process.env.AI_TAGGING === 'true';
   const tx = database.transaction((list) => {
     for (const r of list) {
       const nextRole = classifyRole(r.job_title, r.source);
-      if (nextRole !== r.role_type) {
+      if (!aiTags && nextRole !== r.role_type) {
         updRole.run(nextRole, r.id);
         reclassified++;
       }
@@ -221,7 +224,8 @@ function migrate(database) {
       // Only update if changed — avoids unnecessary writes on every boot.
       // The current values come from the outer SELECT; re-querying per row here
       // was an N+1 (the category pass above is the pattern to follow).
-      const curated = CURATED_SPONSORSHIP_SOURCES.includes(r.source);
+      // AI-tagged rows are treated like curated ones: the stored verdict stands.
+      const curated = aiTags || CURATED_SPONSORSHIP_SOURCES.includes(r.source);
       let sponsorship = r.sponsorship;
       if (!curated) {
         // Getro's employer fallback, as in the collector (employerFromApplyUrl).
@@ -566,6 +570,14 @@ function queryJobs(filters) {
   return { total, rows };
 }
 
+// Stored text and tags for the given links (see storedTags in src/db/pg.js).
+function storedTags(urls) {
+  const stmt = getDb().prepare(
+    'SELECT apply_url, job_title, description, role_type, sponsorship, restriction FROM jobs WHERE apply_url = ?',
+  );
+  return urls.map((u) => stmt.get(u)).filter(Boolean);
+}
+
 function getJobById(id) {
   return getDb().prepare('SELECT * FROM jobs WHERE id = ?').get(id);
 }
@@ -678,4 +690,5 @@ module.exports = {
   statsSummary,
   pruneStaleJobs,
   deleteByApplyUrls,
+  storedTags,
 };

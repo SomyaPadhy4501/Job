@@ -4,7 +4,8 @@ const { COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob, parseDateToIso, stripTracking } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
-const { bulkUpsert, startRun, finishRun, pruneStaleJobs, deleteByApplyUrls } = require('../db');
+const { bulkUpsert, startRun, finishRun, pruneStaleJobs, deleteByApplyUrls, storedTags } = require('../db');
+const aiTagger = require('./ai-tagger');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -34,7 +35,7 @@ async function fetchCompanySafe(company) {
 }
 
 async function collectAll({ companies = COMPANIES } = {}) {
-  const runId = startRun();
+  const runId = await startRun();
   const started = Date.now();
   log.info('collection.start', { runId, companies: companies.length });
 
@@ -109,6 +110,36 @@ async function collectAll({ companies = COMPANIES } = {}) {
 
   const deduped = dedupeBatch(normalized);
 
+  // AI tagging (src/services/ai-tagger.js): the model replaces the rule-based
+  // role and sponsorship on new or changed postings before they are saved.
+  // Skipped inside Vercel functions (/admin/collect), which can't wait on a
+  // model for minutes. Never fails the collect: on any problem the rule tags
+  // computed by normalizeJob are saved, as they always were.
+  let tags;
+  if (aiTagger.enabled() && !process.env.VERCEL) {
+    try {
+      const options = require('./model-options').modelOptions();
+      const limit = Number(process.env.AI_TAG_LIMIT || 150);
+      const minutes = Number(process.env.AI_TAG_MINUTES || 15);
+      tags = await aiTagger.tagJobs(deduped, {
+        lookup: storedTags,
+        options,
+        limit: Number.isFinite(limit) && limit >= 0 ? limit : 150,
+        deadline: Date.now() + (Number.isFinite(minutes) && minutes > 0 ? minutes : 15) * 60_000,
+        onError: (job, err) => log.debug('tags.error', { url: job.apply_url, error: err.message }),
+        onTag: (job, rules, tag) => log.debug('tags.verdict', {
+          title: job.job_title, company: job.company_name,
+          role: `${rules.role_type}->${job.role_type}`, sponsorship: `${rules.sponsorship}->${job.sponsorship}`,
+          specialty: tag.specialty, reason: tag.reason, quote: tag.quote,
+        }),
+      });
+      log.info('tags.review', { runId, model: options.model, ...tags });
+      if (tags.unavailable) log.warn('tags.unavailable', { runId, note: 'model unreachable; remaining new postings keep their rule tags' });
+    } catch (err) {
+      log.error('tags.failed', { runId, error: err.message });
+    }
+  }
+
   // Bulk upsert in a single transaction (works for both SQLite and Postgres).
   const { inserted, updated } = await bulkUpsert(deduped);
 
@@ -118,10 +149,10 @@ async function collectAll({ companies = COMPANIES } = {}) {
   // stopped listing them — role filled or pulled).
   const expired = expiredUrls.length ? await deleteByApplyUrls(expiredUrls) : 0;
   if (expired > 0) log.info('collection.expired', { runId, expired });
-  const pruned = pruneStaleJobs(CONFIG.retentionDays);
+  const pruned = await pruneStaleJobs(CONFIG.retentionDays);
   if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
 
-  finishRun(runId, {
+  await finishRun(runId, {
     companies_ok: companiesOk,
     companies_fail: companiesFail,
     jobs_inserted: inserted,
@@ -141,7 +172,7 @@ async function collectAll({ companies = COMPANIES } = {}) {
     seconds: took,
   });
 
-  return { runId, companiesOk, companiesFail, inserted, updated, kept: deduped.length };
+  return { runId, companiesOk, companiesFail, inserted, updated, kept: deduped.length, ...(tags && { tags }) };
 }
 
 module.exports = { collectAll };

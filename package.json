@@ -5,8 +5,9 @@
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node src/index.js",
-    "collect": "node src/scripts/collect-once.js",
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "collect": "node --env-file-if-exists=.env src/scripts/collect-once.js",
+    "tags:mina": "node --env-file-if-exists=.env src/scripts/preview-tags.js test/tag-examples.json data/tag-preview.json --model",
     "init-db": "node src/scripts/init-db.js",
     "reclassify": "node src/scripts/reclassify-sponsorship.js",
     "backfill-derived": "node src/scripts/backfill-derived.js",

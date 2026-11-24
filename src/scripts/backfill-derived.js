@@ -56,7 +56,9 @@ function derive(row) {
   // re-capture alone can't repair it.
   const company_name = cleanCompanyName(row.company_name);
   row = { ...row, company_name };
-  const curated = CURATED_SPONSORSHIP_SOURCES.includes(row.source);
+  // With AI tagging on, stored sponsorship may be the model's verdict
+  // (src/services/ai-tagger.js): keep it, as for curated sources.
+  const curated = process.env.AI_TAGGING === 'true' || CURATED_SPONSORSHIP_SOURCES.includes(row.source);
   // Getro rows need the apply-URL employer as a second USCIS key, exactly as
   // the collector supplies it (see employerFromApplyUrl) — without it the dry
   // run proposed downgrading 279 Getro rows from YES to UNKNOWN.
