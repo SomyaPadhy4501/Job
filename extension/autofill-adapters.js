@@ -14,7 +14,7 @@
   const captcha =
     '[data-sitekey],[id*="captcha" i],[name*="captcha" i],[class*="captcha" i],[class*="turnstile" i]';
   const wrapper =
-    '.application-question,.ashby-application-form-field-entry,.field-wrapper,[data-automation-id^="formField"]';
+    '.application-question,.ashby-application-form-field-entry,.ashby-application-form-input-radio-group,.field-wrapper,[data-automation-id^="formField"]';
   const controls =
     'input,textarea,select,button[aria-haspopup="listbox"],[role="button"][aria-haspopup="listbox"],.ashby-application-form-input-yesno';
   const roots = {
@@ -364,7 +364,8 @@
         if (d.type === 'select') d.members = all(d.el, 'option');
         if (d.members)
           d.options = d.members.map((m) =>
-            m.localName === 'input' ? text(m.closest('label')) || attr(m, 'value') : text(m)
+            // Ashby labels each radio with a sibling <label for=…>, not a wrapper.
+            m.localName === 'input' ? text(m.closest('label')) || text(labels.get(m.id)) || attr(m, 'value') : text(m)
           );
       }
       return fields;

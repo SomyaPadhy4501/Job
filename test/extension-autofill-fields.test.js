@@ -442,3 +442,41 @@ test('"I currently work here" is ticked only for the current job; other checkbox
   assert.equal(F.classify({ label: 'I agree to the terms', type: 'checkbox', row: { section: 'experience', index: 0 } }).kind, 'protected');
   assert.equal(F.classify({ label: 'I currently work here', type: 'checkbox' }).kind, 'protected', 'outside an experience row');
 });
+
+test('EEO, visa, work-authorization and source questions in their common wordings', () => {
+  const profile = {
+    eeo: { gender: 'Male', race: 'Asian', hispanicLatino: 'No', veteran: 'I am a protected veteran', disability: 'No' },
+    workAuth: { visaStatus: 'f1_opt', authorizedUS: true },
+    misc: { howDidYouHear: 'LinkedIn' },
+  };
+  const choose = (label, options, p = profile) => options[F.pick(options, F.resolve({ label, type: 'radio' }, p))];
+  assert.equal(choose('What gender do you identify as?', ['Man', 'Woman', 'Non-binary']), 'Man');
+  assert.equal(
+    choose('Race/Ethnicity', ['Asian (Not Hispanic or Latino)', 'White (Not Hispanic or Latino)', 'Hispanic or Latino']),
+    'Asian (Not Hispanic or Latino)'
+  );
+  assert.equal(
+    choose('Race', ['Asian', 'White', 'Hispanic or Latino'], { eeo: { race: 'White', hispanicLatino: 'Yes' } }),
+    'Hispanic or Latino'
+  );
+  assert.equal(
+    choose('Disability Status', [
+      'Yes, I have a disability (or previously had a disability)',
+      'No, I do not have a disability and have not had one in the past',
+      'I do not want to answer',
+    ]),
+    'No, I do not have a disability and have not had one in the past'
+  );
+  // Ashby's veteran wording.
+  const ashbyVeteran = [
+    'I identify as one or more of the classifications of protected veteran listed above',
+    'I am not a protected veteran',
+    'I decline to self-identify',
+  ];
+  assert.equal(choose('Veteran Status', ashbyVeteran), ashbyVeteran[0]);
+  assert.equal(choose('Are you a protected veteran?', ashbyVeteran, { eeo: { veteran: 'decline' } }), ashbyVeteran[2]);
+  assert.deepEqual(F.classify({ label: 'What is your current visa status?' }), { kind: 'visa' });
+  assert.deepEqual(F.classify({ label: 'Do you have the legal right to work in the United States?' }), { kind: 'authorizedUS' });
+  for (const label of ['How did you hear about OpenAI?', 'How did you hear about this position?', 'Where did you hear about us?'])
+    assert.deepEqual(F.resolve({ label, type: 'text' }, profile), ['LinkedIn']);
+});

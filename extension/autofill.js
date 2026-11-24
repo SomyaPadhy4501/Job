@@ -153,13 +153,12 @@
   const fill = element('button', ats === 'workday' ? 'Fill this step' : 'Fill this page');
   fill.className = 'main';
   const status = element('p'),
-    results = element('div'),
-    save = element('button', 'Save my answers');
+    results = element('div');
   status.setAttribute('role', 'status');
   const head = element('div');
   head.className = 'head';
   head.append(element('h2', 'Application autofill'), close);
-  panel.append(head, status, label, picker.box, fill, results, save);
+  panel.append(head, status, label, picker.box, fill, results);
   shadow.append(style, panel, open);
   function mount() {
     if (host.isConnected || !document.body) return;
@@ -173,8 +172,7 @@
   let generation = 0,
     busy = false,
     account,
-    previousStep = '',
-    candidates = [];
+    previousStep = '';
   const marked = new Map();
   async function api(type, params = {}) {
     const r = await chrome.runtime.sendMessage({ type: 'autofill:' + type, ...params });
@@ -200,8 +198,6 @@
   }
   function refresh() {
     results.replaceChildren();
-    candidates = [];
-    save.hidden = true;
     clearMarks();
   }
   function closePanel() {
@@ -210,7 +206,7 @@
     open.hidden = false;
     busy = false;
     account = null;
-    picker.disabled = save.disabled = false;
+    picker.disabled = false;
     picker.replaceChildren();
     refresh();
     open.focus();
@@ -228,7 +224,6 @@
     const version = ++generation;
     panel.hidden = false;
     open.hidden = true;
-    save.hidden = true;
     fill.disabled = true;
     close.focus();
     status.textContent = 'Loading profile…';
@@ -308,20 +303,12 @@
       if (!rows.length) continue;
       const list = element('ul');
       results.append(element('strong', group + ' (' + rows.length + ')'), list);
-      for (const { d, reason, saveable } of rows) {
+      for (const { d, reason } of rows) {
         const item = element('li');
         const description = d.label || d.name || d.automationId || 'Unlabelled field';
         item.textContent =
           (description.length > 180 ? description.slice(0, 177) + '…' : description) +
           (reason ? ' · ' + reason : '');
-        if (saveable) {
-          const box = element('input');
-          box.type = 'checkbox';
-          const choice = element('label');
-          choice.append(box, ' Save my response');
-          item.append(element('br'), choice);
-          candidates.push({ d, box });
-        }
         list.append(item);
         if (d.required && group !== 'Filled' && d.anchor.isConnected && !adapter.read(d)) {
           const old = d.anchor.style.outline;
@@ -330,7 +317,6 @@
         }
       }
     }
-    save.hidden = !candidates.length;
   }
   fill.onclick = async (e) => {
     if (!e.isTrusted || !account || busy) return;
@@ -348,6 +334,17 @@
       const data = await api('getProfile', { binding: current.binding });
       if (!active()) return;
       const resume = data.resumes.find((r) => r.id === picker.value);
+      // Education and experience come from the resume being attached: each
+      // resume can list different jobs and points (set per resume on the
+      // Profile page). Without one, the profile's own lists are used.
+      const own = resume && data.history?.[resume.id];
+      const profile = own
+        ? {
+            ...data.profile,
+            education: own.education?.length ? own.education : data.profile.education,
+            experience: own.experience?.length ? own.experience : data.profile.experience,
+          }
+        : data.profile;
       const records = [];
       const initial = adapter.collect();
       const attachments = initial.filter((d) => F.classify(d).kind === 'resume');
@@ -379,21 +376,20 @@
         records.push({ d, group, reason, values: attached ? [attached.name] : [] });
       }
       if (!active()) return;
-      await adapter.expand(data.profile, active);
+      await adapter.expand(profile, active);
       if (!active()) return;
       const fields = adapter.collect().filter((d) => F.classify(d).kind !== 'resume');
       const mixed = new Set(
         fields
-          .filter((d) => d.row && adapter.read(d) && F.pick([adapter.read(d)], F.resolve(d, data.profile)) !== 0)
+          .filter((d) => d.row && adapter.read(d) && F.pick([adapter.read(d)], F.resolve(d, profile)) !== 0)
           .map((d) => d.rowElement)
       );
       for (const d of fields) {
         if (!active()) return;
         const kind = F.classify(d).kind;
-        const values = F.resolve(d, data.profile, data.answers);
+        const values = F.resolve(d, profile, data.answers);
         let group = 'Needs you',
-          reason = '',
-          saveable = false;
+          reason = '';
         if (!d.el.isConnected) {
           group = 'Skipped';
           reason = 'Form changed';
@@ -411,21 +407,21 @@
               reason = SENSITIVE[kind] || '';
             } else {
               reason = 'Check the value or choose an option';
-              saveable = kind === 'question';
             }
           } catch {
             reason = 'Could not fill this control';
           }
         } else {
+          // New custom questions: you answer them, and after you submit the
+          // extension offers to save them (offerHeld below).
           reason =
             kind === 'question'
-              ? 'No saved response'
-              : ['education', 'experience', 'row'].includes(kind)
-                ? 'Not in your profile (add it there to fill this)'
-                : 'No unambiguous profile answer';
-          saveable = kind === 'question' && d.type !== 'file';
+              ? 'New question: answer it, then save it after you submit'
+              : kind === 'manual'
+                ? 'Complete personally'
+                : 'Not in your profile (add it there to fill this)';
         }
-        records.push({ d, group, reason, saveable, values });
+        records.push({ d, group, reason, values });
       }
       // Final-value check, after the form has had a chance to re-render.
       await pause(400);
@@ -434,7 +430,6 @@
         if (r.group === 'Filled' && !adapter.holds(r.d, r.values)) {
           r.group = 'Needs you';
           r.reason = 'The form did not keep the filled value, check it';
-          r.saveable = false;
         }
       }
       if (active()) {
@@ -455,48 +450,6 @@
         busy = false;
         fill.disabled = false;
         picker.disabled = false;
-      }
-    }
-  };
-  save.onclick = async (e) => {
-    if (!e.isTrusted || !account || busy) return;
-    if (previousStep !== step()) {
-      refresh();
-      status.textContent = 'Page changed. Fill this step first.';
-      return;
-    }
-    // Collect only explicitly selected unresolved questions that still have
-    // the same DOM control and label on this step.
-    const now = new Map(adapter.collect().map((d) => [d.el, d]));
-    const chosen = candidates
-      .filter((c) => c.box.checked && !c.box.disabled)
-      .flatMap((c) => {
-        const current = now.get(c.d.el);
-        if (!current || current.label !== c.d.label || F.classify(current).kind !== 'question') return [];
-        const answer = adapter.answer(current);
-        return answer ? [{ c, question: c.d.label, answer }] : [];
-      });
-    const answers = chosen.map(({ question, answer }) => ({ question, answer }));
-    if (!answers.length) {
-      status.textContent = 'Answer a listed question and check “Save my response”.';
-      return;
-    }
-    const version = generation;
-    busy = true;
-    fill.disabled = save.disabled = true;
-    try {
-      const { saved } = await api('saveAnswers', { answers, binding: account.binding });
-      if (version === generation) {
-        for (const { c } of chosen) c.box.disabled = true;
-        status.textContent =
-          'Saved ' + saved + (saved === 1 ? ' answer' : ' answers') + ' to your answer bank.';
-      }
-    } catch (err) {
-      if (version === generation) status.textContent = err.message;
-    } finally {
-      if (version === generation) {
-        busy = false;
-        fill.disabled = save.disabled = false;
       }
     }
   };

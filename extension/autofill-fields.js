@@ -126,11 +126,15 @@
   const eeoText =
     /gender|hispanic|latin[oax]|ethnicity|race\b|veteran|disabilit|sexual orientation|self.identif/;
   const eeoKeys = {
-    gender: /^(?:gender|gender identity|what is your gender)$/,
-    race: /^(?:race|race\/ethnicity|race and ethnicity)$/,
-    hispanicLatino: /^(?:are you hispanic\/latino|hispanic or latino|are you hispanic or latino)$/,
-    veteran: /^(?:protected )?veteran\s*status$/,
-    disability: /^(?:disability status|disability)$/,
+    gender:
+      /^(?:gender|sex|gender identity|what is your gender(?: identity)?|(?:what|which) gender do you identify (?:as|with)|(?:please )?(?:select|indicate|identify) your gender)$/,
+    race: /^(?:race|ethnicity|race ?\/ ?ethnicity|ethnicity ?\/ ?race|race and ethnicity|race or ethnicity|ethnic background|racial\/ethnic background|(?:what is|please (?:select|indicate|identify)) your race(?: ?\/ ?ethnicity| and ethnicity| or ethnicity)?|(?:what is|please (?:select|indicate|identify)) your ethnicity)$/,
+    hispanicLatino:
+      /^(?:are you hispanic ?\/ ?latino|hispanic ?\/ ?latino|hispanic or latino|are you hispanic or latino|are you of hispanic or latino (?:origin|descent)|hispanic or latino (?:origin|ethnicity)|do you identify as hispanic or latino)$/,
+    veteran:
+      /^(?:(?:protected |united states |military ?\/ ?)?veteran(?:\s*status)?|are you a (?:protected |united states )?veteran|do you identify as a (?:protected )?veteran)$/,
+    disability:
+      /^(?:disability status|disability|do you have a disability|are you a person with a disability|voluntary self-identification of disability)$/,
   };
 
   // Match complete questions. A suffix about citizenship, another country, a
@@ -171,15 +175,16 @@
       };
     }
     if (
-      /^are you (?:currently )?(?:legally )?(?:authori[sz]ed|eligible) to work in (?:(?:the )?(?:us|united states(?: of america)?)|this country|the country where (?:the|this) (?:job|role|position) is located)$/.test(
+      /^(?:are you (?:currently )?(?:legally )?(?:authori[sz]ed|eligible|permitted) to work|do you have (?:the )?(?:legal )?(?:right|authori[sz]ation) to work) in (?:(?:the )?(?:us|united states(?: of america)?)|this country|the country where (?:the|this) (?:job|role|position) is located)$/.test(
         q
       )
     )
       return { kind: 'authorizedUS' };
     if (
-      /^(?:(?:what is|please select) your (?:current )?)?(?:visa type|visa status|immigration status)$/.test(
+      /^(?:(?:what is|please (?:select|indicate)) your (?:current )?)?(?:visa type|visa status|immigration status|work authorization status|current visa status|current immigration status)$/.test(
         q
-      )
+      ) ||
+      /^what (?:type of |kind of )?visa do you (?:currently )?(?:have|hold)$/.test(q)
     )
       return { kind: 'visa' };
     if (/^(?:opt end date|opt expiration date)$/.test(q))
@@ -472,6 +477,8 @@
     if (eeoText.test(label) || d.eeo || ids.some((id) => id.startsWith('eeo '))) return { kind: 'manual' };
     const edu = eduQuestion(label);
     if (edu && d.type !== 'file') return edu;
+    if (/^(?:how|where) did you (?:first )?(?:hear|learn|find out) about (?:us|this|the|our|[a-z0-9.&' -]{1,40}$)/.test(label) || /^(?:referral )?source$|^how did you hear$/.test(label))
+      return { kind: 'profile', path: 'misc.howDidYouHear' };
     if (label === 'preferred name | what would you like us to call you')
       return { kind: 'profile', path: 'identity.preferredName' };
     const path =
@@ -528,7 +535,35 @@
     'I do not want to answer',
     "I don't wish to answer",
     'I decline to self-identify for protected veteran status',
+    'I decline to self-identify',
   ];
+  // The profile stores one wording per veteran answer; forms use others
+  // (Ashby: "I identify as one or more of the classifications of protected
+  // veteran listed above"). pick() still needs exactly one option to match.
+  const genderLabels = {
+    Female: ['Female', 'Woman', 'Female/Woman', 'Woman/Female', 'Cisgender woman'],
+    Male: ['Male', 'Man', 'Male/Man', 'Man/Male', 'Cisgender man'],
+    'Non-binary': ['Non-binary', 'Nonbinary', 'Non binary', 'Non-binary/non-conforming', 'Gender non-conforming'],
+  };
+  const disabilityLabels = {
+    Yes: ['Yes', 'Yes, I have a disability (or previously had a disability)', 'Yes, I have a disability, or have had one in the past', 'Yes, I have a disability'],
+    No: ['No', 'No, I do not have a disability and have not had one in the past', "No, I don't have a disability", 'No, I do not have a disability'],
+  };
+  const raceLabels = (race, hispanic) => {
+    const own = race ? [race, race + ' (Not Hispanic or Latino)', race + ' (not Hispanic or Latino)'] : [];
+    if (race === 'Two or More Races') own.push('Two or more races', 'Multiracial');
+    // Forms that fold the Hispanic/Latino question into race.
+    return hispanic === 'Yes' ? tiered([['Hispanic or Latino', 'Hispanic/Latino', 'Hispanic or Latinx'], own]) : own;
+  };
+  const veteranLabels = {
+    'I am not a protected veteran': ['I am not a protected veteran', 'Not a protected veteran', 'I am not a veteran'],
+    'I am a protected veteran': [
+      'I am a protected veteran',
+      'I identify as one or more of the classifications of protected veteran listed above',
+      'I identify as one or more of the classifications of protected veteran',
+      'I identify as a protected veteran',
+    ],
+  };
   function profileValue(profile, path) {
     if (path === 'skillList')
       return profile.skills?.filter((skill) => typeof skill === 'string' && clean(skill)).join(', ');
@@ -587,6 +622,11 @@
       case 'eeo':
         value = profile.eeo?.[c.field];
         if (value === 'decline') return decline;
+        if (c.field === 'veteran' && veteranLabels[value]) return veteranLabels[value];
+        if (c.field === 'gender' && genderLabels[value]) return genderLabels[value];
+        if (c.field === 'disability' && disabilityLabels[value]) return disabilityLabels[value];
+        if (c.field === 'race' && (value || profile.eeo?.hispanicLatino === 'Yes'))
+          return raceLabels(value, profile.eeo?.hispanicLatino);
         break;
       case 'question':
         value = savedAnswer(d.label, answers);

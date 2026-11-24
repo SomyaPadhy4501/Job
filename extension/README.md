@@ -80,11 +80,11 @@ loopback today; add a custom domain there if the portal moves).
    fields left empty get an orange outline.
 4. On Workday, move to the next step yourself and click **Fill this step**
    again; the panel notices the new step and never carries a fill over.
-5. Custom questions with no saved answer are listed with **Save my response**.
-   Answer them on the form, tick that box for the ones to keep, then click
-   **Save my answers**. Only ticked questions that still have an answer on the
-   current step are sent (`POST /api/autofill/answers`); the next form asking
-   the same question (same wording) fills it from your answer bank.
+5. Custom questions with no saved answer are listed under **Needs you**.
+   Answer them on the form. After you submit, a small card lists the new
+   answers (ticked by default) and asks whether to save them; only the ones
+   you keep are sent (`POST /api/autofill/answers`). The next form asking the
+   same question (same wording) fills it from your answer bank.
 
 Employer-specific widgets, conditional legal names and location searches
 without an exact selection can still need manual entry.

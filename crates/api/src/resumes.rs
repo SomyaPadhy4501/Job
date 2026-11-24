@@ -359,6 +359,48 @@ pub async fn update(
     Ok(Json(json!({ "resume": resume })))
 }
 
+#[derive(Deserialize)]
+pub struct HistoryBody {
+    education: Vec<accounts::profile::Education>,
+    experience: Vec<accounts::profile::Experience>,
+}
+
+/// `PUT /api/me/resumes/{id}/history`: this resume's own education and
+/// experience. Different resumes can list different jobs and points; the
+/// extension fills a form with the history of the resume it attaches. Stored
+/// in the resume's parsed details (encrypted); re-parsing the file replaces it.
+pub async fn put_history(
+    State(state): State<AppState>,
+    signed: Signed,
+    Path(id): Path<String>,
+    JsonBody(body): JsonBody<HistoryBody>,
+) -> ApiResult<Json<Value>> {
+    let id = parse_id(&id)?;
+    let user_id = signed.user.id;
+    let pool = state.pool()?;
+    let resume = db::get_resume(pool, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    // Same limits and date rules as the profile's own lists.
+    let mut check = accounts::profile::Profile {
+        education: body.education,
+        experience: body.experience,
+        ..Default::default()
+    };
+    check.validate().map_err(|e| ApiError::bad(sentence(e)))?;
+    let mut parsed = parsed_of(&state, user_id, &resume)?.unwrap_or_default();
+    parsed.education = check.education;
+    parsed.experience = check.experience;
+    let encrypted = state
+        .keyring()?
+        .encrypt_json(Field::ResumeParsed, &user_id, &parsed);
+    db::set_resume_parse(pool, user_id, id, "parsed", PARSER_VERSION, Some(&encrypted)).await?;
+    let resume = db::get_resume(pool, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(json!({ "resume": resume, "parsed": parsed })))
+}
+
 pub async fn remove(
     State(state): State<AppState>,
     signed: Signed,

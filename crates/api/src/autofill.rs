@@ -66,9 +66,23 @@ pub async fn profile(State(state): State<AppState>, who: TokenUser) -> ApiResult
         .into_iter()
         .map(|a| json!({ "question": a.question, "answer": a.answer, "scope": a.scope, "company": a.company }))
         .collect();
+    // Each resume's own education and experience, keyed by resume id: the
+    // extension fills a form with the history of the resume it attaches.
+    let mut history = serde_json::Map::new();
+    for r in &resumes {
+        if let Ok(Some(p)) = crate::resumes::parsed_of(&state, user_id, r)
+            && (!p.education.is_empty() || !p.experience.is_empty())
+        {
+            history.insert(
+                r.id.to_string(),
+                json!({ "education": p.education, "experience": p.experience }),
+            );
+        }
+    }
     Ok(Json(json!({
         "user": { "email": who.user.email, "name": who.user.name },
         "profile": stored.profile,
+        "history": history,
         "profileVersion": stored.version,
         "resumes": resumes,
         "answers": answers,

@@ -283,6 +283,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/me/resumes/{id}/file", get(resumes::file))
         .route("/api/me/resumes/{id}/reparse", post(resumes::reparse))
+        .route("/api/me/resumes/{id}/history", put(resumes::put_history))
         .route(
             "/api/me/resumes/{id}/latex",
             put(resumes::save_latex).layer(DefaultBodyLimit::max(MAX_UPLOAD_BODY)),

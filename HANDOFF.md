@@ -113,6 +113,28 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
   - Gmail (`gmail.js`, `autofill-codes.js`, `config.js`): codes and Workday
     verify links from Gmail; **off until `gmailClientId` is set**.
 
+**Done 2026-11-24 (fourth session):**
+- The 403s were Vercel's automatic DDoS mitigation challenging the owner's
+  own IP (Firewall -> Persistent Actions); it expired on its own. IP bypass
+  rules need Pro. Bursts of requests from one IP (test runs) can retrigger it.
+- Extension 1.17.0: Ashby radio groups (`fieldset.ashby-application-form-input-radio-group`)
+  are question boxes, and their option text comes from sibling `label[for]`,
+  so Veteran/Gender/Race radios fill (checked live on OpenAI's form). Wider
+  wordings for gender, race, Hispanic/Latino, disability, veteran, visa,
+  work authorization and "how/where did you hear about ___". The panel no
+  longer has "Save my response" checkboxes: new answers are offered only by
+  the after-submit card (`offerHeld`).
+- Per-resume history: `PUT /api/me/resumes/{id}/history` stores a resume's
+  own education/experience in its parsed blob (a reparse replaces it);
+  `/api/autofill/profile` returns `history[resumeId]`, and the extension
+  fills with the attached resume's history (profile lists as fallback).
+- Profile page: card sections, Yes/No buttons, on-site as a Yes/No over
+  `workMode` (No = remote), address search via Photon (photon.komoot.io,
+  allowed in the main CSP's connect-src; Google Places needs billing), and
+  an "Education & experience" card with a tab per resume.
+- Not shipped: `web/public/update-extension.ps1` browser-restart change
+  (restarts the browser for copies < 1.16); written, never tested end to end.
+
 **Not verified / open:**
 1. Production smoke tests still not run (they need the owner signed in in
    the in-app browser; Google's popup only opens from the owner's own click):

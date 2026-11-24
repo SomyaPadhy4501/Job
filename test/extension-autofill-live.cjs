@@ -252,40 +252,17 @@ async function live() {
             .locator('.ashby-application-form-field-entry')
             .filter({ hasText: 'minimum of 7 years' });
           assert.equal(await item.locator('[aria-pressed=true]').count(), 0);
-          const question = 'Please elaborate on your experience';
-          const entry = page.locator('.ashby-application-form-field-entry').filter({ hasText: question });
-          await entry.locator('textarea').fill('A synthetic test response.');
-          await inPanel(
-            function (q) {
-              [...this.querySelectorAll('li input[type=checkbox]')]
-                .find((input) => input.closest('li').textContent.startsWith(q))
-                .focus();
-            },
-            [question]
-          );
-          await page.keyboard.press('Space');
-          assert.equal(
+          // Saving answers is offered after you submit (the multi-step check
+          // below), never with checkboxes inside the panel.
+          assert.deepEqual(
             await inPanel(function () {
-              return this.querySelectorAll('input[type=checkbox]:checked').length;
+              return [
+                this.querySelectorAll('li input[type=checkbox]').length,
+                [...this.querySelectorAll('button')].some((b) => /save my answers/i.test(b.textContent)),
+              ];
             }),
-            1
+            [0, false]
           );
-          await click('section > button:last-child');
-          for (let i = 0; i < 30 && !profile.answers.length; i++) await page.waitForTimeout(100);
-          if (!profile.answers.length)
-            console.error(
-              'Save status',
-              await inPanel(function () {
-                return [
-                  this.querySelector('[role=status]').textContent,
-                  this.querySelectorAll('input:checked').length,
-                  this.querySelector('section > button:last-child').outerHTML,
-                ];
-              })
-            );
-          assert.deepEqual(profile.answers, [
-            { question: await entry.locator('label').innerText(), answer: 'A synthetic test response.' },
-          ]);
         }
         assert.equal(await page.evaluate(() => window.__smokeSubmits), 0);
         assert.deepEqual(errors, []);
@@ -300,13 +277,6 @@ async function live() {
       requests.filter((p) => p.endsWith('/profile')).length,
       1,
       'profile was cached across three tabs'
-    );
-    await popup.reload();
-    await popup.getByText('Connected as pat@example.invalid').waitFor();
-    assert.equal(
-      requests.filter((p) => p.endsWith('/profile')).length,
-      2,
-      'saving invalidated the profile cache'
     );
     // Multi-step form, panel never opened: each step's answers are held, and
     // the save card appears only once the page confirms the submission.
