@@ -847,6 +847,28 @@ Neon's free plan is 1 GB (not 0.5 GB as written above) and 100 compute-hours a
 month shared with the collector. Anonymous visitors never touch the accounts
 tables: the web app calls `/api/auth/me` only when the `jb_li` cookie is set.
 
+### Outside scheduler (collect and scrape every 3 hours)
+
+GitHub's cron is unreliable for this repo: runs came 3.5–9 hours apart, and on
+2026-11-24 nothing fired for 14 hours, with GitHub reporting no incident. A
+free outside cron triggers the workflows instead; GitHub's schedule stays as a
+backup, and the due check makes extra triggers harmless.
+
+1. GitHub → Settings → Developer settings → Fine-grained tokens → new token:
+   repository access *Only this repository*, permission *Actions: Read and
+   write*, nothing else, longest expiry.
+2. cron-job.org (free) → two cron jobs, every 30 minutes (collect at :11 and
+   :41, scrape at :26 and :56):
+   - URL `https://api.github.com/repos/SomyaPadhy4501/Job/actions/workflows/collect.yml/dispatches`
+     (and `scrape.yml/dispatches`), method POST
+   - headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`
+   - body `{"ref":"main","inputs":{"gated":"true"}}`
+   - success is HTTP 204.
+
+`gated` makes the run check `.github/scripts/due.sh` first, like a scheduled
+run: it does the work only when the last real run is 170+ minutes old (or
+failed 55+ minutes ago). A run without it (the Actions button) always works.
+
 ### Hosting red lines (don't)
 
 - Don't introduce Airflow, Prefect, Dagster, or any orchestrator. Cron is

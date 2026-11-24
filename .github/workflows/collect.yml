@@ -10,7 +10,15 @@ name: collect
 on:
   schedule:
     - cron: '11,41 * * * *'
-  workflow_dispatch:         # Manual "Run workflow" button in GitHub UI
+  # Manual runs always do the work. An outside scheduler sends gated=true
+  # every 30 minutes, so the due check below decides, as for schedule:
+  # GitHub's own cron fired nothing for 14 hours on 2026-11-24 (see HANDOFF).
+  workflow_dispatch:
+    inputs:
+      gated:
+        description: Only run if due (for an outside scheduler)
+        type: boolean
+        default: false
 
 # Never two collects at once: a trigger that starts while a slow run is still
 # going waits for it, then sees it and skips.
@@ -40,7 +48,7 @@ jobs:
 
       - name: Is a collect due?
         id: due
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || inputs.gated
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/due.sh collect.yml "Run one-shot collect" 170 55

@@ -7,7 +7,15 @@ name: scrape
 on:
   schedule:
     - cron: '26,56 * * * *'
-  workflow_dispatch:         # Manual trigger for testing (always scrapes)
+  # Manual runs always do the work. An outside scheduler sends gated=true
+  # every 30 minutes, so the due check below decides, as for schedule:
+  # GitHub's own cron fired nothing for 14 hours on 2026-11-24 (see HANDOFF).
+  workflow_dispatch:
+    inputs:
+      gated:
+        description: Only run if due (for an outside scheduler)
+        type: boolean
+        default: false
 
 concurrency:
   group: scrape
@@ -29,7 +37,7 @@ jobs:
 
       - name: Is a scrape due?
         id: due
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || inputs.gated
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/due.sh scrape.yml "Run one-shot scrape (all targets)" 170 55
