@@ -131,3 +131,18 @@ test('a row is matched by its link before its key', () => {
     { dedupe_key: 'openings-1#b', apply_url: 'https://example.com/openings-1/b' },
   ]);
 });
+
+// Built In relays postings we also collect from the employer. When its row
+// lands on the employer's row by key, Built In's link (behind a Built In
+// sign-in) must not replace the employer's.
+test("a Built In link never replaces the employer's link", () => {
+  const link = (key) => getDb().prepare('SELECT apply_url FROM jobs WHERE dedupe_key = ?').get(key).apply_url;
+  upsertJob(job({ dedupe_key: 'builtin-1', apply_url: 'https://capitalone.wd12.myworkdayjobs.com/job/R1' }));
+  upsertJob(job({ dedupe_key: 'builtin-1', source: 'builtin', apply_url: 'https://builtin.com/job/full-stack-engineer-4/1' }));
+  assert.strictEqual(link('builtin-1'), 'https://capitalone.wd12.myworkdayjobs.com/job/R1');
+
+  // The other way round, the employer's link replaces Built In's.
+  upsertJob(job({ dedupe_key: 'builtin-2', source: 'builtin', apply_url: 'https://www.builtin.com/job/x/2' }));
+  upsertJob(job({ dedupe_key: 'builtin-2', apply_url: 'https://capitalone.wd12.myworkdayjobs.com/job/R2' }));
+  assert.strictEqual(link('builtin-2'), 'https://capitalone.wd12.myworkdayjobs.com/job/R2');
+});

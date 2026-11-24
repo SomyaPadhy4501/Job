@@ -68,3 +68,16 @@ jobs:
           INGEST_URL:    ${{ secrets.INGEST_URL }}
           COLLECT_TOKEN: ${{ secrets.COLLECT_TOKEN }}
           HEADLESS:      'true'
+
+      # Built In rows whose posting we already store from the employer (the
+      # Workday rows the extension sends, Greenhouse, ...) take that row's link,
+      # or go when it's already on the board. No network, a few seconds.
+      - name: Install root dependencies (pg)
+        if: steps.due.outputs.due != 'false'
+        run: npm ci
+
+      - name: Give Built In rows the employer's link
+        if: steps.due.outputs.due != 'false'
+        run: node src/scripts/fix-builtin-links.js --apply --stored-only
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

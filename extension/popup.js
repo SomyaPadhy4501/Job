@@ -91,6 +91,13 @@ $('workdayEnabled').addEventListener('change', async () => {
   await chrome.storage.local.set({ workdayEnabled: on });
 });
 $('workdayNow').addEventListener('click', async () => {
+  // The rows go to /admin/ingest, which takes only the collect token; the
+  // background run would fail on it, so say so here instead of "starting…".
+  const { token } = await chrome.storage.local.get({ token: '' });
+  if (!token) {
+    $('workdayStatus').textContent = 'Workday needs the collect token: paste it in the Collect token box above, press Save, then try again.';
+    return;
+  }
   if (!(await chrome.permissions.request({ origins: WORKDAY_ORIGINS }))) {
     $('workdayStatus').textContent = 'Workday collection needs access to myworkdayjobs.com.';
     return;

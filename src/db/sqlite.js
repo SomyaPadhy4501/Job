@@ -395,9 +395,13 @@ function upsertJob(job) {
         // Keep derived fields when this fetch has no description but the stored
         // row does, and keep the earliest date_posted so a re-listed role isn't
         // shown as new — same rules as the Postgres upsert (see src/db/pg.js).
+        // A Built In link never replaces an employer's own (it needs a Built
+        // In sign-in). LIKE is case-insensitive for ASCII here.
         `UPDATE jobs
          SET last_seen_at   = datetime('now'),
-             apply_url      = @apply_url,
+             apply_url      = CASE WHEN (@apply_url LIKE 'http%://builtin.com/%' OR @apply_url LIKE 'http%://www.builtin.com/%')
+                                    AND NOT (apply_url LIKE 'http%://builtin.com/%' OR apply_url LIKE 'http%://www.builtin.com/%')
+                                   THEN apply_url ELSE @apply_url END,
              description    = CASE WHEN COALESCE(@description,'') = '' THEN description ELSE @description END,
              location       = @location,
              date_posted    = CASE WHEN date_posted IS NULL OR @date_posted < date_posted

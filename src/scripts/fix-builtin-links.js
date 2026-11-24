@@ -6,8 +6,10 @@
 // The scraper now swaps them at scrape time (scraper/src/targets/builtin-
 // resolve.js); this applies the same lookup to rows stored before that.
 //
-// For each stored row whose link is on builtin.com, the resolver looks the
-// posting up on the employer's board. When it finds it:
+// For each stored row whose link is on builtin.com, the posting is looked up
+// first among the rows already stored from the employer (Workday rows from the
+// extension, Greenhouse, Oracle, ...: no network), then on the employer's
+// board, unless --stored-only (the step after each scrape). When found:
 //   - another row already holds that link (the employer's own collector
 //     stored it): this row is a duplicate and is deleted;
 //   - otherwise: only apply_url changes. Location, description and dedupe_key
@@ -18,11 +20,13 @@
 // Usage (safe, dry-run by default):
 //   node src/scripts/fix-builtin-links.js                    # local SQLite
 //   DATABASE_URL=... node src/scripts/fix-builtin-links.js --apply
+//   DATABASE_URL=... node src/scripts/fix-builtin-links.js --apply --stored-only
 
 const { canonicalUrl } = require('../services/normalize');
-const { resolveOriginalLinks } = require('../../scraper/src/targets/builtin-resolve');
+const { resolveOriginalLinks, matchStored } = require('../../scraper/src/targets/builtin-resolve');
 
 const APPLY = process.argv.includes('--apply');
+const STORED_ONLY = process.argv.includes('--stored-only');
 const USE_PG = !!process.env.DATABASE_URL;
 
 const BUILTIN_LINK = /^https?:\/\/(www\.)?builtin\.com\/job\//i;
@@ -99,14 +103,22 @@ async function main() {
   }
 
   const builtin = rows.filter((r) => BUILTIN_LINK.test(r.apply_url));
-  // Runs alone, so it can take most of the workflow's 20 minutes, not the
-  // scraper's 4. Rows not reached keep their link; run it again for the rest.
-  const resolved = await resolveOriginalLinks(
-    builtin.map((r) => ({ ...r, description: '' })),
-    { budgetMs: 15 * 60_000 },
-  );
+  const fromStored = matchStored(builtin, rows.filter((r) => !BUILTIN_LINK.test(r.apply_url)));
+  const viaStored = builtin.map((r) => (fromStored.has(r) ? { ...r, apply_url: fromStored.get(r).apply_url } : r));
+  // The network lookup runs alone, so it can take most of the workflow's 20
+  // minutes, not the scraper's 4. Rows not reached keep their link; run it
+  // again for the rest.
+  const left = viaStored.filter((r) => BUILTIN_LINK.test(r.apply_url));
+  const looked = STORED_ONLY
+    ? left
+    : await resolveOriginalLinks(left.map((r) => ({ ...r, description: '' })), { budgetMs: 15 * 60_000 });
+  const resolved = [...viaStored.filter((r) => !BUILTIN_LINK.test(r.apply_url)), ...looked];
   const p = plan(rows, resolved);
 
+  console.log(
+    `Matched ${fromStored.size} to a row we already store from the employer` +
+      (STORED_ONLY ? ' (stored rows only).' : '.')
+  );
   console.log(
     `Scanned ${rows.length} rows; ${builtin.length} link to Built In. ` +
       `Found the employer's posting for ${p.updates.length + p.deletes.length}: ` +

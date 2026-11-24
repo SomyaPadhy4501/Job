@@ -45,7 +45,7 @@ global.fetch = async (url, init = {}) => {
   return new Response('not found', { status: 404 });
 };
 
-const { resolveOriginalLinks, normalizeTitle, slugGuesses, sharesPlace } = require('../scraper/src/targets/builtin-resolve');
+const { resolveOriginalLinks, matchStored, titleHeads, normalizeTitle, slugGuesses, sharesPlace } = require('../scraper/src/targets/builtin-resolve');
 
 function row(company, title, location, id) {
   return {
@@ -121,6 +121,39 @@ test('the first Workday 429 ends Workday lookups for the run, without waiting', 
 test('out of time: lookups stop and rows keep their Built In link', async () => {
   const [r] = await resolveOriginalLinks([row('Capital One', 'Full-stack Engineer 4', 'New York, NY, USA', '8')], { budgetMs: -1 });
   assert.equal(r.apply_url, 'https://builtin.com/job/x/8');
+});
+
+// Built In cuts titles at the first qualifier ("Full-stack Engineer 4, Enterprise
+// Data Tech" shows as "Full-stack Engineer 4"; seen on Capital One 2026-11-24).
+test('titleHeads: each title up to a separator, never mid-word', () => {
+  assert.deepEqual(titleHeads('Full-stack Engineer 4, Enterprise Data Tech'), ['full stack engineer 4']);
+  assert.deepEqual(titleHeads('Machine Learning Engineer 4 (IC) - Card'), ['machine learning engineer 4', 'machine learning engineer 4 ic']);
+  assert.deepEqual(titleHeads('Software Engineer II'), []);
+  assert.deepEqual(titleHeads('Full-stack Engineer'), []);
+});
+
+test("matchStored: the employer's stored row, exact title first, then one cut-short title in the same city", () => {
+  const stored = [
+    { company_name: 'Capital One', job_title: 'Full-stack Engineer 4, Enterprise Data Tech', location: 'San Francisco , CA', apply_url: 'https://wd/sf-edt' },
+    { company_name: 'Capital One', job_title: 'Full-stack Engineer 4 (Manager, IC)-EDT', location: 'McLean, VA', apply_url: 'https://wd/mclean' },
+    { company_name: 'Capital One', job_title: 'Cloud Engineer 4, Platform', location: 'Richmond, VA', apply_url: 'https://wd/cloud-a' },
+    { company_name: 'Capital One', job_title: 'Cloud Engineer 4, Data', location: 'Richmond, VA', apply_url: 'https://wd/cloud-b' },
+    { company_name: 'Snap', job_title: 'Software Engineer, Full Stack, Level 4', location: 'Los Angeles, CA', apply_url: 'https://wd/snap' },
+    { company_name: 'Acme', job_title: 'Software Engineer II', location: 'Boston, MA', apply_url: 'https://acme/2' },
+  ];
+  const rows = [
+    row('Capital One', 'Full-stack Engineer 4', 'San Francisco, USA', 'a'),   // one cut-short title in SF
+    row('Capital One', 'Cloud Engineer 4', 'Richmond, VA, USA', 'b'),         // two candidates: too vague
+    row('Capital One', 'Full-stack Engineer 4', 'Chicago, USA', 'c'),         // none in Chicago
+    row('Snap Inc.', 'Software Engineer, Full Stack, Level 4', 'Los Angeles, USA', 'd'), // exact, "Inc." dropped
+    row('Acme', 'Software Engineer', 'Boston, MA, USA', 'e'),                 // "II" is another role
+  ];
+  const m = matchStored(rows, stored);
+  assert.equal(m.get(rows[0])?.apply_url, 'https://wd/sf-edt');
+  assert.ok(!m.has(rows[1]));
+  assert.ok(!m.has(rows[2]));
+  assert.equal(m.get(rows[3])?.apply_url, 'https://wd/snap');
+  assert.ok(!m.has(rows[4]));
 });
 
 // ─── src/scripts/fix-builtin-links.js: what happens to stored rows ───────────

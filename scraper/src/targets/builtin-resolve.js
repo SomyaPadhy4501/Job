@@ -120,12 +120,61 @@ function pick(candidates, row, requirePlace) {
   return requirePlace ? null : candidates[0] || null;
 }
 
+// Built In shortens titles at the first qualifier: Capital One's "Full-stack
+// Engineer 4, Enterprise Data Tech" is "Full-stack Engineer 4" there. Each
+// title up to a separator (", ", " - ", " (", ": ", " | "), never one cut
+// mid-word, so "Software Engineer" isn't "Software Engineer II".
+const TITLE_BREAK = /\s*(?:,|\s[-–—|]\s|\(|:\s)/g;
+function titleHeads(title) {
+  const t = String(title || '');
+  const heads = [];
+  for (const m of t.matchAll(TITLE_BREAK)) if (m.index > 0) heads.push(normalizeTitle(t.slice(0, m.index)));
+  return heads;
+}
+
+// candidates: postings with a `title` field `key`. Exact titles first (pick's
+// rules); otherwise a longer title Built In cut short, only when exactly one
+// such posting is in the row's city, since a cut title says less.
+function findPosting(candidates, row, requirePlace, key) {
+  const want = normalizeTitle(row.job_title);
+  if (!want) return null;
+  const exact = candidates.filter((c) => normalizeTitle(c[key]) === want);
+  if (exact.length) return pick(exact, row, requirePlace);
+  const longer = candidates.filter(
+    (c) => titleHeads(c[key]).includes(want) && sharesPlace(row.location, c.location)
+  );
+  return longer.length === 1 ? longer[0] : null;
+}
+
+// Same company, ignoring legal suffixes and spaces ("Snap Inc." = "Snap",
+// "JPMorganChase" = "JPMorgan Chase").
+const companyKey = (name) => normalizeName(name).replace(/ /g, '');
+
+// The posting among rows we already store from the employer (the Workday rows
+// the extension collects, Greenhouse, Oracle, ...): Map row -> stored row.
+// stored: rows with company_name, job_title, location, apply_url, none of them
+// a Built In link.
+function matchStored(rows, stored) {
+  const byCompany = new Map();
+  for (const s of stored) {
+    const k = companyKey(s.company_name);
+    if (!k) continue;
+    if (!byCompany.has(k)) byCompany.set(k, []);
+    byCompany.get(k).push(s);
+  }
+  const out = new Map();
+  for (const row of rows) {
+    const hit = findPosting(byCompany.get(companyKey(row.company_name)) || [], row, false, 'job_title');
+    if (hit) out.set(row, hit);
+  }
+  return out;
+}
+
 // Workday: one title search per row instead of listing a tenant of thousands.
 async function matchWorkday(board, rows) {
   const out = new Map();
   for (const row of rows) {
     if (Date.now() > deadline) return out;
-    const want = normalizeTitle(row.job_title);
     let items;
     try {
       // eslint-disable-next-line no-await-in-loop
@@ -137,10 +186,12 @@ async function matchWorkday(board, rows) {
       log.debug('builtin.resolve.workday-fail', { company: board.displayName, error: err.message });
       return out;
     }
-    const hits = items
-      .filter((j) => normalizeTitle(j.title) === want)
-      .map((j) => ({ ...j, location: workday.resolveLocation(j) }));
-    const hit = pick(hits, row, false);
+    const hit = findPosting(
+      items.map((j) => ({ ...j, location: workday.resolveLocation(j) })),
+      row,
+      false,
+      'title'
+    );
     if (!hit) continue;
     // eslint-disable-next-line no-await-in-loop
     const description = await workdayJson(workday.detailUrl(board, hit.externalPath))
@@ -164,15 +215,9 @@ async function matchListing(board, rows, requirePlace) {
   } catch {
     return out; // no such board (404) or it failed; try the next one
   }
-  const byTitle = new Map();
-  for (const j of jobs) {
-    if (!j.apply_url) continue;
-    const k = normalizeTitle(j.job_title);
-    if (!byTitle.has(k)) byTitle.set(k, []);
-    byTitle.get(k).push(j);
-  }
+  const linked = jobs.filter((j) => j.apply_url);
   for (const row of rows) {
-    const hit = pick(byTitle.get(normalizeTitle(row.job_title)) || [], row, requirePlace);
+    const hit = findPosting(linked, row, requirePlace, 'job_title');
     if (hit) out.set(row, { apply_url: hit.apply_url, location: hit.location, description: hit.description });
   }
   return out;
@@ -247,4 +292,4 @@ async function resolveOriginalLinks(rows, { budgetMs = BUDGET_MS } = {}) {
   });
 }
 
-module.exports = { resolveOriginalLinks, normalizeTitle, normalizeName, slugGuesses, sharesPlace };
+module.exports = { resolveOriginalLinks, matchStored, titleHeads, normalizeTitle, normalizeName, slugGuesses, sharesPlace };

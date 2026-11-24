@@ -89,10 +89,14 @@ async function upsertJob(job, client) {
     // it (new posting date, same company/title/location), and taking the new
     // date put a weeks-old job back at the top of the 7-day window as if new.
     // ISO-8601 strings compare correctly as text, and LEAST ignores NULLs.
+    // A Built In link never replaces an employer's own: Built In's needs a
+    // Built In sign-in before it reaches the company (builtin-resolve.js).
     await db.query(
       `UPDATE jobs
          SET last_seen_at   = $1,
-             apply_url      = $2,
+             apply_url      = CASE WHEN $2 ~* '^https?://(www\\.)?builtin\\.com/'
+                                    AND apply_url !~* '^https?://(www\\.)?builtin\\.com/'
+                                   THEN apply_url ELSE $2 END,
              description    = CASE WHEN COALESCE($3::text,'') = '' THEN description ELSE $3::text END,
              location       = $4,
              date_posted    = LEAST(date_posted, COALESCE($5, date_posted)),
