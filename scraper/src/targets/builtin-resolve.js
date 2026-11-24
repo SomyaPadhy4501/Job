@@ -30,6 +30,35 @@ const log = require('../logger');
 
 const LISTING = { greenhouse, lever, ashby };
 const CONCURRENCY = 6;
+
+// The whole step gets a time limit, so it can't push the scrape job past its
+// 20-minute timeout. Companies not reached in time keep their Built In links.
+const BUDGET_MS = 4 * 60_000;
+let deadline = Infinity;
+
+// Workday rate-limits by IP, and the shared fetchJson answers a 429 by pausing
+// the whole platform for up to a minute and retrying, up to six times. With
+// six companies at once that ran past ten minutes on 220 rows (2026-11-24).
+// So Workday calls here are single-shot, and the first 429 ends Workday
+// lookups for the run.
+let workdayBlocked = false;
+
+async function workdayJson(url, body) {
+  if (workdayBlocked) throw new Error('Workday rate-limited this run');
+  const res = await fetch(url, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'user-agent': 'job-aggregator/1.0', accept: 'application/json', 'content-type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (res.status === 429) {
+    if (!workdayBlocked) log.warn('builtin.resolve.workday-429', { url });
+    workdayBlocked = true;
+    throw new Error('HTTP 429');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 const LEGAL_SUFFIX = /\b(inc|llc|ltd|corp|corporation|co|company|plc|lp|holdings)\b\.?/g;
 
 function normalizeName(name) {
@@ -95,11 +124,15 @@ function pick(candidates, row, requirePlace) {
 async function matchWorkday(board, rows) {
   const out = new Map();
   for (const row of rows) {
+    if (Date.now() > deadline) return out;
     const want = normalizeTitle(row.job_title);
     let items;
     try {
       // eslint-disable-next-line no-await-in-loop
-      ({ items } = await workday.fetchPages(board, row.job_title, 20));
+      const data = await workdayJson(`${workday.baseUrl(board)}/jobs`, {
+        appliedFacets: {}, limit: 20, offset: 0, searchText: row.job_title,
+      });
+      items = Array.isArray(data?.jobPostings) ? data.jobPostings : [];
     } catch (err) {
       log.debug('builtin.resolve.workday-fail', { company: board.displayName, error: err.message });
       return out;
@@ -110,7 +143,9 @@ async function matchWorkday(board, rows) {
     const hit = pick(hits, row, false);
     if (!hit) continue;
     // eslint-disable-next-line no-await-in-loop
-    const description = await workday.fetchDetail(board, hit.externalPath).catch(() => '');
+    const description = await workdayJson(workday.detailUrl(board, hit.externalPath))
+      .then((d) => d?.jobPostingInfo?.jobDescription || '')
+      .catch(() => '');
     out.set(row, {
       apply_url: workday.applyUrl(board, hit.externalPath),
       location: hit.location,
@@ -150,7 +185,7 @@ async function resolveCompany(name, rows) {
 
   const known = configuredBoards(name).filter((b) => LISTING[b.source] || b.source === 'workday');
   for (const board of known) {
-    if (!left().length) break;
+    if (!left().length || Date.now() > deadline) break;
     // eslint-disable-next-line no-await-in-loop
     merge(board.source === 'workday' ? await matchWorkday(board, left()) : await matchListing(board, left(), false));
   }
@@ -160,7 +195,7 @@ async function resolveCompany(name, rows) {
   if (!configuredBoards(name).length) {
     for (const slug of slugGuesses(name)) {
       for (const source of Object.keys(LISTING)) {
-        if (!left().length) break;
+        if (!left().length || Date.now() > deadline) break;
         // eslint-disable-next-line no-await-in-loop
         merge(await matchListing({ source, slug, displayName: name }, left(), true));
       }
@@ -171,7 +206,10 @@ async function resolveCompany(name, rows) {
 
 // rows: Built In rows from builtin.js. Returns them with apply_url (and the
 // board's location and description) replaced wherever the original was found.
-async function resolveOriginalLinks(rows) {
+async function resolveOriginalLinks(rows, { budgetMs = BUDGET_MS } = {}) {
+  // Per call: the scheduler (src/index.js) runs targets again in one process.
+  deadline = Date.now() + budgetMs;
+  workdayBlocked = false;
   const byCompany = new Map();
   for (const r of rows) {
     if (!byCompany.has(r.company_name)) byCompany.set(r.company_name, []);
@@ -193,6 +231,8 @@ async function resolveOriginalLinks(rows) {
     companies: byCompany.size,
     resolved: resolved.size,
     seconds: Math.round((Date.now() - started) / 1000),
+    outOfTime: Date.now() > deadline,
+    workdayRateLimited: workdayBlocked,
   });
 
   return rows.map((r) => {
