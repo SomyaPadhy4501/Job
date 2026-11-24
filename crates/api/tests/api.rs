@@ -1429,3 +1429,294 @@ async fn each_resume_keeps_its_own_history_for_the_extension() {
     let p = ext.get("/api/autofill/profile").await.json();
     assert_eq!(p["history"][&id]["experience"][0]["title"], "ML Intern");
 }
+
+/// Every per-user route, called by another user with Alice's ids: nothing is
+/// found, nothing changes, and lists show only the caller's own data.
+#[tokio::test]
+async fn every_per_user_route_refuses_another_users_data() {
+    let Some(app) = app() else { return };
+    let mut alice = Browser::new(&app);
+    alice.sign_in().await;
+    let (id, sha) = new_latex_resume(&mut alice).await;
+    let answer = alice
+        .json(
+            Method::PUT,
+            "/api/me/answers",
+            json!({"question": "Why us?", "answer": "alice-secret-answer"}),
+        )
+        .await
+        .json()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let created = alice.json(Method::POST, "/api/me/tokens", json!({})).await;
+    let alice_token = created.json()["token"].as_str().unwrap().to_owned();
+    let alice_token_id = created.json()["info"]["id"].as_str().unwrap().to_owned();
+    let alice_profile = alice.get("/api/me/profile").await.json();
+
+    let mut bob = Browser::new(&app);
+    bob.sign_in().await;
+    let (latex_ct, latex_body) = multipart(&[("source", SOURCE_V2)], Some(&pdf_v("bob")));
+    let json_ct = Some("application/json");
+    let refused: Vec<(Method, String, Option<&str>, Vec<u8>)> = vec![
+        (Method::GET, format!("/api/me/resumes/{id}"), None, vec![]),
+        (
+            Method::GET,
+            format!("/api/me/resumes/{id}/file"),
+            None,
+            vec![],
+        ),
+        (
+            Method::GET,
+            format!("/api/me/resumes/{id}/source"),
+            None,
+            vec![],
+        ),
+        (
+            Method::PATCH,
+            format!("/api/me/resumes/{id}"),
+            json_ct,
+            br#"{"title":"mine"}"#.to_vec(),
+        ),
+        (
+            Method::PATCH,
+            format!("/api/me/resumes/{id}"),
+            json_ct,
+            br#"{"isDefault":true}"#.to_vec(),
+        ),
+        (
+            Method::POST,
+            format!("/api/me/resumes/{id}/reparse"),
+            None,
+            vec![],
+        ),
+        (
+            Method::PUT,
+            format!("/api/me/resumes/{id}/history"),
+            json_ct,
+            br#"{"education":[],"experience":[]}"#.to_vec(),
+        ),
+        (
+            Method::PUT,
+            format!("/api/me/resumes/{id}/source"),
+            json_ct,
+            br#"{"source":"\\documentclass{article}"}"#.to_vec(),
+        ),
+        (
+            Method::PUT,
+            format!("/api/me/resumes/{id}/latex"),
+            Some(latex_ct.as_str()),
+            latex_body.clone(),
+        ),
+        (
+            Method::POST,
+            format!("/api/me/profile/import/{id}"),
+            json_ct,
+            b"{}".to_vec(),
+        ),
+        (
+            Method::DELETE,
+            format!("/api/me/answers/{answer}"),
+            None,
+            vec![],
+        ),
+        (
+            Method::DELETE,
+            format!("/api/me/tokens/{alice_token_id}"),
+            None,
+            vec![],
+        ),
+        (
+            Method::DELETE,
+            format!("/api/me/resumes/{id}"),
+            None,
+            vec![],
+        ),
+    ];
+    for (method, path, ct, body) in refused {
+        let res = bob.send(method.clone(), &path, ct, body).await;
+        assert_eq!(
+            res.status,
+            StatusCode::NOT_FOUND,
+            "{method} {path}: {}",
+            String::from_utf8_lossy(&res.body)
+        );
+    }
+
+    // Bob's own lists and export hold nothing of Alice's.
+    for (path, key) in [
+        ("/api/me/resumes", "resumes"),
+        ("/api/me/answers", "answers"),
+        ("/api/me/tokens", "tokens"),
+    ] {
+        assert_eq!(bob.get(path).await.json()[key], json!([]), "{path}");
+    }
+    assert_eq!(bob.get("/api/me/profile").await.json()["version"], 0);
+    let export = bob.get("/api/me/export").await;
+    assert_eq!(export.status, StatusCode::OK);
+    let text = String::from_utf8_lossy(&export.body);
+    assert!(!text.contains(&id) && !text.contains("alice-secret-answer"));
+
+    // Bob's extension token sees only Bob.
+    let bob_token = bob
+        .json(Method::POST, "/api/me/tokens", json!({}))
+        .await
+        .json()["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut bob_ext = Browser::new(&app);
+    bob_ext.bearer = Some(bob_token);
+    bob_ext.csrf = false;
+    assert_eq!(
+        bob_ext
+            .get(&format!("/api/autofill/resumes/{id}/file"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    let p = bob_ext.get("/api/autofill/profile").await.json();
+    assert_eq!(p["resumes"], json!([]));
+    assert_eq!(p["answers"], json!([]));
+    assert_eq!(p["history"], json!({}));
+    assert_eq!(
+        bob_ext.get("/api/autofill/resumes?title=x").await.json()["resumes"],
+        json!([])
+    );
+    // Answers saved with Bob's token land in Bob's bank only.
+    let saved = bob_ext
+        .json(
+            Method::POST,
+            "/api/autofill/answers",
+            json!({"answers": [{"question": "Why us?", "answer": "bob"}]}),
+        )
+        .await;
+    assert_eq!(saved.status, StatusCode::OK);
+
+    // Alice's data is untouched, and her token still works.
+    let shown = alice.get(&format!("/api/me/resumes/{id}")).await.json();
+    assert_eq!(shown["resume"]["title"], "LaTeX resume");
+    assert_eq!(shown["resume"]["fileSha256"], sha.as_str());
+    assert_eq!(
+        alice
+            .get(&format!("/api/me/resumes/{id}/source"))
+            .await
+            .json()["source"],
+        SOURCE_V1
+    );
+    let answers = alice.get("/api/me/answers").await.json();
+    assert_eq!(answers["answers"].as_array().unwrap().len(), 1);
+    assert_eq!(answers["answers"][0]["answer"], "alice-secret-answer");
+    assert_eq!(alice.get("/api/me/profile").await.json(), alice_profile);
+    let mut alice_ext = Browser::new(&app);
+    alice_ext.bearer = Some(alice_token);
+    alice_ext.csrf = false;
+    assert_eq!(
+        alice_ext.get("/api/autofill/profile").await.status,
+        StatusCode::OK
+    );
+}
+
+/// Roles: the owner page is for `OWNER_SUBS` only; everyone else, signed in or
+/// not, cookie or token, is refused.
+#[tokio::test]
+async fn owner_routes_deny_everyone_else() {
+    let owner_sub = unique("owner");
+    let allow = owner_sub.clone();
+    let Some(app) = app_with(move |c| c.owner_subs = vec![allow]) else {
+        return;
+    };
+    let mut owner = Browser::new(&app);
+    assert_eq!(owner.sign_in_as(&owner_sub).await.status, StatusCode::OK);
+    let me = owner.get("/api/auth/me").await.json();
+    assert_eq!(me["role"], "owner");
+    assert_eq!(me["owner"], true);
+    assert_eq!(owner.get("/api/admin/usage").await.status, StatusCode::OK);
+
+    let mut user = Browser::new(&app);
+    user.sign_in().await;
+    let me = user.get("/api/auth/me").await.json();
+    assert_eq!(me["role"], "user");
+    assert_eq!(me["owner"], false);
+    assert_eq!(
+        user.get("/api/admin/usage").await.status,
+        StatusCode::NOT_FOUND
+    );
+
+    let mut anon = Browser::new(&app);
+    assert_eq!(
+        anon.get("/api/admin/usage").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    let token = owner
+        .json(Method::POST, "/api/me/tokens", json!({}))
+        .await
+        .json()["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut ext = Browser::new(&app);
+    ext.bearer = Some(token);
+    ext.csrf = false;
+    assert_eq!(
+        ext.get("/api/admin/usage").await.status,
+        StatusCode::UNAUTHORIZED,
+        "an extension token is never the owner"
+    );
+}
+
+/// Session and nonce cookies: HttpOnly, SameSite=Strict, `__Host-` + Secure in
+/// production; signing in again replaces the old session.
+#[tokio::test]
+async fn session_cookies_are_locked_down_and_rotate() {
+    let Some(app) = app_with(|c| c.secure_cookies = true) else {
+        return;
+    };
+    let mut b = Browser::new(&app);
+    let config = b.get("/api/auth/config").await;
+    let nonce = config
+        .cookies()
+        .into_iter()
+        .find(|c| c.starts_with("__Host-jb_nonce="))
+        .expect("nonce cookie");
+    for flag in ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"] {
+        assert!(nonce.contains(flag), "nonce cookie {flag}: {nonce}");
+    }
+    let sub = unique("sub");
+    let res = b.sign_in_as(&sub).await;
+    assert_eq!(res.status, StatusCode::OK);
+    let sid = res
+        .cookies()
+        .into_iter()
+        .find(|c| c.starts_with("__Host-jb_sid="))
+        .expect("session cookie");
+    for flag in ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"] {
+        assert!(sid.contains(flag), "session cookie {flag}: {sid}");
+    }
+    assert!(!sid.contains("Domain="), "{sid}");
+    let old = b.cookie("__Host-jb_sid").unwrap().to_owned();
+
+    // Signing in again in the same browser ends the old session.
+    assert_eq!(b.sign_in_as(&sub).await.status, StatusCode::OK);
+    assert_ne!(b.cookie("__Host-jb_sid").unwrap(), old);
+    let mut stolen = Browser::new(&app);
+    stolen.jar.push(("__Host-jb_sid".into(), old));
+    assert!(stolen.get("/api/auth/me").await.json()["user"].is_null());
+}
+
+/// The dev sign-in doesn't exist unless the dev binary turns it on.
+#[tokio::test]
+async fn dev_login_is_off_by_default() {
+    let Some(app) = app() else { return };
+    let mut b = Browser::new(&app);
+    let res = b
+        .json(
+            Method::POST,
+            "/api/auth/dev-login",
+            json!({"email": "owner@example.com"}),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::NOT_FOUND);
+    assert!(b.cookie("jb_sid").is_none());
+    assert_eq!(b.get("/api/auth/config").await.json()["devLogin"], false);
+}

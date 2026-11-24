@@ -30,6 +30,7 @@ use accounts::token::{
 use crate::AppState;
 use crate::error::{ApiError, ApiResult};
 use crate::http::{CookieSpec, JsonBody, client_ip, cookie, set_cookie, today, user_agent};
+use crate::roles::Role;
 
 pub const SESSION_DAYS: i64 = 30;
 pub const ABSOLUTE_DAYS: i64 = 90;
@@ -79,6 +80,7 @@ fn session_cookie(state: &AppState, value: &str, max_age: i64) -> String {
         max_age,
         http_only: true,
         secure: state.config.secure_cookies,
+        strict: true,
     })
 }
 
@@ -89,6 +91,7 @@ fn hint_cookie(state: &AppState, on: bool) -> String {
         max_age: if on { ABSOLUTE_DAYS * 86_400 } else { 0 },
         http_only: false,
         secure: state.config.secure_cookies,
+        strict: false,
     })
 }
 
@@ -99,6 +102,7 @@ fn nonce_cookie(state: &AppState, value: &str, max_age: i64) -> String {
         max_age,
         http_only: true,
         secure: state.config.secure_cookies,
+        strict: true,
     })
 }
 
@@ -354,11 +358,7 @@ async fn start_session(
     db::trim_sessions(pool, user.id, MAX_SESSIONS).await?;
     db::audit(pool, Some(user.id), kind).await?;
 
-    let owner = state
-        .config
-        .owner_subs
-        .iter()
-        .any(|s| s == &user.google_sub);
+    let role = Role::of(&state.config, &user);
     let cookies = [
         (
             header::SET_COOKIE,
@@ -369,7 +369,12 @@ async fn start_session(
     ];
     Ok((
         AppendHeaders(cookies),
-        Json(json!({ "user": user, "owner": owner, "isNew": is_new })),
+        Json(json!({
+            "user": user,
+            "role": role,
+            "owner": role == Role::Owner,
+            "isNew": is_new,
+        })),
     )
         .into_response())
 }
@@ -377,15 +382,12 @@ async fn start_session(
 pub async fn me(State(state): State<AppState>, signed: Option<Signed>) -> Json<serde_json::Value> {
     match signed {
         Some(s) => {
-            let owner = state
-                .config
-                .owner_subs
-                .iter()
-                .any(|sub| sub == &s.user.google_sub);
+            let role = Role::of(&state.config, &s.user);
             let reauth_until = s.session.created_at + Duration::minutes(REAUTH_MINUTES);
             Json(json!({
                 "user": s.user,
-                "owner": owner,
+                "role": role,
+                "owner": role == Role::Owner,
                 "recentSignIn": OffsetDateTime::now_utc() < reauth_until,
             }))
         }

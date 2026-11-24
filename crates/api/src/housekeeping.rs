@@ -9,8 +9,8 @@ use serde_json::{Value, json};
 use accounts::token::ct_eq;
 
 use crate::AppState;
-use crate::auth::Signed;
 use crate::error::{ApiError, ApiResult};
+use crate::roles::Owner;
 
 /// Deletes queued files. Each success clears its queue row; each failure is
 /// counted and retried by the cleanup. Returns (deleted, failed).
@@ -58,17 +58,9 @@ pub async fn cleanup(State(state): State<AppState>, headers: HeaderMap) -> ApiRe
     ))
 }
 
-/// `GET /api/admin/usage`: counts only, no personal data. For the Google
-/// accounts listed in `OWNER_SUBS`.
-pub async fn usage(State(state): State<AppState>, signed: Signed) -> ApiResult<Json<Value>> {
-    if !state
-        .config
-        .owner_subs
-        .iter()
-        .any(|s| s == &signed.user.google_sub)
-    {
-        return Err(ApiError::NotFound);
-    }
+/// `GET /api/admin/usage`: counts only, no personal data. Owner only
+/// (see `roles`).
+pub async fn usage(State(state): State<AppState>, _owner: Owner) -> ApiResult<Json<Value>> {
     let usage = db::usage(state.pool()?).await?;
     let c = &state.config;
     Ok(Json(json!({

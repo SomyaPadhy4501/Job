@@ -31,13 +31,18 @@ pub struct CookieSpec<'a> {
     pub max_age: i64,
     pub http_only: bool,
     pub secure: bool,
+    /// `SameSite=Strict`: never sent on a request another site starts, not
+    /// even a top-level link. The app only calls `/api` from its own pages,
+    /// so the session and the sign-in nonce lose nothing by it.
+    pub strict: bool,
 }
 
 pub fn set_cookie(c: CookieSpec<'_>) -> String {
     let mut s = format!(
-        "{}={}; Path=/; SameSite=Lax; Max-Age={}",
+        "{}={}; Path=/; SameSite={}; Max-Age={}",
         c.name,
         c.value,
+        if c.strict { "Strict" } else { "Lax" },
         c.max_age.max(0)
     );
     if c.http_only {

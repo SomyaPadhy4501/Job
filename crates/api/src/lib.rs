@@ -22,6 +22,7 @@ pub mod housekeeping;
 pub mod http;
 pub mod profile;
 pub mod resumes;
+pub mod roles;
 
 use std::sync::Arc;
 use std::time::Duration;
