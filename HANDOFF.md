@@ -80,6 +80,97 @@ after load and submits blocked. Never submit a real application.
 sponsorship/qualification answers; no credit cards on any service; prefers
 the agent to drive the browser for setup; communicates in English/Hinglish.
 
+### Doubts, risks and known gaps (honest list, most important first)
+
+**Not verified live**
+- Extension 1.10.0 deploy: last check still served 1.9.0 (deploy was in
+  progress). Check `/downloads/extension.json`.
+- Listing sharing end to end in production (extension → Rust
+  `/api/capture/jobs` → Node `/admin/ingest` over the public URL with
+  `COLLECT_TOKEN`): only tested locally with a fake ingest server.
+- Resume upload to Backblaze from production: health says `storage: s3`,
+  but no real upload/download/delete was done on prod. Do one, and check
+  the file disappears from the bucket after deleting it.
+- Daily cleanup cron (`/api/cron/cleanup`) has never run on Vercel.
+- Google sign-in works for the owner (confirmed by them); nobody else can
+  until the consent screen is published.
+
+**Autofill doubts**
+- Save-after-submit detection is a heuristic (`onSubmitLike` in
+  `extension/autofill.js`): a `submit` event, or a click on a button whose
+  text says submit/send/apply. It misses forms that submit from JS with other
+  button text ("Finish", "Complete", "Next" on the last step) and can fire
+  on an "Apply" button that isn't the final submit. It only works if the
+  user opened the Autofill panel on that page (needs `account`).
+- Workday is multi-step: only the step visible at submit is read, so
+  answers from earlier steps are never offered for saving.
+- Held answers are keyed by tab id; a confirmation page in a new tab, or
+  after 30 min, loses them.
+- "This country" / "the country where the job is located" is read as the
+  US because the board is US-only. On non-US jobs (via "Autofill this page"
+  on other sites) that would be wrong. It is marked "check it" in the panel.
+- `guardedClick` blocks form submission while clicking Ashby Yes/No. It
+  worked on OpenAI's live form; if Ashby changes markup it may need updating.
+- Saved answers match only on the normalized exact question wording
+  (`savedAnswer` in `autofill-fields.js`); reworded questions won't match.
+- Company scope uses a URL slug (Ashby/Lever path, Greenhouse `for=`, the
+  Workday subdomain), so the same company on two ATSs gets two names.
+- Still left for the user: location search comboboxes (Ashby "Where are
+  you located?", Greenhouse "Location (City)"), date pickers (Ashby
+  "When can you start?"), Greenhouse phone (the form doesn't keep the
+  value), school/degree dropdowns, EEO unless set.
+- Generic (company-built) forms are only tested on a fixture page; Tesla
+  blocks headless browsers and Amazon needs a login, so both are untested.
+
+**Product / security doubts**
+- The sign-in wall is front-end only. The Node API (`/jobs`, `/companies`)
+  is still public, so anyone can fetch job data directly, and search engines
+  now see only the landing page. Gate on the server if that matters.
+- Every signed-in board visit now calls `/api/auth/me` and
+  `/api/me/profile`, which wakes Neon. Watch Neon Free's 100 compute-hours
+  a month (shared with the collector).
+- Backblaze B2 free tier: 10 GB, plus daily free caps on API calls.
+  Without a card, going over blocks requests instead of billing. Each
+  autofill downloads the resume (one download call). Fine for a few users;
+  check B2 "Caps & Alerts" before opening sign-ups.
+- Listing sharing is open to every signed-in user (`SHARING_OPEN` default
+  true, 3000 listings/user/day). Links must be on the page's own site or a
+  known ATS, but a user could still push junk listings from their own
+  site. Consider turning it off, or allowlisting sharers.
+- `SIGNUP_ALLOWLIST`, `OWNER_SUBS` and `MAX_USERS` are not set (MAX_USERS
+  defaults to 500). The owner usage panel needs `OWNER_SUBS`.
+- Secrets exposure: `DATA_KEYS` and the B2 application key each appeared
+  once on screen during setup; those screenshots are in the setup chat's
+  history on the owner's PC. Low risk, but you can rotate:
+  `DATA_KEYS=1:<old>,2:<new>` (old values re-encrypt on next write), and
+  make a new B2 key and delete the old one.
+- The Vercel Rust runtime is in beta; cold-start time and binary size were
+  never measured.
+- The resume parser is rule-based (`crates/accounts/src/parser/`):
+  two-column PDFs and unusual layouts parse poorly; scanned PDFs give
+  "no text".
+- Extension distribution is load-unpacked (developer mode warning, manual
+  updates). The Chrome Web Store ($5 once) would fix both.
+
+**Code / repo hygiene**
+- `web/dist` is committed although Vercel rebuilds it. It's noisy in
+  diffs; consider removing it from git.
+- Profile page: for an account saved before the `board` field existed, the
+  Save button can show as enabled before any edit (the draft adds empty
+  board defaults). Harmless; clears after one save.
+- The Welcome step 1 embeds the full Resumes page, so its heading repeats.
+- Old worktrees under `.claude/worktrees/` (incl. an abandoned separate
+  `extension-autofill/` draft in `priceless-leakey-117b83`) can be removed.
+- The level rework (`6e70b61`: seniority read from posting text, 12 boards
+  moved to cloud collectors) is now live on `main`; watch the next collect
+  runs for count changes.
+- The TikTok/ByteDance collector (`claude/exciting-leavitt-975106`) is still
+  unmerged and was cut from an older `main`; expect conflicts in
+  `src/config.js`.
+- The live extension test scripts used during setup weren't saved in the
+  repo (only `test/extension-autofill-live.cjs`, which uses a stub API).
+  Recreate them from the "How to test locally" notes above.
+
 ---
 
 ## What this is
