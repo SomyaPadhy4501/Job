@@ -6,6 +6,7 @@
     TTL = 10 * 60_000;
   let revision = 0;
   const popup = chrome.runtime.getURL('popup.html');
+  const previewPage = chrome.runtime.getURL('preview.html');
   function origin(url) {
     const u = new URL(url);
     if (
@@ -57,7 +58,8 @@
   }
   async function handle(msg, sender) {
     if (sender.id !== chrome.runtime.id) throw new Error('Unsupported sender.');
-    const isPopup = sender.url === popup;
+    // The extension's own pages: the popup, and the resume preview tab.
+    const isPopup = sender.url === popup || sender.url.startsWith(previewPage);
     const url = new URL(sender.url);
     // Pages may ask only from the four ATS hosts, or from a site you allowed
     // with "Autofill this page" in the popup (an optional host permission).
@@ -79,6 +81,16 @@
       });
       revision++;
       await chrome.storage.session.remove(CACHE);
+      return {};
+    }
+    // "Preview" beside a resume in the panel: opens the file in a new tab,
+    // next to the application. The tab fetches it itself (preview.js).
+    if (msg.type === 'autofill:previewResume') {
+      if (typeof msg.id !== 'string' || !/^[a-z0-9_-]{1,128}$/i.test(msg.id)) throw new Error('Invalid resume.');
+      await chrome.tabs.create({
+        url: previewPage + '#' + encodeURIComponent(msg.id),
+        ...(sender.tab ? { index: sender.tab.index + 1, openerTabId: sender.tab.id } : {}),
+      });
       return {};
     }
     // ─── The job site password (one, chosen by the user) ─────────────────
