@@ -33,16 +33,39 @@
     if (value) node.textContent = value;
     return node;
   };
+  // Light theme. Every element sets its own display, spacing and line height,
+  // so nothing about the page around it can stack or squash the text.
   const style = element(
     'style',
     (framed
       ? ':host{all:initial;display:block;position:relative;width:max-content;max-width:100%;margin:0 0 12px auto;'
-      : ':host{all:initial;position:fixed;right:16px;bottom:16px;') +
-      'z-index:2147483647;color:#182430;font:14px/1.45 system-ui,sans-serif}' +
-      '*{box-sizing:border-box}button,select{font:inherit;padding:.45rem .65rem;border:1px solid #aebac5;border-radius:5px;background:white;color:inherit}' +
-      'button{cursor:pointer}button:disabled{opacity:.55;cursor:default}button.main{background:#174464;color:white}' +
-      'section{background:white;border:1px solid #9cabb7;border-radius:10px;padding:14px;width:min(360px,90vw);max-height:70vh;overflow:auto;box-shadow:0 3px 18px #0003}' +
-      'label,select{display:block;width:100%;margin-bottom:6px}h2{font-size:16px;margin:0}ul{padding-left:18px;margin:6px 0}li{overflow-wrap:anywhere}li label{display:inline}.close{float:right}p{margin:8px 0}'
+      : ':host{all:initial;position:fixed;right:20px;bottom:20px;') +
+      'z-index:2147483647}' +
+      '*{box-sizing:border-box;margin:0;padding:0;position:static;float:none;height:auto;min-height:0;max-width:100%;' +
+      'font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;line-height:1.45;' +
+      'letter-spacing:normal;text-transform:none;text-align:left;color:#1a1d26;background:none;border:0}' +
+      '[hidden]{display:none!important}' +
+      'section,.card{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid #e6e8ee;border-radius:14px;' +
+      'padding:16px;width:min(380px,92vw);max-height:75vh;overflow:auto;box-shadow:0 12px 32px rgba(15,23,42,.14)}' +
+      '.head{display:flex;justify-content:space-between;align-items:center;gap:8px}' +
+      'h2{display:block;font-size:15px;font-weight:700}' +
+      'p{display:block;color:#6b7280;font-size:12.5px}' +
+      'label{display:block;font-size:12px;font-weight:600;color:#6b7280}' +
+      'select{display:block;width:100%;padding:8px 10px;border:1px solid #d4d7e0;border-radius:8px;background:#fff;cursor:pointer}' +
+      'button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border:1px solid #d4d7e0;' +
+      'border-radius:8px;background:#fff;font-weight:600;cursor:pointer}' +
+      'button:hover{border-color:#a5a9b8}button:disabled{opacity:.55;cursor:default}' +
+      'button.main{background:#7c3aed;border-color:#7c3aed;color:#fff}button.main:hover{background:#6d28d9}' +
+      'button.ghost{background:#fff;color:#5b21b6;border-color:#ddd6fe}' +
+      '.close{padding:4px 10px;font-weight:500;color:#6b7280}' +
+      ':host>button.main{border-radius:999px;padding:10px 18px;box-shadow:0 6px 18px rgba(124,58,237,.35)}' +
+      'strong{display:block;margin-top:4px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#5b21b6}' +
+      'ul{display:flex;flex-direction:column;gap:6px;list-style:none}' +
+      'li{display:block;padding:8px 10px;border:1px solid #eef0f4;border-radius:8px;background:#fafbfd;overflow-wrap:anywhere}' +
+      'li br{display:none}' +
+      'li label,.check{display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;color:#1a1d26}' +
+      'input[type=checkbox]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#7c3aed;border:1px solid #a5a9b8}' +
+      '.row{display:flex;gap:8px;flex-wrap:wrap}.ok{color:#047857}'
   );
   const open = element('button', 'Autofill'),
     panel = element('section');
@@ -61,7 +84,10 @@
     results = element('div'),
     save = element('button', 'Save my answers');
   status.setAttribute('role', 'status');
-  panel.append(close, element('h2', 'Application autofill'), status, label, picker, fill, results, save);
+  const head = element('div');
+  head.className = 'head';
+  head.append(element('h2', 'Application autofill'), close);
+  panel.append(head, status, label, picker, fill, results, save);
   shadow.append(style, panel, open);
   function mount() {
     if (host.isConnected || !document.body) return;
@@ -391,6 +417,126 @@
       }
     }
   };
+  // ─── After you submit: offer to save the new answers ─────────────────────
+  // Watches passively (never blocks or delays anything). When you submit an
+  // application yourself, the custom questions you answered that aren't in
+  // your answer bank yet are held for a few minutes, so the offer survives a
+  // page change, then shown as a small card. Nothing is sent until you click
+  // Save.
+  function companyName() {
+    const parts = location.pathname.split('/').filter(Boolean);
+    if (ats === 'ashby' || ats === 'lever') return parts[0] || '';
+    if (ats === 'greenhouse')
+      return new URLSearchParams(location.search).get('for') || (parts[0] !== 'embed' ? parts[0] : '') || '';
+    if (ats === 'workday') return location.hostname.split('.')[0];
+    return location.hostname.replace(/^(?:www|careers|jobs|apply)\./, '').split('.')[0];
+  }
+  function newAnswers() {
+    if (!account) return [];
+    const seen = new Set();
+    return adapter
+      .collect()
+      .filter((d) => F.classify(d).kind === 'question' && d.label)
+      .map((d) => ({ question: F.clean(d.label).slice(0, 500), answer: F.clean(adapter.answer(d) || '').slice(0, 4000) }))
+      .filter((a) => {
+        if (!a.answer || seen.has(a.question)) return false;
+        seen.add(a.question);
+        return F.savedAnswer(a.question, account.answers || []) !== a.answer;
+      });
+  }
+  let held = false;
+  function onSubmitLike(e) {
+    if (!e.isTrusted || busy || held) return;
+    if (e.type === 'click') {
+      const b = e.target?.closest?.('button,input[type=submit],[role=button]');
+      const words = (b?.textContent || b?.value || b?.getAttribute?.('aria-label') || '').trim();
+      if (!b || !/\b(?:submit|send)\b.*\b(?:application)?|^apply$/i.test(words)) return;
+    }
+    const answers = newAnswers();
+    if (!answers.length) return;
+    held = true;
+    chrome.runtime
+      .sendMessage({ type: 'autofill:holdAnswers', answers, company: companyName() })
+      .catch(() => {});
+    // Single-page forms (Ashby) stay on this document: offer here shortly.
+    setTimeout(offerHeld, 2500);
+  }
+  window.addEventListener('submit', onSubmitLike, true);
+  document.addEventListener('click', onSubmitLike, true);
+
+  let offered = false;
+  async function offerHeld() {
+    if (offered || window !== window.top && !document.querySelector('form')) return;
+    let pending;
+    try {
+      pending = await api('takeAnswers');
+    } catch {
+      return;
+    }
+    if (!pending?.answers?.length) return;
+    offered = true;
+    const card = element('div');
+    card.className = 'card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'Save your answers');
+    const n = pending.answers.length;
+    const list = element('ul');
+    const boxes = pending.answers.map((a) => {
+      const item = element('li');
+      const box = element('input');
+      box.type = 'checkbox';
+      box.checked = true;
+      const lab = element('label');
+      lab.append(box, a.question.length > 140 ? a.question.slice(0, 137) + '…' : a.question);
+      const ans = element('p', a.answer.length > 160 ? a.answer.slice(0, 157) + '…' : a.answer);
+      item.append(lab, ans);
+      list.append(item);
+      return { box, a };
+    });
+    const scope = element('label');
+    scope.className = 'check';
+    const scopeBox = element('input');
+    scopeBox.type = 'checkbox';
+    scope.append(scopeBox, pending.company ? 'Use only for ' + pending.company : 'Use only for this company');
+    const msg = element('p', 'Next time a form asks the same question, it fills in by itself.');
+    const keep = element('button', 'Save');
+    keep.className = 'main';
+    const skip = element('button', 'Not now');
+    const row = element('div');
+    row.className = 'row';
+    row.append(keep, skip);
+    const cardHead = element('div');
+    cardHead.className = 'head';
+    cardHead.append(element('h2', 'Save ' + n + (n === 1 ? ' new answer?' : ' new answers?')));
+    card.append(cardHead, msg, list, scope, row);
+    skip.onclick = (ev) => ev.isTrusted && card.remove();
+    keep.onclick = async (ev) => {
+      if (!ev.isTrusted) return;
+      const chosen = boxes.filter((b) => b.box.checked).map((b) => ({
+        ...b.a,
+        ...(scopeBox.checked && pending.company ? { company: pending.company } : {}),
+      }));
+      if (!chosen.length) return card.remove();
+      keep.disabled = skip.disabled = true;
+      try {
+        // A fresh page (after submit) hasn't loaded the account yet.
+        const binding = (account || (await api('getProfile'))).binding;
+        const { saved } = await api('saveAnswers', { answers: chosen, binding });
+        card.replaceChildren(element('h2', 'Saved ' + saved + (saved === 1 ? ' answer' : ' answers')));
+        card.querySelector('h2').className = 'ok';
+        setTimeout(() => card.remove(), 2500);
+      } catch (err) {
+        msg.textContent = err.message;
+        keep.disabled = skip.disabled = false;
+      }
+    };
+    shadow.append(card);
+    open.hidden = true;
+    panel.hidden = true;
+  }
+  // A page that follows a submit (Greenhouse's confirmation page) offers too.
+  if (window === window.top) setTimeout(offerHeld, 1500);
+
   if (ats === 'workday') {
     const observer = new MutationObserver(() => {
       if (panel.hidden || !account) return;

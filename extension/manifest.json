@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Sends the job listings a careers page loads to your own job board, and fills job applications from your profile. Personal use; load unpacked.",
   "permissions": [
     "storage",

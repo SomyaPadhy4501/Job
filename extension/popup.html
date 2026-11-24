@@ -3,60 +3,94 @@
 <head>
 <meta charset="utf-8">
 <style>
-  :root { --fg:#1f2328; --muted:#656d76; --bg:#fff; --line:#d0d7de; --ok:#1a7f37; --bad:#cf222e; --accent:#0969da; }
-  @media (prefers-color-scheme: dark) { :root { --fg:#e6edf3; --muted:#8d96a0; --bg:#0d1117; --line:#30363d; --ok:#3fb950; --bad:#f85149; --accent:#4493f8; } }
-  body { font: 13px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--bg); width: 340px; margin: 0; padding: 12px; }
-  h1 { font-size: 14px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
-  label { display: block; color: var(--muted); margin: 8px 0 3px; }
-  input[type=text], input[type=password], textarea { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); font: inherit; }
+  :root {
+    --bg: #f4f5f8; --panel: #fff; --line: #e6e8ee; --line-strong: #d4d7e0;
+    --fg: #1a1d26; --muted: #6b7280; --accent: #7c3aed; --accent-soft: #ede9fe; --accent-fg: #5b21b6;
+    --ok: #047857; --ok-bg: #d1fae5; --bad: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body { font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); width: 360px; margin: 0; }
+  header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #ec4899); }
+  header strong { font-size: 14px; }
+  main { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  h2 { font-size: 13px; margin: 0 0 4px; }
+  label { display: block; color: var(--muted); font-size: 12px; font-weight: 500; margin: 10px 0 4px; }
+  label.check { display: flex; align-items: flex-start; gap: 8px; color: var(--fg); font-weight: 400; }
+  label.check input { margin-top: 2px; accent-color: var(--accent); }
+  input[type=text], input[type=password], input[type=number], textarea, select {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 8px;
+    background: #fff; color: var(--fg); font: inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
   textarea { height: 64px; resize: vertical; }
-  button { margin-top: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .row { display: flex; gap: 6px; }
-  .log { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 180px; overflow: auto; }
+  button { padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--fg); cursor: pointer; font: inherit; font-weight: 600; }
+  button:hover { border-color: #a5a9b8; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; padding: 9px 12px; }
+  button.primary:hover { background: #6d28d9; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  #account { margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-fg); font-weight: 500; }
+  #account:empty { display: none; }
+  #fillStatus { margin: 8px 0 0; }
+  details { margin-top: 0; }
+  summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 2px 0; }
+  details[open] summary { margin-bottom: 4px; }
+  #sites .row { align-items: center; justify-content: space-between; margin-top: 6px; }
+  .log { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 160px; overflow: auto; font-size: 12px; }
   .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
-  .ok { color: var(--ok); } .bad { color: var(--bad); } .muted { color: var(--muted); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
 </style>
 </head>
 <body>
-  <h1>Job Board Capture <label style="margin:0"><input type="checkbox" id="enabled"> on</label></h1>
+  <header><span class="dot"></span><strong>US SWE Jobs</strong><span class="muted" style="margin-left:auto">Autofill</span></header>
+  <main>
+    <section class="card" aria-labelledby="autofill-title">
+      <h2 id="autofill-title">Fill an application</h2>
+      <button id="fillPage" class="primary">Autofill this page</button>
+      <button id="allowFrames" hidden style="width:100%;margin-top:8px"></button>
+      <p id="fillStatus" class="muted">Greenhouse, Lever, Ashby and Workday forms show an Autofill button by themselves. On any other site, open the application and press this once.</p>
+    </section>
 
-  <label for="portalUrl">Portal URL</label>
-  <input type="text" id="portalUrl" placeholder="https://job-two-xi.vercel.app">
-  <label for="token">Collect token</label>
-  <input type="password" id="token" placeholder="COLLECT_TOKEN">
-  <label for="boards">My boards (one careers URL per line)</label>
-  <textarea id="boards" placeholder="https://www.tesla.com/careers/search/?country=US"></textarea>
+    <section class="card" aria-labelledby="account-title">
+      <h2 id="account-title">Your account</h2>
+      <p id="account" role="status"></p>
+      <label for="portalUrl">Job board address</label>
+      <input type="text" id="portalUrl" placeholder="https://job-two-xi.vercel.app">
+      <label for="autofillToken">Autofill token (from the site's Autofill page)</label>
+      <input type="password" autocomplete="off" id="autofillToken" placeholder="jbt_…">
+      <div class="row"><button id="connect">Connect</button><button id="disconnect">Disconnect</button></div>
+      <label for="defaultResume">Default resume when jobs match equally</label>
+      <select id="defaultResume" disabled></select>
+      <label class="check" title="When you browse a careers page (Tesla, company sites), the job listings it loads are added to the job board for everyone. Only public listings: never application forms, sign-in pages or LinkedIn/Indeed/Glassdoor.">
+        <input type="checkbox" id="shareListings"> Share job listings I browse with the job board
+      </label>
+      <details id="sitesBox" hidden>
+        <summary>Sites you allowed</summary>
+        <div id="sites"></div>
+      </details>
+    </section>
 
-  <label><input type="checkbox" id="autoOpen"> Open my boards automatically every
-    <input type="number" id="autoEveryHours" min="1" max="24" style="width:56px;display:inline"> hours</label>
-  <label><input type="checkbox" id="autoClose"> Close the window when done</label>
-  <label title="These sites ban automated collection and restrict accounts for it. When on, the extension only reads job lists on pages you open yourself — it never opens these sites on a schedule or sends them extra requests."><input type="checkbox" id="allowSensitive"> Capture LinkedIn / Indeed / Glassdoor pages I browse <span class="muted">(account risk)</span></label>
-  <div class="muted" id="lastRun"></div>
-
-  <div class="row">
-    <button id="save">Save</button>
-    <button id="open" class="primary">Open my boards</button>
-  </div>
-
-  <div class="log" id="log"><span class="muted">No captures yet. Open a careers page.</span></div>
-  <section aria-labelledby="autofill-title">
-    <h2 id="autofill-title">Autofill</h2>
-    <label for="autofillToken">Personal autofill token</label>
-    <input type="password" autocomplete="off" id="autofillToken">
-    <div class="row"><button id="connect">Connect</button><button id="disconnect">Disconnect</button></div>
-    <p id="account" role="status"></p>
-    <label for="defaultResume">Default resume for equally matching jobs</label>
-    <select id="defaultResume" disabled></select>
-    <label title="When you browse a careers page (Tesla, company sites), the job listings it loads are sent to the job board so everyone can find them. Only public listings: never application forms, sign-in pages or LinkedIn/Indeed/Glassdoor."><input type="checkbox" id="shareListings"> Share job listings I browse with the job board</label>
-    <button id="fillPage" class="primary">Autofill this page</button>
-    <button id="allowFrames" hidden></button>
-    <p id="fillStatus" class="muted" role="status">Greenhouse, Lever, Ashby and Workday forms show an Autofill button by themselves. On any other site (Tesla, Amazon, company career sites), open the application form and press this once; Chrome asks before the extension can use that site.</p>
-    <details id="sitesBox" hidden>
-      <summary>Sites you allowed</summary>
-      <div id="sites"></div>
+    <details class="card">
+      <summary>Advanced: job collection (site owner)</summary>
+      <label class="check"><input type="checkbox" id="enabled"> Capture listings on careers pages</label>
+      <label for="token">Collect token</label>
+      <input type="password" id="token" placeholder="COLLECT_TOKEN">
+      <label for="boards">My boards (one careers URL per line)</label>
+      <textarea id="boards" placeholder="https://www.tesla.com/careers/search/?country=US"></textarea>
+      <label class="check"><input type="checkbox" id="autoOpen"> Open my boards automatically every
+        <input type="number" id="autoEveryHours" min="1" max="24" style="width:56px;display:inline;padding:2px 6px"> hours</label>
+      <label class="check"><input type="checkbox" id="autoClose"> Close the window when done</label>
+      <label class="check" title="These sites ban automated collection and restrict accounts for it. When on, the extension only reads job lists on pages you open yourself."><input type="checkbox" id="allowSensitive"> Capture LinkedIn / Indeed / Glassdoor pages I browse (account risk)</label>
+      <div class="muted" id="lastRun"></div>
+      <div class="row">
+        <button id="save">Save</button>
+        <button id="open">Open my boards</button>
+      </div>
+      <div class="log" id="log"><span class="muted">No captures yet.</span></div>
     </details>
-  </section>
+  </main>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -130,7 +130,10 @@
       '(?:require|need) (?:employment |employer |immigration |visa |work visa )?sponsorship(?: ' +
       time +
       ')?' +
-      '(?: for (?:an? )?(?:employment visa status|work visa)| (?:to work|for employment) in (?:the )?(?:us|united states)| to work at [\\w.-]+)?$'
+      '(?: for (?:an? )?(?:employment visa status|work visa)| (?:to work|for employment) in (?:the )?(?:us|united states)| to work at [\\w.-]+)?' +
+      // "...in this country" / "...where the job is located": every job on
+      // this board is in the US, so these mean the US (marked "check it").
+      '(?: in (?:this country|the country where (?:the|this) (?:job|role|position) is located))?$'
   );
   // "Will you require Stripe to sponsor you for a US work permit now or in
   // the future?": the employer named in the middle. US (or no country) only;
@@ -155,7 +158,7 @@
       };
     }
     if (
-      /^are you (?:currently )?(?:legally )?(?:authori[sz]ed|eligible) to work in (?:the )?(?:us|united states(?: of america)?)$/.test(
+      /^are you (?:currently )?(?:legally )?(?:authori[sz]ed|eligible) to work in (?:(?:the )?(?:us|united states(?: of america)?)|this country|the country where (?:the|this) (?:job|role|position) is located)$/.test(
         q
       )
     )

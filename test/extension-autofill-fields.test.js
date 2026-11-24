@@ -284,3 +284,19 @@ test('"require <employer> to sponsor you" wording: US or unstated only, timefram
   ])
     assert.notEqual(F.classify(radio(q)).kind, 'sponsorship', q);
 });
+
+test('"this country" and "the country where the job is located" read as the US; named countries stay blank', () => {
+  const profile = { workAuth: { authorizedUS: true, requiresSponsorshipNow: false, requiresSponsorshipFuture: true } };
+  const yesno = (label) => ({ label, type: 'yesno', options: ['Yes', 'No'] });
+  assert.deepEqual(F.resolve(yesno('Are you authorized to work in the country where the job is located?'), profile), ['Yes']);
+  assert.deepEqual(F.resolve(yesno('Are you legally authorized to work in this country?'), profile), ['Yes']);
+  assert.deepEqual(
+    F.resolve(yesno('Will you now or in the future require sponsorship for employment visa status in this country?'), profile),
+    ['Yes']
+  );
+  for (const q of [
+    'Are you authorized to work in Canada?',
+    'Will you now or in the future require sponsorship for employment visa status in Canada?',
+  ])
+    assert.deepEqual(F.resolve(yesno(q), profile), [], q);
+});

@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const defaults = { enabled: true, portalUrl: '', token: '', boards: [], autoOpen: true, autoEveryHours: 3, autoClose: true, allowSensitive: false, lastRunAt: '', log: [] };
+const defaults = { enabled: true, portalUrl: 'https://job-two-xi.vercel.app', token: '', boards: [], autoOpen: true, autoEveryHours: 3, autoClose: true, allowSensitive: false, lastRunAt: '', log: [] };
 
 function renderLog(log) {
   if (!log.length) return;
@@ -79,9 +79,11 @@ async function showConnection() {
 }
 async function configure(token) {
   try {
-    const settings = await chrome.storage.local.get('portalUrl');
-    if (token && $('portalUrl').value.trim().replace(/\/+$/, '') !== settings.portalUrl) {
-      throw new Error('Save the portal URL first.');
+    // Connecting saves the job board address too: one button, no separate Save.
+    const portal = $('portalUrl').value.trim().replace(/\/+$/, '');
+    if (token) {
+      if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(portal)) throw new Error('Enter the job board address (https://…).');
+      await chrome.storage.local.set({ portalUrl: portal });
     }
     await autofill('configure',{token});
     await chrome.storage.local.remove('autofillDefault');

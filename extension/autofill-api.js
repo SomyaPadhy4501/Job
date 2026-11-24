@@ -69,6 +69,25 @@
       await chrome.storage.session.remove(CACHE);
       return {};
     }
+    // Answers typed into an application, held between "submit" and the next
+    // page so the save prompt survives a page change. Per tab, 30 minutes.
+    if (msg.type === 'autofill:holdAnswers' || msg.type === 'autofill:takeAnswers') {
+      const key = 'pendingAnswers:' + sender.tab.id;
+      if (msg.type === 'autofill:takeAnswers') {
+        const held = (await chrome.storage.session.get(key))[key];
+        await chrome.storage.session.remove(key);
+        return held && Date.now() - held.at < 30 * 60_000 ? held : null;
+      }
+      const answers = (Array.isArray(msg.answers) ? msg.answers : [])
+        .filter((a) => typeof a?.question === 'string' && typeof a?.answer === 'string')
+        .slice(0, 50)
+        .map((a) => ({ question: a.question.slice(0, 500), answer: a.answer.slice(0, 4000) }));
+      if (answers.length)
+        await chrome.storage.session.set({
+          [key]: { answers, company: String(msg.company || '').slice(0, 100), at: Date.now() },
+        });
+      return {};
+    }
     const auth = await credentials();
     if (!auth?.token || auth.origin !== origin(portalUrl))
       throw new Error('Connect the autofill token for this portal in the extension popup.');
@@ -140,10 +159,13 @@
     }
     if (msg.type === 'autofill:saveAnswers') {
       if (!Array.isArray(msg.answers) || !msg.answers.length) throw new Error('Choose answers to save.');
-      const answers = msg.answers.map(({ question, answer }) => {
+      const answers = msg.answers.map(({ question, answer, company }) => {
         if (typeof question !== 'string' || typeof answer !== 'string' || !question.trim() || !answer.trim())
           throw new Error('Invalid answer.');
-        return { question, answer };
+        // An answer with a company is used for that company only.
+        return typeof company === 'string' && company.trim()
+          ? { question, answer, company: company.trim().slice(0, 100) }
+          : { question, answer };
       });
       const result = await (
         await request('answers', {
