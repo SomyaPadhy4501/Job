@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use accounts::token::ct_eq;
 
 use crate::AppState;
-use crate::chat::{self, Channel, Incoming, MENU, Reply};
+use crate::chat::{self, Channel, Incoming, MENU, Menu, Reply};
 use crate::error::{ApiError, ApiResult};
 
 pub const SECRET_HEADER: &str = "x-telegram-bot-api-secret-token";
@@ -182,16 +182,18 @@ fn markup(state: &AppState, reply: &Reply) -> Option<Value> {
         }
         return Some(json!({ "inline_keyboard": rows }));
     }
-    reply.menu.then(|| {
-        json!({
+    match reply.menu {
+        Menu::Leave => None,
+        Menu::Hide => Some(json!({ "remove_keyboard": true })),
+        Menu::Show => Some(json!({
             "keyboard": MENU
                 .iter()
                 .map(|row| row.iter().map(|label| json!({ "text": label })).collect::<Vec<_>>())
                 .collect::<Vec<_>>(),
             "resize_keyboard": true,
             "is_persistent": true,
-        })
-    })
+        })),
+    }
 }
 
 #[cfg(test)]
@@ -211,7 +213,7 @@ mod tests {
                 url: "https://x.example/?a=1&b=\"2\"".into(),
             }],
             foot: String::new(),
-            menu: false,
+            menu: Menu::Leave,
         };
         assert_eq!(
             html(&reply),

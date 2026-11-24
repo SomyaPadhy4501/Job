@@ -101,8 +101,18 @@ pub struct Reply {
     pub head: String,
     pub jobs: Vec<JobCard>,
     pub foot: String,
-    /// Show the menu ([`MENU`]) under the message.
-    pub menu: bool,
+    /// What happens to the menu ([`MENU`]) under the message box.
+    pub menu: Menu,
+}
+
+/// The menu stays once shown, so a reply shows it, hides it, or leaves it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Menu {
+    #[default]
+    Leave,
+    Show,
+    /// The chat was unlinked: the menu's commands no longer work.
+    Hide,
 }
 
 impl Reply {
@@ -126,8 +136,8 @@ impl Reply {
         text
     }
 
-    fn with_menu(mut self) -> Self {
-        self.menu = true;
+    fn with_menu(mut self, menu: Menu) -> Self {
+        self.menu = menu;
         self
     }
 }
@@ -248,7 +258,7 @@ pub async fn handle(state: &AppState, msg: &Incoming<'_>) -> ApiResult<Reply> {
     let site = &state.config.notify.site_url;
     Ok(match command {
         Command::Link(_) => unreachable!("handled above"),
-        Command::Help => Reply::from(HELP).with_menu(),
+        Command::Help => Reply::from(HELP).with_menu(Menu::Show),
         Command::Jobs => jobs_reply(state, user.id).await?,
         Command::Alerts => alerts_reply(state, user.id).await?.into(),
         Command::Pause => {
@@ -282,7 +292,8 @@ pub async fn handle(state: &AppState, msg: &Incoming<'_>) -> ApiResult<Reply> {
         Command::Unlink => {
             db::chat::unlink_chat(pool, user.id, msg.channel.as_str()).await?;
             db::audit(pool, Some(user.id), "chat_unlink").await?;
-            "This chat is disconnected. Link it again from the Alerts page.".into()
+            Reply::from("This chat is disconnected. Link it again from the Alerts page.")
+                .with_menu(Menu::Hide)
         }
     })
 }
@@ -325,7 +336,7 @@ async fn link(
     Ok(Reply::from(format!(
         "Linked. Alerts set to Telegram will arrive here.\n\n{HELP}"
     ))
-    .with_menu())
+    .with_menu(Menu::Show))
 }
 
 async fn jobs_reply(state: &AppState, user_id: Uuid) -> ApiResult<Reply> {
@@ -378,7 +389,7 @@ async fn jobs_reply(state: &AppState, user_id: Uuid) -> ApiResult<Reply> {
         jobs: cards,
         foot: "Tap “Queue” under a job, or send /apply <number>, to add it to your apply queue."
             .into(),
-        menu: false,
+        menu: Menu::Leave,
     })
 }
 
@@ -508,7 +519,7 @@ mod tests {
                 url: "https://acme.example/7".into(),
             }],
             foot: "Bye.".into(),
-            menu: false,
+            menu: Menu::Leave,
         };
         assert_eq!(
             reply.plain(),

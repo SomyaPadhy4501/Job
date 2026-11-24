@@ -2499,6 +2499,13 @@ async fn telegram_links_one_account_per_chat_and_answers_commands() {
     assert!(reply(&res).contains("isn’t linked"));
     let res = say(&mut hook, chat_b, "private", "/alerts", HOOK).await;
     assert!(reply(&res).contains("B's alert"), "B is still linked");
+    let res = say(&mut hook, chat_b, "private", "/unlink", HOOK).await;
+    assert!(reply(&res).contains("disconnected"), "{}", reply(&res));
+    assert_eq!(
+        res.json()["reply_markup"]["remove_keyboard"],
+        true,
+        "unlinking hides the menu"
+    );
 
     // Leave no due alerts behind for the next run of the alert-run test.
     for who in [&mut a, &mut b] {
