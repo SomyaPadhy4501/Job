@@ -193,7 +193,7 @@ function fakeApi(pagesByOffset, count) {
   return { post, calls };
 }
 
-test('bytedance: fetchCompany reads every US page and keeps only rows normalize would keep', async () => {
+test('bytedance: fetchCompany reads every US page and keeps rows that pass the title gates', async () => {
   const SENIOR = { ...BD_ROW, id: '7617931526848104001', title: 'Senior Backend Software Engineer - Platforms' };
   const NOT_SOFTWARE = { ...BD_ROW, id: '7710034115379005749', title: 'Ops Communications Leader' };
   // An intern posting whose title doesn't say so: the recruit type catches it.
@@ -209,7 +209,8 @@ test('bytedance: fetchCompany reads every US page and keeps only rows normalize 
   );
   const rows = await bd.fetchCompany(TIKTOK, { post, delayMs: 0 });
 
-  assert.deepStrictEqual(rows.map((r) => r.external_id), [TT_GRAD.id, BD_ROW.id]);
+  // SENIOR passes the title gate: normalize's levelVerdict reads its posting.
+  assert.deepStrictEqual(rows.map((r) => r.external_id), [TT_GRAD.id, SENIOR.id, BD_ROW.id]);
   assert.strictEqual(calls[0].path, '/config/job/filters');
   const searches = calls.filter((c) => c.path === '/search/job/posts');
   assert.deepStrictEqual(searches.map((c) => c.body.offset).sort((a, b) => a - b), [0, 3, 6]);

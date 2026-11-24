@@ -113,12 +113,13 @@ function isGraduateProgram(p) {
 // vendor, not by TikTok or ByteDance.
 const NOT_EMPLOYEE = /intern|third[\s-]?party/i;
 
-function keep(p, employer) {
+function keep(p) {
   if (!p?.id || !p.title) return false;
   if (!isUS(countryOf(p.city_info))) return false;
   if (NOT_EMPLOYEE.test(nameOf(p.recruit_type))) return false;
   if (CONFIG.filterSoftwareOnly && !looksSoftware(p.title)) return false;
-  return passesLevel(p.title, CONFIG.entryLevelMode || 'permissive', employer);
+  // Seniority words pass here so normalize can judge them from the posting text.
+  return passesLevel(p.title, CONFIG.entryLevelMode || 'permissive');
 }
 
 // Pure field mapping, split out so it can be regression-tested without network.
@@ -160,7 +161,7 @@ function request(company, path, body) {
 
 // `post` and `delayMs` are injectable so the paging can be tested offline.
 async function fetchCompany(company, { post, delayMs = PAGE_DELAY_MS } = {}) {
-  const { slug, displayName, apiBase, websitePath, applyUrlBase } = company;
+  const { slug, apiBase, websitePath, applyUrlBase } = company;
   if (!apiBase || !websitePath || !applyUrlBase) {
     throw new Error(`bytedance entry "${slug}" missing apiBase/websitePath/applyUrlBase`);
   }
@@ -217,7 +218,7 @@ async function fetchCompany(company, { post, delayMs = PAGE_DELAY_MS } = {}) {
 
   // Two postings were listed on both sites on 2026-11-23, and both were years
   // old. A shared one would come through once under each employer.
-  return [...byId.values()].filter((p) => keep(p, displayName)).map((p) => mapPosting(p, company));
+  return [...byId.values()].filter((p) => keep(p)).map((p) => mapPosting(p, company));
 }
 
 module.exports = {
