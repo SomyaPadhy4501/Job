@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { JobRow, JobsHead, TableState, PostedCell, LevelPill, RestrictionPill, ROLE_LABEL } from './JobsTable.jsx';
+import { JobRow, JobsHead, TableState, PostedCell, LevelPill, RestrictionPill, QueueButton, ROLE_LABEL } from './JobsTable.jsx';
 import { useCompanyJobs } from '../hooks/useJobs.js';
 import { webHref } from '../safe-url.js';
 
@@ -35,6 +35,7 @@ function NewestJobCells({ job }) {
         <span className="role-title">{job.job_title}</span>
         <span className="pill">{ROLE_LABEL[job.role_type] || job.role_type}</span>
         <LevelPill row={job} />
+        <QueueButton jobId={job.id} />
       </span>
       <span className="muted">{job.location || '—'}</span>
       <span className="sponsor-cell">

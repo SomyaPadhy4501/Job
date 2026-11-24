@@ -1,4 +1,6 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { webHref } from '../safe-url.js';
+import { api, useAccount } from '../account.js';
 
 const ROLE_LABEL = {
   SWE: 'SWE',
@@ -129,6 +131,37 @@ function RestrictionPill({ row }) {
   );
 }
 
+// One click from the board into the apply queue. Signed-in users only: the
+// queue is private. The server answers `added: false` when it was already there.
+function QueueButton({ jobId }) {
+  const { data: account } = useAccount();
+  const qc = useQueryClient();
+  const add = useMutation({
+    mutationFn: () => api('/api/me/queue', { method: 'POST', body: { jobId } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['queue'] }),
+  });
+  if (!account?.user) return null;
+  let label = 'Add to queue';
+  if (add.isPending) label = 'Adding…';
+  else if (add.isSuccess) label = add.data?.added === false ? 'In your queue' : 'Queued';
+  else if (add.isError) label = 'Try again';
+  return (
+    <button
+      type="button"
+      className="btn btn-small btn-ghost nowrap"
+      disabled={add.isPending || add.isSuccess}
+      title={add.isError ? add.error.message : undefined}
+      onClick={(e) => {
+        // Inside a company group the whole row toggles it open.
+        e.stopPropagation();
+        add.mutate();
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 // One job as a table row. Shared by the flat list and the expanded company
 // groups; `hideCompany` drops the company cell inside a group, where the
 // company is already the group header.
@@ -144,6 +177,7 @@ export function JobRow({ row: r, hideCompany = false }) {
         <div className="role-cell">
           <span className="role-title">{r.job_title}</span>
           <LevelPill row={r} />
+          <QueueButton jobId={r.id} />
         </div>
       </td>
       <td>
@@ -208,7 +242,7 @@ export function TableState({ error, isLoading, empty, emptyText }) {
   return null;
 }
 
-export { PostedCell, LevelPill, RestrictionPill, ROLE_LABEL };
+export { PostedCell, LevelPill, RestrictionPill, QueueButton, ROLE_LABEL };
 
 export default function JobsTable({ rows, isLoading, error }) {
   const state = (
