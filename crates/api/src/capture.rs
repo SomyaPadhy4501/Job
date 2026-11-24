@@ -9,11 +9,9 @@
 //! with the collect token, server to server. The usual normalize filters
 //! (US, software, level) then run on everything, as for any other source.
 //!
-//! The owner's own Workday collection (extension/workday-collect.js) comes
-//! here too, so no extension ever holds the collect token: rows from a
-//! Workday page must link to Workday, are stored as source `workday` (the
-//! same rows the server collector made) and have their own daily count. An
-//! owner (`OWNER_SUBS`) isn't counted at all.
+//! Rows shared from a Workday careers page must link to Workday, are stored as
+//! source `workday` (the same rows the server collector makes) and have their
+//! own daily count. An owner (`OWNER_SUBS`) isn't counted at all.
 
 use axum::Json;
 use axum::extract::State;

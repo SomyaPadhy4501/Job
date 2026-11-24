@@ -279,27 +279,16 @@ General → Login Items so it starts with the machine.
 
 ## Workday employers (site owner)
 
-Workday's Cloudflare answers the server collector's requests with HTTP 429
-(since 2026-11-24), so the extension can read the Workday employers instead.
-Turn on **Collect Workday employers from this computer** under Advanced (it
-asks Chrome for access to `*.myworkdayjobs.com`), with your account connected
-(the Autofill token). The rows go to `/api/capture/jobs` as that account; the
-server forwards them as source `workday` with its own collect token, so no
-browser holds it. Workday rows have their own daily count per account
-(`WORKDAY_SHARES_PER_USER_PER_DAY`, default 20,000); an `OWNER_SUBS` account
-isn't counted.
+The extension no longer collects Workday employers (removed in 1.21.2). The
+server reads them from GitHub Actions again: Workday's Cloudflare refused
+Node's `fetch`, not the server, and `src/collectors/http.js` now sends Workday
+requests through Node's `https` module. The hand-configured employers run with
+every collect; the ~1,250 found by `scripts/discover-workday.js` run twice a
+day (`workday-wide.yml`), and that list is refreshed monthly
+(`discover-workday.yml`). Updating removes the old Workday settings and alarm.
 
-- Every 6 hours, in the background: no windows or tabs open.
-- The employer list is `/downloads/workday-tenants.json`, built from
-  `src/config.js` at each deploy, so new employers need no extension update.
-- One request at a time, one a second, the same calls each careers site makes
-  (`workday-collect.js`). A run of ~256 employers takes about an hour.
-- Only US, technical postings from the last 14 days are sent, as source
-  `workday` (the server filters them again). Descriptions are read for up to
-  40 postings per employer, and never twice for the same posting.
-- The first 429, 403 or block page ends the run until the next one, so your
-  own Workday sign-ins aren't put at risk. The popup shows the last run.
-- **Run Workday now** starts one immediately.
+Listings shared while browsing a Workday careers page still go through
+`/api/capture/jobs` and are stored as source `workday`.
 
 ## Privacy
 

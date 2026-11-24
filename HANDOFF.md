@@ -5,6 +5,11 @@ this codebase. It exists so you don't have to re-derive context.
 
 ---
 
+### Done 2026-11-24 (Workday back on the server; extension no longer collects it)
+- The 429s were Workday's Cloudflare refusing Node's `fetch` (undici), from GitHub's runners and a home connection alike; the same request through Node's `https` module with the same user agent gets JSON. `src/collectors/http.js` sends `myworkdayjobs.com` through `nodeFetch` (`NODE_HTTP_PLATFORMS`); tests that fake `fetch` clear that set.
+- `scripts/discover-workday.js` finds every Workday tenant in Common Crawl, checks each live (one software search, one posting for the employer's legal name) and writes `src/data/workday-discovered.json` (1,244 employers on 2026-11-24, after the usual exclusions). `src/config.js` loads them as `cadence: 'wide'`, search-only entries; `workday-wide.yml` collects them twice a day, `discover-workday.yml` refreshes the list monthly.
+- Extension: Workday collection removed (`workday-collect.js`, popup controls, `AutofillShareReady`, `workday-tenants.json`); an update clears its stored settings and alarm.
+
 ### Done 2026-11-24 (Workday login on the server) — needs migration 010 before deploy
 - One Workday email + password per user, set on the Autofill page ("Workday accounts" card, `web/src/components/WorkdayLogin.jsx`: generate, save, remove; the password is never shown again). Stored as encrypted `{email, password}` JSON (`Field::WorkdayLogin`, bound to the user id) in `workday_logins` (`migrations/010_workday_login.sql`). Routes in `crates/api/src/workday_login.rs`:
   - `GET /api/me/workday-login` → `{ email, set, updatedAt }` (no password); `PUT` `{ email, password? }` (password 12–128 chars with upper, lower, digit and symbol; left out = keep the saved one, required when none is saved); `DELETE` → `{ ok: true }`. Session + CSRF like every `/api/me/*` route.

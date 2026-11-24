@@ -1,7 +1,7 @@
 // Service worker: de-duplicates captured rows, posts them to the portal's
 // /admin/ingest in batches, keeps a short capture log for the popup, and opens
 // the saved boards once a day.
-importScripts('schedule.js', 'application-pages.js', 'gmail.js', 'autofill-api.js', 'updates.js', 'workday-collect.js');
+importScripts('schedule.js', 'application-pages.js', 'gmail.js', 'autofill-api.js', 'updates.js');
 
 // The toolbar icon opens the extension in Chrome's side panel (docked on the
 // right, and it stays open while you switch tabs) instead of a popup.
@@ -56,13 +56,7 @@ const defaults = {
   allowSensitive: false,
   lastRunAt: '',
   log: [],
-  // Workday collection (workday-collect.js): off until the owner turns it on
-  // in the popup, which also asks Chrome for access to *.myworkdayjobs.com.
-  workdayEnabled: false,
-  workdayEveryHours: 6,
-  workdayLastRunAt: '',
 };
-const WORKDAY_ORIGINS = ['https://*.myworkdayjobs.com/*'];
 const getSettings = () => chrome.storage.local.get(defaults);
 
 // Same posting seen twice in one browser session (page re-render, second XHR)
@@ -70,11 +64,11 @@ const getSettings = () => chrome.storage.local.get(defaults);
 // upserts, so a resend only refreshes last_seen_at.
 const sentIds = new Set();
 
-async function postBatch(portalUrl, token, jobs, source = SOURCE) {
+async function postBatch(portalUrl, token, jobs) {
   const res = await fetch(new URL('/admin/ingest', portalUrl).toString(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-collect-token': token },
-    body: JSON.stringify({ source, jobs }),
+    body: JSON.stringify({ source: SOURCE, jobs }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -223,88 +217,11 @@ chrome.windows.onRemoved.addListener(async (id) => {
   if (id === boardsWindowId) await chrome.storage.local.remove(['boardsWindowId', 'autoCloseRun']);
 });
 
-// ── Workday collection ──────────────────────────────────────────────────────
-// A run is worked through by a one-minute alarm, a slice at a time
-// (workday-collect.js says why); the alarm goes once the run ends.
-function workdayDeps(s) {
-  return {
-    storage: chrome.storage.local,
-    fetch: (...a) => fetch(...a),
-    sleep,
-    clock: () => Date.now(),
-    tenantsUrl: new URL('/downloads/workday-tenants.json', s.portalUrl).toString(),
-    post: async (rows) => {
-      const total = { inserted: 0, updated: 0, rejected: 0 };
-      // An older install with the collect token still posts directly.
-      if (s.token) {
-        for (const batch of batches(rows)) {
-          const r = await postBatch(s.portalUrl, s.token, batch, 'workday');
-          for (const k of Object.keys(total)) total[k] += r[k] || 0;
-        }
-        return total;
-      }
-      // Otherwise through the connected account: the server checks it and
-      // forwards the rows as Workday's. One employer's site per request
-      // (AutofillShare splits it to the route's limits).
-      const bySite = new Map();
-      for (const row of rows) {
-        const site = new URL(row.apply_url).origin + '/';
-        if (!bySite.has(site)) bySite.set(site, []);
-        bySite.get(site).push(row);
-      }
-      for (const [site, list] of bySite) {
-        const r = await globalThis.AutofillShare(site, list);
-        total.inserted += r.inserted || 0;
-        total.updated += r.updated || 0;
-        total.rejected += (r.rejected || 0) + (r.refused || 0);
-      }
-      return total;
-    },
-  };
-}
-
-async function startWorkday() {
-  const s = await getSettings();
-  if (!s.token && !(await globalThis.AutofillShareReady())) throw new Error('Connect your account in the popup first.');
-  if (!(await chrome.permissions.contains({ origins: WORKDAY_ORIGINS }))) throw new Error('Allow Workday access in the popup first.');
-  const { workdayRun } = await chrome.storage.local.get('workdayRun');
-  if (!workdayRun) await WorkdayCollect.start(workdayDeps(s));
-  chrome.alarms.create('workdayTick', { periodInMinutes: 1 });
-  await workdayTick();
-}
-
-async function workdayTick() {
-  const s = await getSettings();
-  const result = await WorkdayCollect.tick(workdayDeps(s));
-  if (result.idle || result.done) chrome.alarms.clear('workdayTick');
-  if (result.done) {
-    const r = result.summary;
-    await addLog({
-      host: 'Workday',
-      found: r.found,
-      inserted: r.inserted,
-      updated: r.updated,
-      rejected: r.rejected,
-      ...(r.stoppedFor ? { error: `stopped after ${r.index} of ${r.total} employers: ${r.stoppedFor}` } : {}),
-    });
-  }
-}
-
 // Called on startup, on install, and by the periodic alarm. Runs when the
 // interval has passed — including straight after the machine wakes or Chrome
 // starts, if it was off when a run was due.
 async function checkSchedule() {
   const s = await getSettings();
-  // Workday sends through the connected account (or an older install's
-  // collect token); without either it waits quietly instead of logging an
-  // error every 15 minutes.
-  if (s.enabled && s.workdayEnabled && (s.token || (await globalThis.AutofillShareReady()))) {
-    const { workdayRun } = await chrome.storage.local.get('workdayRun');
-    if (workdayRun) chrome.alarms.create('workdayTick', { periodInMinutes: 1 }); // resume after a restart
-    else if (JobSchedule.isDueEvery(new Date(), s.workdayLastRunAt, s.workdayEveryHours)) {
-      await startWorkday().catch((err) => addLog({ host: 'Workday', found: 0, error: err.message }));
-    }
-  }
   // The boards' pages send through "Share job listings I browse" (or the
   // collect token), as openBoards checks.
   const { shareListings } = await chrome.storage.local.get({ shareListings: false });
@@ -322,7 +239,6 @@ async function scheduleAlarms() {
 
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === 'closeBoards') return closeBoardsWindow();
-  if (a.name === 'workdayTick') return workdayTick();
   if (a.name !== 'check') return; // updates.js handles its own alarms
   return checkSchedule();
 });
@@ -347,6 +263,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     boards: [...current, ...added],
     offeredBoards: [...new Set([...offered, ...STARTER_BOARDS, ...current])],
   });
+  // Workday collection moved to the server (1.21.2): drop what it left behind.
+  await chrome.alarms.clear('workdayTick');
+  await chrome.storage.local.remove(['workdayEnabled', 'workdayEveryHours', 'workdayLastRunAt', 'workdayRun', 'workdayTickUntil', 'workdayDescribed', 'workdayLast']);
   await scheduleAlarms();
 });
 
@@ -355,9 +274,6 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     handleJobs(msg, sender.tab?.id).finally(() => closeTabIfBoard(sender.tab?.id));
   }
   if (msg?.type === 'openBoards') openBoards({ scheduled: false });
-  if (msg?.type === 'workdayRunNow' && sender.id === chrome.runtime.id) {
-    startWorkday().catch((err) => addLog({ host: 'Workday', found: 0, error: err.message }));
-  }
 });
 
 // A site removed in Chrome's extension settings (or from the popup) also

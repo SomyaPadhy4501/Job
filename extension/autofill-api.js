@@ -302,14 +302,6 @@
   // "Share job listings I browse": rows the capture script found on a careers
   // page, sent with the user's own token. The portal checks and forwards them;
   // the owner's collect token never reaches this browser.
-  // True when the account is connected to this job board: listings and the
-  // Workday collection go through it (the server holds the collect token).
-  globalThis.AutofillShareReady = async () => {
-    const { portalUrl } = await chrome.storage.local.get({ portalUrl: 'https://job-two-xi.vercel.app' });
-    const auth = await credentials().catch(() => null);
-    return !!auth?.token && auth.origin === origin(portalUrl);
-  };
-
   globalThis.AutofillShare = async (pageUrl, rows) => {
     const { portalUrl } = await chrome.storage.local.get({ portalUrl: 'https://job-two-xi.vercel.app' });
     const auth = await credentials();

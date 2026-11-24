@@ -65,51 +65,6 @@ $('save').addEventListener('click', async () => {
 
 $('open').addEventListener('click', () => chrome.runtime.sendMessage({ type: 'openBoards' }));
 
-// Workday collection (workday-collect.js). Turning it on asks Chrome for
-// access to *.myworkdayjobs.com; it needs a click, so it's asked here.
-const WORKDAY_ORIGINS = ['https://*.myworkdayjobs.com/*'];
-function showWorkday({ workdayEnabled, workdayRun, workdayLast }) {
-  $('workdayEnabled').checked = !!workdayEnabled;
-  let text = '';
-  if (workdayRun) text = `Workday: reading employer ${workdayRun.index + 1} of ${workdayRun.tenants.length}, ${workdayRun.found} jobs so far.`;
-  else if (workdayLast) {
-    const when = new Date(workdayLast.finishedAt).toLocaleString();
-    text = `Last Workday run ${when}: ${workdayLast.ok} of ${workdayLast.total} employers, ${workdayLast.found} jobs (${workdayLast.inserted} new).` +
-      (workdayLast.stoppedFor ? ` Stopped early: ${workdayLast.stoppedFor}.` : '');
-  }
-  $('workdayStatus').textContent = text;
-}
-chrome.storage.local.get({ workdayEnabled: false, workdayRun: null, workdayLast: null }).then(showWorkday);
-chrome.storage.onChanged.addListener((c) => {
-  if (c.workdayRun || c.workdayLast || c.workdayEnabled) {
-    chrome.storage.local.get({ workdayEnabled: false, workdayRun: null, workdayLast: null }).then(showWorkday);
-  }
-});
-$('workdayEnabled').addEventListener('change', async () => {
-  const on = $('workdayEnabled').checked;
-  if (on && !(await chrome.permissions.request({ origins: WORKDAY_ORIGINS }))) {
-    $('workdayEnabled').checked = false;
-    $('workdayStatus').textContent = 'Workday collection needs access to myworkdayjobs.com.';
-    return;
-  }
-  await chrome.storage.local.set({ workdayEnabled: on });
-});
-$('workdayNow').addEventListener('click', async () => {
-  // The rows go through the connected account; say so here instead of
-  // "starting…" when it isn't connected.
-  const { token } = await chrome.storage.local.get({ token: '' });
-  if (!token && !(await autofill('getProfile').then(() => true, () => false))) {
-    $('workdayStatus').textContent = 'Connect your account first (Back, then paste the token from the job board’s Autofill page).';
-    return;
-  }
-  if (!(await chrome.permissions.request({ origins: WORKDAY_ORIGINS }))) {
-    $('workdayStatus').textContent = 'Workday collection needs access to myworkdayjobs.com.';
-    return;
-  }
-  chrome.runtime.sendMessage({ type: 'workdayRunNow' });
-  $('workdayStatus').textContent = 'Workday: starting…';
-});
-
 chrome.storage.onChanged.addListener((c) => c.log && renderLog(c.log.newValue || []));
 
 async function autofill(type, params) {
