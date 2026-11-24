@@ -510,9 +510,9 @@ normalize.js applies the same rule for collectors that gate detail requests.
 | `wipro` | Single-tenant | `src/collectors/wipro.js` | SAP SuccessFactors-backed in-house endpoint at `careers.wipro.com/services/recruiting/v1/jobs` (POST). `location: "United States"` param narrows the catalog server-side. |
 | `goldman_sachs` | Single-tenant | `src/collectors/goldman_sachs.js` | Anonymous GraphQL at `api-higher.gs.com/gateway/api/v1/graphql`. Pulls all ~1.4k global roles (server-side location filter schema is undocumented) and filters to US client-side via `locations[].country`. |
 | *(scraper)* `deloitte` | Playwright | `scraper/src/targets/deloitte.js` | SSR DOM scrape of `apply.deloitte.com/en_US/careers/SearchJobs`. 10 rows/page via `?jobOffset=N`, capped at 30 pages. |
-| *(scraper)* `phenom` | Playwright | `scraper/src/targets/phenom.js` | Generic Phenom People DOM scraper (Cisco + Cognizant). Infinite-scroll gives ~10 rows/tenant/run; deeper coverage gated behind tenant-specific "show more" buttons. |
+| *(scraper)* `phenom` | Playwright | `scraper/src/targets/phenom.js` | Phenom People sites (Cisco + Cognizant). Loads the search page once, then pages the page's own `/widgets` refineSearch endpoint, US only, 100 at a time (~486 Cisco rows). Cognizant serves a Cloudflare challenge and is reported as a failure. |
 | `amazon` | Single-tenant | `src/collectors/amazon.js` | `amazon.jobs/en/search.json`, 9 role queries, deduped by id |
-| `uber` | Single-tenant | `src/collectors/uber.js` | `uber.com/api/loadSearchJobsResults`. Has authoritative `level` field (3=entry, 4=mid, 5+=senior) — used for overrides |
+| `uber` | Single-tenant | `src/collectors/uber.js` | Uber's public Oracle HCM job API (site `UberCareers`), US only, descriptions for software titles; apply links go to `jobs.uber.com`. The old `uber.com/api/loadSearchJobsResults` returns 404 since 2026-11. No level field, so level comes from title and description. |
 | `microsoft` | Single-tenant | `src/collectors/microsoft.js` | `apply.careers.microsoft.com/api/pcsx/search`. 887 jobs. **Found via scraper's debug-urls.js** — replace endpoint if PCSX disappears |
 | `netflix` | Single-tenant (Eightfold) | `src/collectors/netflix.js` | `explore.jobs.netflix.net/api/apply/v2/jobs`. L-level detection: L3=entry, L4=mid, L6+=reject |
 | `ghlistings` | Curated GitHub JSON | `src/collectors/ghlistings.js` | Generic — URL per config entry. Currently wired to `vanshb03/New-Grad-2027` + `SimplifyJobs/New-Grad-Positions`. Pre-labeled sponsorship via `SPONSOR_MAP` |
@@ -541,7 +541,7 @@ normalize.js applies the same rule for collectors that gate detail requests.
 | Cognizant | Workday tenant rejects anonymous CxS calls (HTTP 422 on every facet/site combination). |
 | Cisco | Same as Cognizant — `cisco.wd1.myworkdayjobs.com` returns 422 anonymously. |
 | Visa | All known Visa careers entry URLs are 404 or DNS-dark (`corporate.visa.com/en/jobs*`, `usa.visa.com/careers*`, `careers.visa.com`, `jobs.visa.com`). No confirmed endpoint. |
-| ~~Cisco~~ / ~~Cognizant~~ | Partially implemented via the `phenom` scraper target — see Sources table above. Coverage bounded at ~10 rows per tenant per run. |
+| ~~Cisco~~ / ~~Cognizant~~ | Cisco: every US opening via the `phenom` scraper target (and Workday). Cognizant: blocked by a Cloudflare challenge; no source. |
 | Goldman Sachs | Workday CxS returns 422 anonymously under `goldmansachs.wd1`/`wd5` for `External`, `GS_External_Careers`, `Professional`, `Campus`, and the `goldman`/`gs` tenant aliases (2026-04-24). |
 | ~~Deloitte~~ | Implemented as the `deloitte` Playwright target (SSR DOM scrape) — see Sources table above. |
 | General Electric / Vernova / Aerospace | `ge.wd1/wd5` returns 422; `jobs.gevernova.com` and `jobs.geaerospace.com` are both DNS-unresolvable. Unknown backends. (GE HealthCare is implemented — see `gehealthcare` Workday entry.) |
