@@ -5,6 +5,12 @@ this codebase. It exists so you don't have to re-derive context.
 
 ---
 
+### Done 2026-11-24 (security audit)
+- Roles live in `crates/api/src/roles.rs`: `Role::of` (User, or Owner when the Google sub is in `OWNER_SUBS`) and an `Owner` extractor; owner-only handlers take `Owner`, so others get 404. `/api/auth/me` also returns `role`.
+- Session and sign-in nonce cookies are `SameSite=Strict` (sign-in uses GIS popup mode, so nothing cross-site needs them). New test `every_per_user_route_refuses_another_users_data` calls every `/api/me/*` and `/api/autofill/*` route as another user: all 404, nothing changes. **New per-user routes must be added to it.**
+- Node `/admin/*`: deny by default. With `COLLECT_TOKEN` it's compared in constant time; without one, only a non-production server answering a loopback request works (Vercel answers 503). Public routes cap page (1000) and filter length (200); async errors are a bare 500 (they used to crash the process).
+- Links: normalize drops non-http(s) `apply_url`; the web app renders job links through `webHref` (`web/src/safe-url.js`). `vercel.json` adds HSTS and `X-Frame-Options: DENY`. Dependencies: `npm audit fix` in both packages, plus a `qs` override.
+
 ### Done 2026-11-24 (closed-job detection)
 - Closed postings now leave the board within ~6 hours instead of lingering until retention. `src/services/closed.js`, run from `collectAll` after the upsert.
 - Rule: when a company's fetch succeeds with a complete, non-empty listing, each stored row of that source and company that nothing listed this run gets `missed_runs + 1`. At 2 the row is deleted. A row counts as listed if its link is in *any* collector's answer this run, or anything updated it since the run started (another source's copy, a scraper or extension ingest). So a job another source still lists is never deleted, whichever source inserted it. Any sighting resets the count. Failed, empty or `partial` answers never count. Neither does a company where more than half its rows (and more than 2) would go missing at once: that's logged as `closed.suspicious` and left alone. Two boards with one name: if either fails, neither is judged.
