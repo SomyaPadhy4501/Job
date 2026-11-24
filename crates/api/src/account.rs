@@ -109,6 +109,15 @@ pub async fn export(State(state): State<AppState>, signed: Signed) -> ApiResult<
             "download": format!("/api/me/resumes/{}/file", r.id),
         }));
     }
+    let mut alerts = Vec::new();
+    for row in db::alerts::list_alerts(pool, user_id).await? {
+        let spec = crate::alerts::spec_of(&state, &row)?;
+        alerts.push(json!({
+            "name": spec.name, "filters": spec.filters, "frequency": row.frequency,
+            "channels": row.channels, "paused": row.paused,
+        }));
+    }
+    let queue = db::queue::list_queue(pool, user_id, None, crate::queue::MAX_ITEMS).await?;
     let body = json!({
         "exportedAt": OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339).unwrap_or_default(),
         "user": signed.user,
@@ -117,6 +126,9 @@ pub async fn export(State(state): State<AppState>, signed: Signed) -> ApiResult<
         "resumes": resumes,
         "answers": crate::answers::all(&state, user_id).await?,
         "extensionTokens": db::list_tokens(pool, user_id).await?,
+        "alerts": alerts,
+        "applyQueue": crate::queue::items_json(&state, user_id, &queue)?,
+        "telegramLinked": db::chat::chat_link(pool, user_id, "telegram").await?.is_some(),
     });
     db::audit(pool, Some(user_id), "export").await?;
     let headers = [(

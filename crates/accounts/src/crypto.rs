@@ -46,6 +46,9 @@ pub enum Field {
     ResumeParsed,
     AnswerEntry,
     ResumeSource,
+    AlertSpec,
+    ChatAddress,
+    QueueNote,
 }
 
 impl Field {
@@ -55,6 +58,9 @@ impl Field {
             Field::ResumeParsed => "resumes.parsed",
             Field::AnswerEntry => "answers.entry",
             Field::ResumeSource => "resume_sources.source",
+            Field::AlertSpec => "job_alerts.spec",
+            Field::ChatAddress => "chat_links.address",
+            Field::QueueNote => "apply_queue.note",
         }
     }
 }

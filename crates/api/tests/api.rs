@@ -1453,6 +1453,25 @@ async fn every_per_user_route_refuses_another_users_data() {
     let alice_token = created.json()["token"].as_str().unwrap().to_owned();
     let alice_token_id = created.json()["info"]["id"].as_str().unwrap().to_owned();
     let alice_profile = alice.get("/api/me/profile").await.json();
+    let alert = alice
+        .json(
+            Method::POST,
+            "/api/me/alerts",
+            alert_body("alice-secret-alert", "Alice Co", &["email"]),
+        )
+        .await
+        .json()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let job = insert_job(&app.pool, &unique("Alice Co"), "Engineer").await;
+    let item = alice
+        .json(Method::POST, "/api/me/queue", json!({ "jobId": job }))
+        .await
+        .json()["item"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
 
     let mut bob = Browser::new(&app);
     bob.sign_in().await;
@@ -1527,6 +1546,42 @@ async fn every_per_user_route_refuses_another_users_data() {
             vec![],
         ),
         (
+            Method::PUT,
+            format!("/api/me/alerts/{alert}"),
+            json_ct,
+            br#"{"name":"mine"}"#.to_vec(),
+        ),
+        (
+            Method::GET,
+            format!("/api/me/alerts/{alert}/preview"),
+            None,
+            vec![],
+        ),
+        (
+            Method::DELETE,
+            format!("/api/me/alerts/{alert}"),
+            None,
+            vec![],
+        ),
+        (
+            Method::PATCH,
+            format!("/api/me/queue/{item}"),
+            json_ct,
+            br#"{"status":"skipped"}"#.to_vec(),
+        ),
+        (
+            Method::DELETE,
+            format!("/api/me/queue/{item}"),
+            None,
+            vec![],
+        ),
+        (
+            Method::DELETE,
+            "/api/me/chat/telegram".to_owned(),
+            None,
+            vec![],
+        ),
+        (
             Method::DELETE,
             format!("/api/me/resumes/{id}"),
             None,
@@ -1548,6 +1603,8 @@ async fn every_per_user_route_refuses_another_users_data() {
         ("/api/me/resumes", "resumes"),
         ("/api/me/answers", "answers"),
         ("/api/me/tokens", "tokens"),
+        ("/api/me/alerts", "alerts"),
+        ("/api/me/queue", "items"),
     ] {
         assert_eq!(bob.get(path).await.json()[key], json!([]), "{path}");
     }
@@ -1556,6 +1613,7 @@ async fn every_per_user_route_refuses_another_users_data() {
     assert_eq!(export.status, StatusCode::OK);
     let text = String::from_utf8_lossy(&export.body);
     assert!(!text.contains(&id) && !text.contains("alice-secret-answer"));
+    assert!(!text.contains("alice-secret-alert") && !text.contains(&item));
 
     // Bob's extension token sees only Bob.
     let bob_token = bob
@@ -1583,6 +1641,10 @@ async fn every_per_user_route_refuses_another_users_data() {
         bob_ext.get("/api/autofill/resumes?title=x").await.json()["resumes"],
         json!([])
     );
+    assert_eq!(
+        bob_ext.get("/api/autofill/queue").await.json()["items"],
+        json!([])
+    );
     // Answers saved with Bob's token land in Bob's bank only.
     let saved = bob_ext
         .json(
@@ -1608,6 +1670,18 @@ async fn every_per_user_route_refuses_another_users_data() {
     assert_eq!(answers["answers"].as_array().unwrap().len(), 1);
     assert_eq!(answers["answers"][0]["answer"], "alice-secret-answer");
     assert_eq!(alice.get("/api/me/profile").await.json(), alice_profile);
+    let alerts = alice.get("/api/me/alerts").await.json();
+    assert_eq!(alerts["alerts"][0]["name"], "alice-secret-alert");
+    let queue = alice.get("/api/me/queue").await.json();
+    assert_eq!(queue["items"][0]["status"], "queued");
+    alice
+        .send(
+            Method::DELETE,
+            &format!("/api/me/alerts/{alert}"),
+            None,
+            vec![],
+        )
+        .await;
     let mut alice_ext = Browser::new(&app);
     alice_ext.bearer = Some(alice_token);
     alice_ext.csrf = false;
@@ -1719,4 +1793,667 @@ async fn dev_login_is_off_by_default() {
     assert_eq!(res.status, StatusCode::NOT_FOUND);
     assert!(b.cookie("jb_sid").is_none());
     assert_eq!(b.get("/api/auth/config").await.json()["devLogin"], false);
+}
+
+// ---------------------------------------------------------------------------
+// Job alerts, linked chats and the apply queue (migrations/007_alerts.sql)
+
+/// A job row as the Node collectors write it, first seen now.
+async fn insert_job(pool: &sqlx::PgPool, company: &str, title: &str) -> i32 {
+    let now = api::alerts::iso(time::OffsetDateTime::now_utc());
+    sqlx::query_scalar(
+        "INSERT INTO jobs (dedupe_key, source, company_name, job_title, location, apply_url,
+                           date_posted, sponsorship, role_type, restriction, is_entry_level,
+                           first_seen_at, last_seen_at)
+         VALUES ($1, 'test', $2, $3, 'Boston, MA', $4, $5, 'YES', 'SWE', '', 1, $5, $5)
+         RETURNING id",
+    )
+    .bind(unique("job"))
+    .bind(company)
+    .bind(title)
+    .bind(format!("https://jobs.example/{}", unique("apply")))
+    .bind(now)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Records every request a fake Resend / Telegram gets: (path, JSON body).
+type Outbox = std::sync::Arc<std::sync::Mutex<Vec<(String, Value)>>>;
+
+async fn fake_outbox() -> (String, Outbox) {
+    let got: Outbox = Default::default();
+    let seen = got.clone();
+    let app = Router::new().fallback(move |uri: axum::http::Uri, body: axum::body::Bytes| {
+        let seen = seen.clone();
+        async move {
+            let json = serde_json::from_slice(&body).unwrap_or(Value::Null);
+            seen.lock().unwrap().push((uri.path().to_owned(), json));
+            axum::Json(json!({ "id": "fake", "ok": true }))
+        }
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    (format!("http://{addr}"), got)
+}
+
+const CRON: &str = "cron-secret-for-tests-0123456789";
+const HOOK: &str = "telegram-hook-secret-0123456789";
+
+fn alert_body(name: &str, company: &str, channels: &[&str]) -> Value {
+    json!({
+        "name": name,
+        "filters": { "role": "SWE", "sponsorship": "YES", "companies": [company] },
+        "frequency": "instant",
+        "channels": channels,
+    })
+}
+
+/// A message to the bot from `chat`, through the webhook.
+async fn say(hook: &mut Browser<'_>, chat: i64, kind: &str, text: &str, secret: &str) -> Res {
+    let body = json!({ "update_id": 1, "message": { "message_id": 1, "text": text,
+                       "chat": { "id": chat, "type": kind } } });
+    hook.send_with(
+        Method::POST,
+        "/api/telegram/webhook",
+        Some("application/json"),
+        serde_json::to_vec(&body).unwrap(),
+        &[("x-telegram-bot-api-secret-token", secret)],
+    )
+    .await
+}
+
+/// A random private chat id, so parallel tests never share a chat.
+fn new_chat_id() -> i64 {
+    (Uuid::new_v4().as_u128() % 1_000_000_000_000) as i64 + 1
+}
+
+fn reply(res: &Res) -> String {
+    res.json()["text"].as_str().unwrap_or("").to_owned()
+}
+
+/// Other tests' alerts may be due too: runs batches until `alert` ran.
+async fn run_alerts_until(cron: &mut Browser<'_>, pool: &sqlx::PgPool, alert: &str) {
+    for _ in 0..50 {
+        let res = cron
+            .send(Method::POST, "/api/cron/alerts", None, vec![])
+            .await;
+        assert_eq!(
+            res.status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&res.body)
+        );
+        let ran: bool = sqlx::query_scalar(
+            "SELECT last_run_at > now() - interval '5 minutes' FROM job_alerts WHERE id = $1::uuid",
+        )
+        .bind(alert)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+        if ran {
+            return;
+        }
+    }
+    panic!("the alert never ran");
+}
+
+#[tokio::test]
+async fn alerts_belong_to_their_owner_only() {
+    let Some(app) = app() else { return };
+    let mut a = Browser::new(&app);
+    a.sign_in().await;
+    let mut b = Browser::new(&app);
+    b.sign_in().await;
+
+    let company = unique("Acme");
+    let created = a
+        .json(
+            Method::POST,
+            "/api/me/alerts",
+            alert_body("Backend", &company, &["email"]),
+        )
+        .await;
+    assert_eq!(
+        created.status,
+        StatusCode::CREATED,
+        "{}",
+        String::from_utf8_lossy(&created.body)
+    );
+    let id = created.json()["id"].as_str().unwrap().to_owned();
+    assert_eq!(created.json()["filters"]["restriction"], "hide");
+    let bad = a
+        .json(
+            Method::POST,
+            "/api/me/alerts",
+            json!({ "filters": { "level": "senior" } }),
+        )
+        .await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+
+    // B can't see, change, preview or delete A's alert.
+    assert_eq!(b.get("/api/me/alerts").await.json()["alerts"], json!([]));
+    let path = format!("/api/me/alerts/{id}");
+    let stolen = b
+        .json(
+            Method::PUT,
+            &path,
+            alert_body("Mine now", "Other", &["email"]),
+        )
+        .await;
+    assert_eq!(stolen.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        b.get(&format!("{path}/preview")).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        b.send(Method::DELETE, &path, None, vec![]).await.status,
+        StatusCode::NOT_FOUND
+    );
+
+    let mine = a.get("/api/me/alerts").await.json();
+    assert_eq!(mine["alerts"][0]["name"], "Backend", "untouched by B");
+    // The name and filters are stored encrypted.
+    let raw: Vec<u8> = sqlx::query_scalar("SELECT spec FROM job_alerts WHERE id = $1::uuid")
+        .bind(&id)
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&raw).contains(&company));
+
+    let job = insert_job(&app.pool, &company, "Backend Engineer").await;
+    let preview = a.get(&format!("{path}/preview")).await.json();
+    assert_eq!(preview["jobs"][0]["id"], job);
+
+    let edited = a
+        .json(
+            Method::PUT,
+            &path,
+            json!({ "name": "Renamed", "frequency": "weekly", "channels": [], "paused": true }),
+        )
+        .await;
+    assert_eq!(edited.status, StatusCode::OK);
+    assert_eq!(edited.json()["frequency"], "weekly");
+    assert_eq!(
+        a.send(Method::DELETE, &path, None, vec![]).await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(a.get("/api/me/alerts").await.json()["alerts"], json!([]));
+}
+
+#[tokio::test]
+async fn the_queue_is_private_and_an_agent_stops_at_prepared() {
+    let Some(app) = app() else { return };
+    let mut a = Browser::new(&app);
+    a.sign_in().await;
+    let mut b = Browser::new(&app);
+    b.sign_in().await;
+    let job = insert_job(&app.pool, &unique("Queue Co"), "Software Engineer").await;
+
+    let added = a
+        .json(Method::POST, "/api/me/queue", json!({ "jobId": job }))
+        .await;
+    assert_eq!(added.status, StatusCode::CREATED);
+    let item = added.json()["item"]["id"].as_str().unwrap().to_owned();
+    let again = a
+        .json(Method::POST, "/api/me/queue", json!({ "jobId": job }))
+        .await;
+    assert_eq!(again.status, StatusCode::OK, "added once");
+    assert_eq!(again.json()["added"], false);
+
+    // B sees none of it and can't change it.
+    assert_eq!(b.get("/api/me/queue").await.json()["items"], json!([]));
+    let path = format!("/api/me/queue/{item}");
+    let res = b
+        .json(Method::PATCH, &path, json!({ "status": "skipped" }))
+        .await;
+    assert_eq!(res.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        b.send(Method::DELETE, &path, None, vec![]).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        b.get(&format!("{path}/events")).await.json()["events"],
+        json!([])
+    );
+
+    // An agent token for A, one for B, and A's extension token.
+    let token = |res: Res| res.json()["token"].as_str().unwrap().to_owned();
+    let agent_a = token(
+        a.json(Method::POST, "/api/me/agent-tokens", json!({}))
+            .await,
+    );
+    let agent_b = token(
+        b.json(Method::POST, "/api/me/agent-tokens", json!({}))
+            .await,
+    );
+    let ext_a = token(a.json(Method::POST, "/api/me/tokens", json!({})).await);
+    let bearer = |t: &str| {
+        let mut x = Browser::new(&app);
+        x.bearer = Some(t.to_owned());
+        x.csrf = false;
+        x
+    };
+    let mut agent = bearer(&agent_a);
+    let mut other_agent = bearer(&agent_b);
+    let mut ext = bearer(&ext_a);
+
+    let listed = agent.get("/api/agent/queue").await;
+    assert_eq!(listed.status, StatusCode::OK);
+    assert_eq!(listed.json()["items"][0]["id"], item.as_str());
+    assert_eq!(
+        other_agent.get("/api/agent/queue").await.json()["items"],
+        json!([])
+    );
+    let agent_path = format!("/api/agent/queue/{item}");
+    let res = other_agent
+        .json(Method::POST, &agent_path, json!({ "status": "prepared" }))
+        .await;
+    assert_eq!(res.status, StatusCode::NOT_FOUND, "another user's item");
+
+    // Tokens stay in their lane.
+    assert_eq!(
+        agent.get("/api/autofill/profile").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        ext.get("/api/agent/queue").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        ext.get("/api/autofill/queue").await.json()["items"][0]["id"],
+        item.as_str()
+    );
+
+    let prepared = agent
+        .json(
+            Method::POST,
+            &agent_path,
+            json!({ "status": "prepared", "note": "Filled the form; cover letter attached." }),
+        )
+        .await;
+    assert_eq!(prepared.status, StatusCode::OK);
+    assert_eq!(prepared.json()["status"], "prepared");
+    assert_eq!(
+        prepared.json()["note"],
+        "Filled the form; cover letter attached."
+    );
+    for status in ["submitted_by_you", "skipped"] {
+        let res = agent
+            .json(Method::POST, &agent_path, json!({ "status": status }))
+            .await;
+        assert_eq!(
+            res.status,
+            StatusCode::FORBIDDEN,
+            "agent can't set {status}"
+        );
+    }
+
+    // Only the user submits. After that the agent can't touch it.
+    let done = a
+        .json(
+            Method::PATCH,
+            &path,
+            json!({ "status": "submitted_by_you" }),
+        )
+        .await;
+    assert_eq!(done.json()["status"], "submitted_by_you");
+    let res = agent
+        .json(Method::POST, &agent_path, json!({ "status": "prepared" }))
+        .await;
+    assert_eq!(res.status, StatusCode::FORBIDDEN);
+
+    // Every step is in the log, refusals included.
+    let events = a.get(&format!("{path}/events")).await.json()["events"].clone();
+    let actions: Vec<String> = events
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| {
+            format!(
+                "{}:{}",
+                e["actor"].as_str().unwrap(),
+                e["action"].as_str().unwrap()
+            )
+        })
+        .collect();
+    for want in ["you:add", "agent:status", "agent:refused", "you:status"] {
+        assert!(actions.contains(&want.to_owned()), "{want} in {actions:?}");
+    }
+    assert_eq!(
+        a.send(Method::DELETE, &path, None, vec![]).await.status,
+        StatusCode::NO_CONTENT
+    );
+}
+
+#[tokio::test]
+async fn the_alert_run_sends_new_jobs_once_and_unsubscribes() {
+    let (outbox_url, outbox) = fake_outbox().await;
+    let Some(app) = app_with(|c| {
+        c.cron_secret = Some(CRON.into());
+        c.notify.resend_api_key = Some("re_test".into());
+        c.notify.alerts_from = Some("Alerts <alerts@example.com>".into());
+        c.notify.resend_base = outbox_url.clone();
+        c.notify.telegram_bot_token = Some("123:test".into());
+        c.notify.telegram_base = outbox_url.clone();
+        c.notify.telegram_webhook_secret = Some(HOOK.into());
+        // The test database's counters outlive runs.
+        c.notify.emails_per_day = i64::MAX;
+        c.notify.emails_per_month = i64::MAX;
+    }) else {
+        return;
+    };
+    let mut a = Browser::new(&app);
+    let sub = a.sign_in().await;
+    let email = format!("{sub}@example.com");
+
+    // Link a Telegram chat so the alert goes there too.
+    let code = a
+        .json(Method::POST, "/api/me/chat/telegram", json!({}))
+        .await;
+    let code = code.json()["code"].as_str().unwrap().to_owned();
+    let chat_id = new_chat_id();
+    let mut hook = Browser::new(&app);
+    hook.csrf = false;
+    let linked = say(
+        &mut hook,
+        chat_id,
+        "private",
+        &format!("/start {code}"),
+        HOOK,
+    )
+    .await;
+    assert!(reply(&linked).starts_with("Linked"), "{}", reply(&linked));
+
+    let company = unique("Alertco");
+    let created = a
+        .json(
+            Method::POST,
+            "/api/me/alerts",
+            alert_body("Backend", &company, &["email", "telegram"]),
+        )
+        .await;
+    let alert = created.json()["id"].as_str().unwrap().to_owned();
+    let first = insert_job(&app.pool, &company, "Backend Engineer").await;
+    let second = insert_job(&app.pool, &company, "Platform Engineer").await;
+
+    let mut cron = Browser::new(&app);
+    cron.csrf = false;
+    assert_eq!(
+        cron.send(Method::POST, "/api/cron/alerts", None, vec![])
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    cron.bearer = Some(CRON.into());
+    run_alerts_until(&mut cron, &app.pool, &alert).await;
+
+    let mine = |outbox: &Outbox| -> Vec<Value> {
+        outbox
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(p, v)| p == "/emails" && v["to"][0] == email.as_str())
+            .map(|(_, v)| v.clone())
+            .collect()
+    };
+    let mails = mine(&outbox);
+    assert_eq!(mails.len(), 1, "one email");
+    let mail = &mails[0];
+    assert_eq!(mail["from"], "Alerts <alerts@example.com>");
+    assert!(mail["subject"].as_str().unwrap().starts_with("2 new jobs"));
+    let html = mail["html"].as_str().unwrap();
+    assert!(html.contains("Backend Engineer") && html.contains("Platform Engineer"));
+    assert!(html.contains(&format!("/queue?add={first}")));
+    assert_eq!(
+        mail["headers"]["List-Unsubscribe-Post"],
+        "List-Unsubscribe=One-Click"
+    );
+    let unsub = mail["headers"]["List-Unsubscribe"]
+        .as_str()
+        .unwrap()
+        .trim_matches(['<', '>'])
+        .to_owned();
+    let chat_key = chat_id.to_string();
+    let chats: Vec<Value> = outbox
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(p, v)| p == "/bot123:test/sendMessage" && v["chat_id"] == chat_key.as_str())
+        .map(|(_, v)| v.clone())
+        .collect();
+    assert_eq!(chats.len(), 1, "one Telegram message");
+    assert!(
+        chats[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("#{second}"))
+    );
+
+    // Next run: only the job that's new since.
+    sqlx::query(
+        "UPDATE job_alerts SET last_run_at = now() - interval '1 hour' WHERE id = $1::uuid",
+    )
+    .bind(&alert)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    insert_job(&app.pool, &company, "Data Engineer").await;
+    run_alerts_until(&mut cron, &app.pool, &alert).await;
+    let mails = mine(&outbox);
+    assert_eq!(mails.len(), 2);
+    let html = mails[1]["html"].as_str().unwrap();
+    assert!(
+        mails[1]["subject"]
+            .as_str()
+            .unwrap()
+            .starts_with("1 new job:")
+    );
+    assert!(html.contains("Data Engineer") && !html.contains("Backend Engineer"));
+
+    // The unsubscribe link: GET only asks, a tampered one is refused, POST stops email.
+    let path = unsub
+        .split_once(".app")
+        .map_or(unsub.as_str(), |(_, p)| p)
+        .to_owned();
+    assert!(path.starts_with("/api/alerts/unsubscribe?t="), "{path}");
+    let mut anon = Browser::new(&app);
+    anon.csrf = false;
+    let page = anon.get(&path).await;
+    assert!(String::from_utf8_lossy(&page.body).contains("<form method=\"post\""));
+    let mut tampered = path.clone();
+    let last = tampered.pop().unwrap();
+    tampered.push(if last == '0' { '1' } else { '0' });
+    assert_eq!(
+        anon.send(Method::POST, &tampered, None, vec![])
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    let channels = a.get("/api/me/alerts").await.json()["alerts"][0]["channels"].clone();
+    assert_eq!(channels, json!(["email", "telegram"]), "still on");
+    let done = anon
+        .send(
+            Method::POST,
+            &path,
+            Some("application/x-www-form-urlencoded"),
+            b"List-Unsubscribe=One-Click".to_vec(),
+        )
+        .await;
+    assert_eq!(done.status, StatusCode::OK);
+    let channels = a.get("/api/me/alerts").await.json()["alerts"][0]["channels"].clone();
+    assert_eq!(channels, json!(["telegram"]));
+
+    assert_eq!(
+        a.send(
+            Method::DELETE,
+            &format!("/api/me/alerts/{alert}"),
+            None,
+            vec![]
+        )
+        .await
+        .status,
+        StatusCode::NO_CONTENT
+    );
+}
+
+#[tokio::test]
+async fn telegram_links_one_account_per_chat_and_answers_commands() {
+    let Some(app) = app_with(|c| {
+        c.notify.telegram_webhook_secret = Some(HOOK.into());
+        c.notify.telegram_bot_username = Some("JobBoardTestBot".into());
+    }) else {
+        return;
+    };
+    let mut a = Browser::new(&app);
+    a.sign_in().await;
+    let mut b = Browser::new(&app);
+    b.sign_in().await;
+    let company = unique("Chatco");
+    a.json(
+        Method::POST,
+        "/api/me/alerts",
+        alert_body("A's alert", &company, &["telegram"]),
+    )
+    .await;
+    b.json(
+        Method::POST,
+        "/api/me/alerts",
+        alert_body("B's alert", "Other", &["email"]),
+    )
+    .await;
+
+    let mut hook = Browser::new(&app);
+    hook.csrf = false;
+    let chat_a = new_chat_id();
+    let chat_b = new_chat_id();
+
+    let wrong = say(
+        &mut hook,
+        chat_a,
+        "private",
+        "/jobs",
+        "wrong-secret-0123456789",
+    )
+    .await;
+    assert_eq!(wrong.status, StatusCode::UNAUTHORIZED);
+    let res = say(&mut hook, chat_a, "private", "/jobs", HOOK).await;
+    assert!(reply(&res).contains("isn’t linked"), "{}", reply(&res));
+
+    let code_a = a
+        .json(Method::POST, "/api/me/chat/telegram", json!({}))
+        .await;
+    assert_eq!(code_a.status, StatusCode::CREATED);
+    let link = code_a.json()["link"].as_str().unwrap().to_owned();
+    assert!(link.starts_with("https://t.me/JobBoardTestBot?start="));
+    let code_a = code_a.json()["code"].as_str().unwrap().to_owned();
+    // A group chat is ignored, even with a valid code.
+    let group = say(
+        &mut hook,
+        chat_a,
+        "group",
+        &format!("/start {code_a}"),
+        HOOK,
+    )
+    .await;
+    assert_eq!(group.json(), json!({}));
+    let lowered = code_a.to_lowercase();
+    let res = say(
+        &mut hook,
+        chat_a,
+        "private",
+        &format!("/start {lowered}"),
+        HOOK,
+    )
+    .await;
+    assert!(reply(&res).starts_with("Linked"), "{}", reply(&res));
+    assert_eq!(
+        a.get("/api/me/chat").await.json()["telegram"]["linked"],
+        true
+    );
+    let reused = say(
+        &mut hook,
+        chat_b,
+        "private",
+        &format!("/start {code_a}"),
+        HOOK,
+    )
+    .await;
+    assert!(reply(&reused).contains("didn’t work"), "a code works once");
+
+    let code_b = b
+        .json(Method::POST, "/api/me/chat/telegram", json!({}))
+        .await;
+    let code_b = code_b.json()["code"].as_str().unwrap().to_owned();
+    say(
+        &mut hook,
+        chat_b,
+        "private",
+        &format!("/link {code_b}"),
+        HOOK,
+    )
+    .await;
+
+    // Each chat sees its own account only.
+    let alerts_a = reply(&say(&mut hook, chat_a, "private", "/alerts", HOOK).await);
+    assert!(
+        alerts_a.contains("A's alert") && !alerts_a.contains("B's alert"),
+        "{alerts_a}"
+    );
+    let alerts_b = reply(&say(&mut hook, chat_b, "private", "/alerts", HOOK).await);
+    assert!(
+        alerts_b.contains("B's alert") && !alerts_b.contains("A's alert"),
+        "{alerts_b}"
+    );
+
+    let job = insert_job(&app.pool, &company, "Backend Engineer").await;
+    let jobs = reply(&say(&mut hook, chat_a, "private", "/jobs", HOOK).await);
+    assert!(jobs.contains(&format!("#{job}")), "{jobs}");
+    let queued = reply(
+        &say(
+            &mut hook,
+            chat_a,
+            "private",
+            &format!("/apply #{job}"),
+            HOOK,
+        )
+        .await,
+    );
+    assert!(queued.starts_with("Added to your apply queue"), "{queued}");
+    let items = a.get("/api/me/queue").await.json()["items"].clone();
+    assert_eq!(items[0]["jobId"], job);
+    assert_eq!(items[0]["addedVia"], "telegram");
+    assert_eq!(b.get("/api/me/queue").await.json()["items"], json!([]));
+
+    let paused = reply(&say(&mut hook, chat_a, "private", "/pause", HOOK).await);
+    assert!(paused.starts_with("Paused 1"), "{paused}");
+    assert_eq!(
+        a.get("/api/me/alerts").await.json()["alerts"][0]["paused"],
+        true
+    );
+    assert_eq!(
+        b.get("/api/me/alerts").await.json()["alerts"][0]["paused"],
+        false
+    );
+
+    assert_eq!(
+        a.send(Method::DELETE, "/api/me/chat/telegram", None, vec![])
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
+    let res = say(&mut hook, chat_a, "private", "/jobs", HOOK).await;
+    assert!(reply(&res).contains("isn’t linked"));
+    let res = say(&mut hook, chat_b, "private", "/alerts", HOOK).await;
+    assert!(reply(&res).contains("B's alert"), "B is still linked");
+
+    // Leave no due alerts behind for the next run of the alert-run test.
+    for who in [&mut a, &mut b] {
+        let alerts = who.get("/api/me/alerts").await.json()["alerts"].clone();
+        for alert in alerts.as_array().unwrap() {
+            let path = format!("/api/me/alerts/{}", alert["id"].as_str().unwrap());
+            who.send(Method::DELETE, &path, None, vec![]).await;
+        }
+    }
 }

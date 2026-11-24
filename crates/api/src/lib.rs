@@ -5,24 +5,34 @@
 //! - `/api/me/*`: the signed-in user's resumes, profile, answers, extension
 //!   tokens, export and account deletion (cookie + CSRF check).
 //! - `/api/autofill/*`: what the extension reads and writes (bearer token).
-//! - `/api/cron/*`, `/api/admin/*`: housekeeping and the owner's usage page.
+//! - `/api/cron/*`, `/api/admin/*`: housekeeping, the alert run and the
+//!   owner's usage page.
+//! - `/api/me/alerts`, `/api/me/chat`, `/api/me/queue`: job alerts, the linked
+//!   Telegram chat and the apply queue; `/api/telegram/webhook` takes the
+//!   bot's messages, `/api/agent/*` is for an apply agent (bearer token,
+//!   scope `agent`), `/api/alerts/unsubscribe` is the link in every email.
 //!
 //! Every response is `Cache-Control: private, no-store`. The Node routes
 //! (`/jobs`, `/companies`, …) are edge-cached for 30 s; nothing under `/api`
 //! may ever be, because it serves one signed-in user's data.
 
 pub mod account;
+pub mod alerts;
 pub mod answers;
 pub mod auth;
 pub mod autofill;
 pub mod capture;
+pub mod chat;
 pub mod error;
 pub mod form_schema;
 pub mod housekeeping;
 pub mod http;
+pub mod notify;
 pub mod profile;
+pub mod queue;
 pub mod resumes;
 pub mod roles;
+pub mod telegram;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,7 +42,7 @@ use accounts::google::GoogleVerifier;
 use accounts::storage::Storage;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderValue, StatusCode, Uri, header};
-use axum::routing::{delete, get, post, put};
+use axum::routing::{delete, get, patch, post, put};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -82,6 +92,8 @@ pub struct Config {
     /// The owner's `COLLECT_TOKEN`; used only server to server.
     pub collect_token: Option<String>,
     pub shares_per_day: i64,
+    /// Email (Resend) and Telegram settings for alerts and chat.
+    pub notify: notify::Settings,
 }
 
 impl Default for Config {
@@ -106,6 +118,7 @@ impl Default for Config {
             ingest_url: None,
             collect_token: None,
             shares_per_day: 3000,
+            notify: notify::Settings::default(),
         }
     }
 }
@@ -164,6 +177,7 @@ impl Config {
                 .ok()
                 .filter(|t| !t.trim().is_empty()),
             shares_per_day: env_int("SHARES_PER_USER_PER_DAY", d.shares_per_day),
+            notify: notify::Settings::from_env(),
         }
     }
 
@@ -305,6 +319,24 @@ pub fn router(state: AppState) -> Router {
         .route("/api/me/export", get(account::export))
         .route("/api/me", delete(account::delete_account))
         .route("/api/admin/usage", get(housekeeping::usage))
+        .route("/api/me/alerts", get(alerts::list).post(alerts::create))
+        .route(
+            "/api/me/alerts/{id}",
+            put(alerts::update).delete(alerts::remove),
+        )
+        .route("/api/me/alerts/{id}/preview", get(alerts::preview))
+        .route("/api/me/chat", get(chat::status))
+        .route(
+            "/api/me/chat/telegram",
+            post(chat::new_telegram_code).delete(chat::unlink_telegram),
+        )
+        .route("/api/me/queue", get(queue::list).post(queue::add_web))
+        .route(
+            "/api/me/queue/{id}",
+            patch(queue::update).delete(queue::remove),
+        )
+        .route("/api/me/queue/{id}/events", get(queue::events))
+        .route("/api/me/agent-tokens", post(queue::create_agent_token))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::session_layer,
@@ -321,7 +353,17 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/autofill/answers", post(autofill::save_answers))
         .route("/api/autofill/form-schema", get(form_schema::form_schema))
-        .route("/api/capture/jobs", post(capture::share));
+        .route("/api/capture/jobs", post(capture::share))
+        .route("/api/autofill/queue", get(queue::for_extension))
+        .route("/api/agent/queue", get(queue::agent_list))
+        .route("/api/agent/queue/{id}", post(queue::agent_set))
+        // Telegram, signed links and the alert run: their own secrets, no cookies.
+        .route("/api/telegram/webhook", post(telegram::webhook))
+        .route(
+            "/api/alerts/unsubscribe",
+            get(alerts::unsubscribe_page).post(alerts::unsubscribe),
+        )
+        .route("/api/cron/alerts", post(alerts::run));
 
     Router::new()
         .route("/api/health", get(health))

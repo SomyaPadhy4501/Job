@@ -15,6 +15,10 @@ use uuid::Uuid;
 
 pub use sqlx;
 
+pub mod alerts;
+pub mod chat;
+pub mod queue;
+
 pub type Tx<'a> = Transaction<'a, Postgres>;
 
 #[derive(Debug, thiserror::Error)]
