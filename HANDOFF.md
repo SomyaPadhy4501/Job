@@ -27,11 +27,11 @@ a preview first.
   them when the URL has no filters. Production builds redirect one-off
   `*.vercel.app` deploy URLs to the main host (`web/src/site.js`,
   `main.jsx`): Google sign-in only works on registered origins.
-- Extension (`extension/`, v1.11.0, served as a zip from `/autofill`, built
+- Extension (`extension/`, v1.14.0, served as a zip from `/autofill`, built
   by `web/scripts/pack-extension.mjs`): autofill on Greenhouse/Lever/Ashby/
   Workday automatically, any other site via popup "Autofill this page"
-  (per-site optional permission); resume picker; Ashby Yes/No clicked with
-  form submission blocked (`guardedClick` in `autofill-adapters.js`);
+  (per-site optional permission); resume picker; Ashby Yes/No clicked via
+  `safeButton` (no `guardedClick` exists, despite older notes);
   "this country"/"country where the job is located" = US; after the user
   submits, unsaved custom answers are held per tab (`autofill:holdAnswers`/
   `takeAnswers` in `autofill-api.js`, `chrome.storage.session`, 30 min) and
@@ -73,12 +73,65 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
   adapter when the panel opens.
 - `web/dist` is no longer tracked; merged worktrees removed.
 
+**Done 2026-11-24 (third session; plan in the session's plan file):**
+- **Resume preview** (`web/src/components/PdfViewer.jsx`, `DocxViewer.jsx`):
+  Preview beside Download. pdf.js 4.10 on canvases (same-origin worker, no
+  eval; cMaps/standard fonts copied to `/pdfjs/` by a Vite plugin), Word via
+  docx-preview in a shadow root. Both lazy-loaded. `vite preview` now sends
+  `vercel.json`'s headers (plugin `vercelHeaders`) and proxies `/api`.
+- **LaTeX editor** `/resumes/latex[?id=]` (`web/src/pages/LatexEditor.jsx`,
+  `web/src/latex/`): CodeMirror + Siglum (`@siglum/engine` 0.2.2, TeX Live
+  2026, pdfLaTeX) in the browser. Engine code (busytex.js/.wasm, xzwasm.js)
+  is pinned to release `tl2026-0cc2592f50103429` and SHA-256-checked before
+  it runs (`engine.js`; to upgrade, change RELEASE + hashes from that
+  release's runtime.json and ENGINE_VERSION). Only `/resumes/latex` and
+  `/siglum/*` get the relaxed CSP (`vercel.json`); the editor is reached by
+  full page loads. SwiftLaTeX was rejected (server dead, TL2020).
+  Template uses lmodern (T1 without cm-super).
+- **LaTeX API** (`migrations/005_resume_sources.sql`, `crates/api/src/resumes.rs`):
+  `PUT /api/me/resumes/{id}/latex` (multipart PDF + source, If-Match = file
+  sha, own quota `REPLACES_PER_DAY`=50, new key reserved in
+  `object_deletions`, old object queued by trigger), `GET/PUT …/source`,
+  optional `source` part on upload; resumes carry `fileSha256`, `hasSource`,
+  `sourceStale`. **005 must be applied to Neon before this code deploys**
+  (every resume query reads `resume_sources`).
+- **Extension 1.12–1.14:**
+  - Education/experience from the profile (`autofill-fields.js` education
+    block: standalone questions, degree levels with tiered option matching,
+    school/major exact-name match, per-control date formats; profile dates may
+    carry a day). Workday section ids fixed. Honeypot fields never filled.
+    Verified live on Discord's Greenhouse form (school typed search, M.S. →
+    Master's Degree, discipline).
+  - **Manifest `key`: stable extension ID `deleknoaeibijjmfngfobapnpbekhcel`.**
+    Updating from ≤1.11 = remove + reload + reconnect once (the Autofill page
+    says so). Private key at `C:\Users\aryan\job-board-extension-key.pem`
+    (outside the repo; only needed to pack a .crx).
+  - Workday sign-in (`autofill-login.js`, own manifest entry, top frame):
+    one job site password set in the popup, kept only in the worker's
+    IndexedDB; ledger in `chrome.storage.session` (≤3 fills/company/10 min, no
+    auto attempt after a failure until the password changes).
+  - Gmail (`gmail.js`, `autofill-codes.js`, `config.js`): codes and Workday
+    verify links from Gmail; **off until `gmailClientId` is set**.
+
 **Not verified / open:**
-1. Production smoke tests still not run (they need the owner signed in):
+1. Production smoke tests still not run (they need the owner signed in in
+   the in-app browser; Google's popup only opens from the owner's own click):
    resume upload/download/delete on Backblaze, the cleanup cron (run it once
    from Vercel -> Settings -> Cron Jobs), and listing sharing end to end.
-2. Extension 1.11.0 and form-schema were pushed this session; check
-   `/downloads/extension.json` says 1.11.0.
+2. Gmail setup (owner): a **separate** Google Cloud project (so the sign-in
+   consent screen can still be published without restricted-scope review),
+   enable Gmail API, consent screen in Testing with scope `gmail.readonly` and
+   the owner as test user, OAuth client type **Web application** with redirect
+   URI `https://deleknoaeibijjmfngfobapnpbekhcel.chromiumapp.org/`; put its
+   client id in `extension/config.js`. Then confirm live: the real From
+   addresses (Workday `<tenant>@myworkday.com`, Greenhouse
+   `*@*greenhouse*.io`) and Workday's verify-link path (`/verif|activat|confirm/`).
+3. Workday sign-in on a real tenant is only fixture-tested: whether Workday
+   accepts the scripted press on `click_filter`, and its failure/verify
+   messages, need the owner's own account. If scripted presses are ignored,
+   the panel already falls back to "Click Sign In".
+4. Workday My Experience (school prompt, month/year boxes) is fixture-tested
+   only (needs a signed-in account to reach).
 3. Owner to do: publish the Google consent screen when opening sign-ups;
    move `C:\Users\aryan\job-board-secrets-BACKUP.txt` into a password
    manager; enable Vercel 2FA; decide on server-side gating of `/jobs` and on

@@ -112,19 +112,52 @@ multi-step flows (fill each step after it appears).
 **Sites you allowed** in the popup lists them; **Remove** takes the permission
 back (so does removing it in Chrome's extension settings).
 
+### Education and jobs
+
+School, degree, field of study, GPA and dates come from your profile's
+education and experience only: the entry in progress or that ended last
+answers questions like "School" or "Graduation date", and "Highest level of
+education" uses your highest degree. Degree options are matched by level
+(B.S. → "Bachelor's Degree"), schools and majors only by the same name. Month
+and year boxes, MM/YYYY fields and month inputs are filled in their own format;
+day pickers only if your profile date has a day. Nothing in the profile means
+the field is left for you.
+
+### Workday sign-in (job site password)
+
+Set one **Job site password** in the popup (kept only in this browser's
+extension storage). On a Workday sign-in page the extension chooses "Sign in
+with email", fills your profile email and the password, and presses Sign In
+once you've interacted with the page. If that fails it offers Create account
+or Forgot password and stops trying until you change the password. On
+**Create Account** it fills email and both password boxes; you tick "I agree"
+and click Create Account.
+
+### Codes from Gmail
+
+**Connect Gmail** in the popup (read-only, Google's consent screen) and the
+extension fills the security / verification codes Greenhouse and Workday
+email mid-application, and opens Workday's "verify your account" link. It reads
+only mail from those sites from the last 15 minutes and never presses submit.
+Needs a Google OAuth client id in `config.js` (see HANDOFF.md).
+
 ### Safety rules (enforced in code and covered by tests)
 
 - **Never submits or navigates.** It never clicks a submit button, an implicit
   submit (a `<button>` in a form without `type="button"`), a link, or any
   control labelled Submit, Apply, Next, Continue, Review, Save, Back, Finish,
   Send, Sign in, Register, Create account, Remove or Delete, even when one is
-  rendered as a dropdown option.
+  rendered as a dropdown option. The one exception is Workday's own sign-in
+  panel (`autofill-login.js`, below): it may press **Sign in with email** and
+  **Sign In**, never **Create Account** or "I agree".
 - **Never touches CAPTCHAs** (reCAPTCHA, hCaptcha, Turnstile) and never ticks
   a checkbox: consent, acknowledgement, privacy, attestation, signature,
   background-check and "share my data" controls are always left to you.
 - **Only on your click**, and only into empty, visible, enabled fields. A
   value already on the form, typed by you or by the ATS, is never replaced.
-  Password fields, and any form containing one, are never filled.
+  Password fields, and any form containing one, are never filled by the form
+  filler; only the Workday sign-in module fills your job site password there.
+  Bot-trap (honeypot) fields are never filled.
 - **No guessing on immigration questions.** Sponsorship is filled only from
   your explicit "need sponsorship now" / "in the future" answers, matched to
   the question's timeframe ("now or in the future" needs both known unless one
