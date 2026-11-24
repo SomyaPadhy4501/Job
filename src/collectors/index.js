@@ -31,6 +31,7 @@ const gem = require('./gem');
 const bamboohr = require('./bamboohr');
 const mdtable = require('./mdtable');
 const jibe = require('./jibe');
+const jsearch = require('./jsearch');
 
 // Registry keyed by source. Adding a new source = drop a module here.
 //
@@ -73,6 +74,7 @@ const REGISTRY = {
   [bamboohr.source]: bamboohr,
   [mdtable.source]: mdtable,
   [jibe.source]: jibe,
+  [jsearch.source]: jsearch,
 };
 
 function getCollector(source) {

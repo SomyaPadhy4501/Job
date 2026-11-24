@@ -118,8 +118,13 @@ function startCooldown(platform, ms) {
   if (until > (cooldownUntil.get(platform) || 0)) cooldownUntil.set(platform, until);
 }
 
-// Shared fetch wrapper with timeout + basic retries.
-async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body } = {}) {
+// Shared fetch wrapper with timeout + basic retries. `rateLimitRetries` caps
+// the extra attempts a 429 earns; metered APIs that bill every request
+// (JSearch) pass 0.
+async function fetchJson(
+  url,
+  { retries = 2, headers = {}, method = 'GET', body, rateLimitRetries = RATE_LIMIT_RETRIES } = {}
+) {
   let lastErr;
   const platform = platformOf(url);
   let rateLimited = 0;
@@ -171,7 +176,7 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
         // A 429 needs seconds, not the half-second used for transient errors.
         // Honour Retry-After when given; pause the whole platform, and allow
         // a few more attempts than other errors get.
-        if (rateLimited < RATE_LIMIT_RETRIES) rateLimited++;
+        if (rateLimited < rateLimitRetries) rateLimited++;
         strikes.set(platform, (strikes.get(platform) || 0) + 1);
         startCooldown(platform, (err.retryAfter || 5 * 2 ** Math.min(attempt, 3)) * 1000);
       } else if (attempt < retries + rateLimited) {
