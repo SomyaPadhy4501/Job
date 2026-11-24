@@ -1,9 +1,17 @@
 name: scrape
 
+# Every 3 hours, like collect: triggered every 30 minutes, and each trigger
+# scrapes only when the last real scrape started 170+ minutes ago (or failed
+# 55+ minutes ago); see .github/scripts/due.sh. Triggers sit 15 minutes off
+# collect's. Overlapping a collect is safe: both upsert in small transactions.
 on:
   schedule:
-    - cron: '30 */2 * * *'  # Every 2h at :30 — offset from collect's :00 to avoid overlapping writes
-  workflow_dispatch:         # Manual trigger for testing
+    - cron: '26,56 * * * *'
+  workflow_dispatch:         # Manual trigger for testing (always scrapes)
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
 
 jobs:
   scrape:
@@ -12,24 +20,38 @@ jobs:
     # Every scheduled scrape failed at the install step from that point on.
     runs-on: ubuntu-24.04
     timeout-minutes: 20      # Playwright + Chromium fan-out takes ~12 min
+    permissions:
+      contents: read
+      actions: read          # due.sh lists this workflow's runs
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Is a scrape due?
+        id: due
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/due.sh scrape.yml "Run one-shot scrape (all targets)" 170 55
+
       - uses: actions/setup-node@v4
+        if: steps.due.outputs.due != 'false'
         with:
           node-version: '22'
           cache: 'npm'
 
       - name: Install scraper dependencies
+        if: steps.due.outputs.due != 'false'
         working-directory: scraper
         run: npm ci
 
       - name: Install Chromium for Playwright
+        if: steps.due.outputs.due != 'false'
         working-directory: scraper
         run: npx playwright install --with-deps chromium
 
       - name: Run one-shot scrape (all targets)
+        if: steps.due.outputs.due != 'false'
         working-directory: scraper
         run: npm run scrape
         env:
