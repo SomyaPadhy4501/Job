@@ -103,7 +103,10 @@ function ProfilePage() {
   const text = (path, label, props = {}) => (
     <TextField label={label} value={get(draft, path) ?? ''} onChange={(v) => set(path, v)} hint={fromResume(path) ? 'from resume' : ''} {...props} />
   );
-  const dirty = JSON.stringify(draft) !== JSON.stringify(data.profile);
+  // Compare with the board defaults the draft adds, so profiles saved before
+  // `board` existed don't look edited.
+  const stored = { ...data.profile, board: { ...BOARD_EMPTY, ...data.profile.board } };
+  const dirty = JSON.stringify(draft) !== JSON.stringify(stored);
 
   return (
     <form

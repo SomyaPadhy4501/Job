@@ -25,16 +25,25 @@ export default function Resumes() {
 }
 
 function ResumesPage() {
-  const { data, isLoading, error } = usePrivateQuery(KEY, '/api/me/resumes');
-  if (isLoading) return <div className="card"><div className="skeleton skeleton-row" /></div>;
-  if (error) return <div className="card error">{error.message}</div>;
-  const { resumes, limits, storage } = data;
   return (
     <>
       <div className="page-head">
         <h2>Resumes</h2>
         <p className="muted">One resume per kind of role. The extension picks the best match for each job.</p>
       </div>
+      <ResumesBody />
+    </>
+  );
+}
+
+// Upload card and resume list without the page heading (Welcome embeds it).
+export function ResumesBody() {
+  const { data, isLoading, error } = usePrivateQuery(KEY, '/api/me/resumes');
+  if (isLoading) return <div className="card"><div className="skeleton skeleton-row" /></div>;
+  if (error) return <div className="card error">{error.message}</div>;
+  const { resumes, limits, storage } = data;
+  return (
+    <>
       {storage ? (
         <UploadCard limits={limits} full={resumes.length >= limits.maxResumes} />
       ) : (

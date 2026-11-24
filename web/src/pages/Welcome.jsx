@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, useAccount, usePrivateQuery } from '../account.js';
 import { Link, navigate } from '../router.jsx';
-import Resumes from './Resumes.jsx';
+import { ResumesBody } from './Resumes.jsx';
 import { BOARD_EMPTY, BOARD_LABELS, BOARD_OPTIONS } from './Profile.jsx';
 
 // First-time setup, shown after a new account's first sign-in (and any time
@@ -58,7 +58,7 @@ export default function Welcome() {
           <p className="muted">
             Upload your resumes and name each one (e.g. ML Engineer). Your profile fills in from them.
           </p>
-          <Resumes />
+          <ResumesBody />
           <StepNav onNext={next} nextLabel="Continue" />
         </>
       )}
