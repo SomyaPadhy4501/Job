@@ -329,19 +329,42 @@
   // "Share job listings I browse": rows the capture script found on a careers
   // page, sent with the user's own token. The portal checks and forwards them;
   // the owner's collect token never reaches this browser.
+  // True when the account is connected to this job board: listings and the
+  // Workday collection go through it (the server holds the collect token).
+  globalThis.AutofillShareReady = async () => {
+    const { portalUrl } = await chrome.storage.local.get({ portalUrl: 'https://job-two-xi.vercel.app' });
+    const auth = await credentials().catch(() => null);
+    return !!auth?.token && auth.origin === origin(portalUrl);
+  };
+
   globalThis.AutofillShare = async (pageUrl, rows) => {
     const { portalUrl } = await chrome.storage.local.get({ portalUrl: 'https://job-two-xi.vercel.app' });
     const auth = await credentials();
     if (!auth?.token || auth.origin !== origin(portalUrl))
       throw new Error('Connect the autofill token in the popup to share listings.');
     const total = { inserted: 0, updated: 0, rejected: 0, refused: 0 };
-    for (let i = 0; i < rows.length; i += 200) {
+    // At most 200 rows and about 200 KB a request: the API takes 256 KB, and
+    // Workday rows carry full descriptions.
+    const chunks = [];
+    let cur = [], bytes = 0;
+    for (const row of rows) {
+      const n = new TextEncoder().encode(JSON.stringify(row)).length;
+      if (cur.length && (cur.length >= 200 || bytes + n > 200_000)) {
+        chunks.push(cur);
+        cur = [];
+        bytes = 0;
+      }
+      cur.push(row);
+      bytes += n;
+    }
+    if (cur.length) chunks.push(cur);
+    for (const jobs of chunks) {
       const res = await fetch(auth.origin + '/api/capture/jobs', {
         method: 'POST',
         credentials: 'omit',
         redirect: 'error',
         headers: { Authorization: 'Bearer ' + auth.token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageUrl, jobs: rows.slice(i, i + 200) }),
+        body: JSON.stringify({ pageUrl, jobs }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Sharing failed (' + res.status + ').');

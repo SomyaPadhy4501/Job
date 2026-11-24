@@ -22,7 +22,6 @@ function renderLog(log) {
 chrome.storage.local.get(defaults).then((s) => {
   $('enabled').checked = s.enabled;
   $('portalUrl').value = s.portalUrl;
-  $('token').value = s.token;
   $('boards').value = s.boards.join('\n');
   $('autoOpen').checked = s.autoOpen;
   $('autoEveryHours').value = s.autoEveryHours;
@@ -31,13 +30,21 @@ chrome.storage.local.get(defaults).then((s) => {
   $('lastRun').textContent = s.lastRunAt
     ? `Last automatic run: ${new Date(s.lastRunAt).toLocaleString()}`
     : 'Automatic run has not happened yet.';
-  if (!s.token) {
-    // Without it nothing captured on these boards (Tesla, LinkedIn…) is sent.
-    $('lastRun').textContent = 'No collect token: nothing captured here reaches the board. Paste it above, then Save.';
-    $('lastRun').style.color = '#cf222e';
-  }
   renderLog(s.log);
+  showReach();
 });
+
+// Captured listings reach the board through the connected account and "Share
+// job listings I browse" (older installs: a saved collect token). Say when
+// they can't, so a run doesn't only look like it worked.
+async function showReach() {
+  const { token, shareListings } = await chrome.storage.local.get({ token: '', shareListings: false });
+  if (token) return;
+  const connected = await autofill('getProfile').then(() => true, () => false);
+  const missing = [!connected && 'connect your account above', !shareListings && 'turn on “Share job listings I browse”'].filter(Boolean);
+  $('lastRun').style.color = missing.length ? '#cf222e' : '';
+  if (missing.length) $('lastRun').textContent = 'Captured jobs can’t reach the board yet: ' + missing.join(' and ') + '.';
+}
 
 $('enabled').addEventListener('change', () => chrome.storage.local.set({ enabled: $('enabled').checked }));
 
@@ -47,7 +54,6 @@ $('save').addEventListener('click', async () => {
     .filter((x) => /^https?:\/\//.test(x) && !/(linkedin|indeed|glassdoor)\.com/i.test(x));
   await chrome.storage.local.set({
     portalUrl: $('portalUrl').value.trim().replace(/\/+$/, ''),
-    token: $('token').value.trim(),
     boards,
     autoOpen: $('autoOpen').checked,
     autoEveryHours: Math.min(24, Math.max(1, Number($('autoEveryHours').value) || 3)),
@@ -91,11 +97,11 @@ $('workdayEnabled').addEventListener('change', async () => {
   await chrome.storage.local.set({ workdayEnabled: on });
 });
 $('workdayNow').addEventListener('click', async () => {
-  // The rows go to /admin/ingest, which takes only the collect token; the
-  // background run would fail on it, so say so here instead of "starting…".
+  // The rows go through the connected account; say so here instead of
+  // "starting…" when it isn't connected.
   const { token } = await chrome.storage.local.get({ token: '' });
-  if (!token) {
-    $('workdayStatus').textContent = 'Workday needs the collect token: paste it in the Collect token box above, press Save, then try again.';
+  if (!token && !(await autofill('getProfile').then(() => true, () => false))) {
+    $('workdayStatus').textContent = 'Connect your account above first (paste the token from the job board’s Extension page, then Connect).';
     return;
   }
   if (!(await chrome.permissions.request({ origins: WORKDAY_ORIGINS }))) {
@@ -125,6 +131,7 @@ async function showConnection() {
     picker.disabled = false;
     $('account').textContent = 'Connected as ' + data.user.email;
   } catch (err) { $('account').textContent = err.message; }
+  showReach();
 }
 async function configure(token) {
   try {
@@ -277,7 +284,10 @@ showSites();
 chrome.storage.local.get({ shareListings: false }).then(({ shareListings }) => {
   $('shareListings').checked = shareListings;
 });
-$('shareListings').onchange = () => chrome.storage.local.set({ shareListings: $('shareListings').checked });
+$('shareListings').onchange = async () => {
+  await chrome.storage.local.set({ shareListings: $('shareListings').checked });
+  showReach();
+};
 
 // "Job site password": kept in the service worker's storage only.
 async function showSitePassword(message) {

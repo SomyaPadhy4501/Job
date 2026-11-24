@@ -105,6 +105,7 @@ function load({ portalUrl = 'https://portal.example', routes = {}, granted = [],
     fetch,
     indexedDB: fakeIndexedDB(),
     crypto: globalThis.crypto,
+    TextEncoder,
     AbortSignal,
     URL,
     btoa,
@@ -256,6 +257,29 @@ test("shared listings go to /api/capture/jobs with the user's token, in batches 
   assert.equal(bodies[0].body.pageUrl, 'https://www.tesla.com/careers');
   assert.equal(bodies[0].auth, 'Bearer tok-9');
   assert.equal(bodies[0].credentials, 'omit');
+});
+
+// The API takes 256 KB a request; Workday rows carry whole descriptions.
+test('shared listings with long descriptions go in requests under 200 KB', async () => {
+  const sizes = [];
+  const api = load({
+    routes: {
+      'POST /api/capture/jobs': (init) => {
+        sizes.push([JSON.parse(init.body).jobs.length, init.body.length]);
+        return json({ inserted: 1 })();
+      },
+    },
+  });
+  await api.send({ type: 'autofill:configure', token: 't' }, FROM_POPUP);
+  const rows = Array.from({ length: 30 }, (_, i) => ({
+    job_title: 'SWE ' + i,
+    apply_url: 'https://acme.wd5.myworkdayjobs.com/job/' + i,
+    description: 'é'.repeat(10_000),
+  }));
+  await api.share('https://acme.wd5.myworkdayjobs.com/', rows);
+  assert.equal(sizes.reduce((n, [jobs]) => n + jobs, 0), 30);
+  assert.ok(sizes.length > 1);
+  for (const [, chars] of sizes) assert.ok(chars * 2 < 256 * 1024, 'each request fits the API limit');
 });
 
 test("a refused share reports the portal's reason", async () => {

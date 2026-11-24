@@ -21,7 +21,8 @@ boards" opens your saved list as ordinary tabs, like a bookmark folder.
 2. **Load unpacked** → select this `extension/` folder.
 3. Click the extension icon, then fill in:
    - **Portal URL**: `https://job-two-xi.vercel.app`
-   - **Collect token**: the `COLLECT_TOKEN` value set on Vercel / in GitHub secrets.
+   - **Autofill token**: from the site's Autofill page, then **Connect**.
+   - **Share job listings I browse**: on, so captured listings reach the board.
    - **My boards**: one careers URL per line, e.g.
      `https://www.tesla.com/careers/search/?country=US`
 4. **Save**.
@@ -262,7 +263,12 @@ General → Login Items so it starts with the machine.
 Workday's Cloudflare answers the server collector's requests with HTTP 429
 (since 2026-11-24), so the extension can read the Workday employers instead.
 Turn on **Collect Workday employers from this computer** under Advanced (it
-asks Chrome for access to `*.myworkdayjobs.com`), with the collect token set.
+asks Chrome for access to `*.myworkdayjobs.com`), with your account connected
+(the Autofill token). The rows go to `/api/capture/jobs` as that account; the
+server forwards them as source `workday` with its own collect token, so no
+browser holds it. Workday rows have their own daily count per account
+(`WORKDAY_SHARES_PER_USER_PER_DAY`, default 20,000); an `OWNER_SUBS` account
+isn't counted.
 
 - Every 6 hours, in the background: no windows or tabs open.
 - The employer list is `/downloads/workday-tenants.json`, built from

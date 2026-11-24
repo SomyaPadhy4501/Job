@@ -92,6 +92,9 @@ pub struct Config {
     /// The owner's `COLLECT_TOKEN`; used only server to server.
     pub collect_token: Option<String>,
     pub shares_per_day: i64,
+    /// Workday rows a user's extension may send per day, counted apart: the
+    /// owner's Workday collection reads ~256 employers every 6 hours.
+    pub workday_shares_per_day: i64,
     /// Telegram settings for alerts and chat.
     pub notify: notify::Settings,
 }
@@ -118,6 +121,7 @@ impl Default for Config {
             ingest_url: None,
             collect_token: None,
             shares_per_day: 3000,
+            workday_shares_per_day: 20_000,
             notify: notify::Settings::default(),
         }
     }
@@ -177,6 +181,10 @@ impl Config {
                 .ok()
                 .filter(|t| !t.trim().is_empty()),
             shares_per_day: env_int("SHARES_PER_USER_PER_DAY", d.shares_per_day),
+            workday_shares_per_day: env_int(
+                "WORKDAY_SHARES_PER_USER_PER_DAY",
+                d.workday_shares_per_day,
+            ),
             notify: notify::Settings::from_env(),
         }
     }

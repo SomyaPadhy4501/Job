@@ -8,6 +8,12 @@
 //! user per day, and forwards the rest to the Node backend's `/admin/ingest`
 //! with the collect token, server to server. The usual normalize filters
 //! (US, software, level) then run on everything, as for any other source.
+//!
+//! The owner's own Workday collection (extension/workday-collect.js) comes
+//! here too, so no extension ever holds the collect token: rows from a
+//! Workday page must link to Workday, are stored as source `workday` (the
+//! same rows the server collector made) and have their own daily count. An
+//! owner (`OWNER_SUBS`) isn't counted at all.
 
 use axum::Json;
 use axum::extract::State;
@@ -18,6 +24,7 @@ use crate::AppState;
 use crate::autofill::TokenUser;
 use crate::error::{ApiError, ApiResult};
 use crate::http::{JsonBody, today};
+use crate::roles::Role;
 
 /// Listings one request may share (the extension sends at most this many).
 pub const MAX_PER_REQUEST: usize = 200;
@@ -79,6 +86,11 @@ fn site(host: &str) -> String {
 
 fn on(host: &str, domain: &str) -> bool {
     host == domain || host.ends_with(&format!(".{domain}"))
+}
+
+/// Workday's job sites, where the Workday collection reads.
+fn workday_host(host: &str) -> bool {
+    on(host, "myworkdayjobs.com") || on(host, "myworkdaysite.com")
 }
 
 fn https_host(raw: &str) -> Option<String> {
@@ -162,12 +174,20 @@ pub async fn share(
         ));
     }
 
+    let workday = workday_host(&page_host);
     let mut accepted = Vec::new();
     let mut refused = 0usize;
     for raw in &body.jobs {
         match clean_listing(&page_host, raw) {
-            Ok(row) => accepted.push(Value::Object(row)),
-            Err(_) => refused += 1,
+            // A Workday page's rows are stored as Workday's: only Workday links.
+            Ok(row)
+                if !workday
+                    || https_host(row["apply_url"].as_str().unwrap_or_default())
+                        .is_some_and(|h| workday_host(&h)) =>
+            {
+                accepted.push(Value::Object(row))
+            }
+            _ => refused += 1,
         }
     }
     if accepted.is_empty() {
@@ -177,26 +197,32 @@ pub async fn share(
     }
 
     let user_id = who.user.id;
-    let used = db::bump_counter(
-        state.pool()?,
-        &format!("user:{user_id}"),
-        "share",
-        &today(),
-        accepted.len() as i64,
-    )
-    .await?;
-    if used > c.shares_per_day {
-        return Err(ApiError::TooMany(format!(
-            "You've shared {} listings today, the most for one day. Thanks! Try again tomorrow.",
-            c.shares_per_day
-        )));
+    if Role::of(c, &who.user) != Role::Owner {
+        let (bucket, cap) = if workday {
+            ("share_workday", c.workday_shares_per_day)
+        } else {
+            ("share", c.shares_per_day)
+        };
+        let used = db::bump_counter(
+            state.pool()?,
+            &format!("user:{user_id}"),
+            bucket,
+            &today(),
+            accepted.len() as i64,
+        )
+        .await?;
+        if used > cap {
+            return Err(ApiError::TooMany(format!(
+                "You've shared {cap} listings today, the most for one day. Thanks! Try again tomorrow."
+            )));
+        }
     }
 
     let res = state
         .http
         .post(ingest)
         .header("x-collect-token", collect_token)
-        .json(&json!({ "source": "extension", "jobs": accepted }))
+        .json(&json!({ "source": if workday { "workday" } else { "extension" }, "jobs": accepted }))
         .send()
         .await
         .map_err(|e| {

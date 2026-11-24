@@ -1073,6 +1073,72 @@ async fn shared_listings_are_checked_and_forwarded_with_the_owners_token() {
     assert_eq!(res.status, StatusCode::UNAUTHORIZED);
 }
 
+/// The extension's Workday collection: the signed-in account sends, the
+/// server forwards as source "workday" with its own token, only Workday
+/// links count, and the Workday rows have a daily count of their own.
+#[tokio::test]
+async fn workday_rows_are_shared_as_workday_with_their_own_daily_count() {
+    let (url, seen) = fake_ingest().await;
+    let Some(app) = app_with(|c| {
+        c.ingest_url = Some(url);
+        c.collect_token = Some("owner-collect-token".into());
+        c.shares_per_day = 1;
+        c.workday_shares_per_day = 3;
+    }) else {
+        return;
+    };
+    let mut ext = Browser::new(&app);
+    ext.bearer = Some(extension_token(&app).await);
+    ext.csrf = false;
+
+    let res = ext
+        .json(
+            Method::POST,
+            "/api/capture/jobs",
+            json!({ "pageUrl": "https://capitalone.wd12.myworkdayjobs.com/", "jobs": [
+                { "job_title": "Software Engineer", "apply_url": "https://capitalone.wd12.myworkdayjobs.com/en-US/Capital_One/job/R1", "company_name": "Capital One" },
+                { "job_title": "Data Engineer", "apply_url": "https://capitalone.wd12.myworkdayjobs.com/en-US/Capital_One/job/R2", "company_name": "Capital One" },
+                { "job_title": "Elsewhere", "apply_url": "https://boards.greenhouse.io/x/jobs/1" }
+            ]}),
+        )
+        .await;
+    assert_eq!(
+        res.status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&res.body)
+    );
+    assert_eq!(
+        res.json()["sent"],
+        2,
+        "Workday counts past the general cap of 1"
+    );
+    assert_eq!(
+        res.json()["refused"],
+        1,
+        "a Workday page's rows link to Workday"
+    );
+    {
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen[0].0.as_deref(), Some("owner-collect-token"));
+        assert_eq!(seen[0].1["source"], "workday");
+    }
+
+    // 2 used of 3: two more is over the Workday count.
+    let over = ext
+        .json(
+            Method::POST,
+            "/api/capture/jobs",
+            json!({ "pageUrl": "https://capitalone.wd12.myworkdayjobs.com/", "jobs": [
+                { "job_title": "A", "apply_url": "https://capitalone.wd12.myworkdayjobs.com/a" },
+                { "job_title": "B", "apply_url": "https://capitalone.wd12.myworkdayjobs.com/b" }
+            ]}),
+        )
+        .await;
+    assert_eq!(over.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(seen.lock().unwrap().len(), 1);
+}
+
 #[tokio::test]
 async fn sharing_is_unavailable_until_configured() {
     let Some(app) = app() else { return };

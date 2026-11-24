@@ -176,7 +176,7 @@ async function openBoards({ scheduled }) {
     await addLog({
       host: scheduled ? 'scheduled run' : 'manual run',
       found: 0,
-      error: 'nothing would be sent. Paste the collect token above and Save',
+      error: 'nothing would be sent. Turn on “Share job listings I browse” and connect your account',
     });
     return;
   }
@@ -231,9 +231,28 @@ function workdayDeps(s) {
     tenantsUrl: new URL('/downloads/workday-tenants.json', s.portalUrl).toString(),
     post: async (rows) => {
       const total = { inserted: 0, updated: 0, rejected: 0 };
-      for (const batch of batches(rows)) {
-        const r = await postBatch(s.portalUrl, s.token, batch, 'workday');
-        for (const k of Object.keys(total)) total[k] += r[k] || 0;
+      // An older install with the collect token still posts directly.
+      if (s.token) {
+        for (const batch of batches(rows)) {
+          const r = await postBatch(s.portalUrl, s.token, batch, 'workday');
+          for (const k of Object.keys(total)) total[k] += r[k] || 0;
+        }
+        return total;
+      }
+      // Otherwise through the connected account: the server checks it and
+      // forwards the rows as Workday's. One employer's site per request
+      // (AutofillShare splits it to the route's limits).
+      const bySite = new Map();
+      for (const row of rows) {
+        const site = new URL(row.apply_url).origin + '/';
+        if (!bySite.has(site)) bySite.set(site, []);
+        bySite.get(site).push(row);
+      }
+      for (const [site, list] of bySite) {
+        const r = await globalThis.AutofillShare(site, list);
+        total.inserted += r.inserted || 0;
+        total.updated += r.updated || 0;
+        total.rejected += (r.rejected || 0) + (r.refused || 0);
       }
       return total;
     },
@@ -242,7 +261,7 @@ function workdayDeps(s) {
 
 async function startWorkday() {
   const s = await getSettings();
-  if (!s.token || !s.portalUrl) throw new Error('Add the collect token first.');
+  if (!s.token && !(await globalThis.AutofillShareReady())) throw new Error('Connect your account in the popup first.');
   if (!(await chrome.permissions.contains({ origins: WORKDAY_ORIGINS }))) throw new Error('Allow Workday access in the popup first.');
   const { workdayRun } = await chrome.storage.local.get('workdayRun');
   if (!workdayRun) await WorkdayCollect.start(workdayDeps(s));
@@ -272,14 +291,20 @@ async function workdayTick() {
 // starts, if it was off when a run was due.
 async function checkSchedule() {
   const s = await getSettings();
-  if (s.enabled && s.token && s.workdayEnabled) {
+  // Workday sends through the connected account (or an older install's
+  // collect token); without either it waits quietly instead of logging an
+  // error every 15 minutes.
+  if (s.enabled && s.workdayEnabled && (s.token || (await globalThis.AutofillShareReady()))) {
     const { workdayRun } = await chrome.storage.local.get('workdayRun');
     if (workdayRun) chrome.alarms.create('workdayTick', { periodInMinutes: 1 }); // resume after a restart
     else if (JobSchedule.isDueEvery(new Date(), s.workdayLastRunAt, s.workdayEveryHours)) {
       await startWorkday().catch((err) => addLog({ host: 'Workday', found: 0, error: err.message }));
     }
   }
-  if (!s.enabled || !s.autoOpen || !s.token) return;
+  // The boards' pages send through "Share job listings I browse" (or the
+  // collect token), as openBoards checks.
+  const { shareListings } = await chrome.storage.local.get({ shareListings: false });
+  if (!s.enabled || !s.autoOpen || !(s.token || shareListings)) return;
   const { boardsWindowId } = await chrome.storage.local.get('boardsWindowId');
   if (boardsWindowId != null) return; // a run is still in progress
   if (JobSchedule.isDueEvery(new Date(), s.lastRunAt, s.autoEveryHours)) await openBoards({ scheduled: true });
