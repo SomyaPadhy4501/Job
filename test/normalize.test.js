@@ -8,7 +8,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { looksUS } = require('../src/services/normalize');
+const { looksUS, normalizeJob } = require('../src/services/normalize');
 
 test('accepts plain US locations', () => {
   for (const loc of ['New York, NY', 'Austin, TX', 'San Francisco, CA, USA', 'Boston, Massachusetts']) {
@@ -325,5 +325,29 @@ test('only http(s) apply links are kept: a javascript: or data: link is dropped'
   for (const bad of ['javascript:alert(document.cookie)', ' JavaScript:alert(1)', 'data:text/html,<script>alert(1)</script>',
     'vbscript:msgbox(1)', '//evil.example/x', '/jobs/1']) {
     assert.strictEqual(row(bad), null, bad);
+  }
+});
+
+test('a numeric level 3+ is read like III: kept only when the posting puts it in range', () => {
+  const run = (title, description) =>
+    normalizeJob(
+      {
+        source: 'greenhouse',
+        company_name: 'Acme',
+        job_title: title,
+        location: 'San Francisco, CA',
+        description,
+        apply_url: `https://example.com/jobs/${encodeURIComponent(title + description)}`,
+        date_posted: new Date().toISOString(),
+      },
+      { filterUSOnly: true, filterSoftwareOnly: true, entryLevelMode: 'permissive' }
+    );
+  for (const title of ['Software Engineer 3', 'Software Engineer III']) {
+    assert.strictEqual(run(title, 'Build things.'), null, title);
+    assert.ok(run(title, 'Requires 1+ years of experience.'), `${title} with a 0-2 year requirement`);
+  }
+  // Not a level: "3D" and "5G", and "2" is mid-level like II.
+  for (const title of ['3D Graphics Software Engineer', '5G Software Engineer', 'Software Engineer 2']) {
+    assert.ok(run(title, 'Build things.'), title);
   }
 });

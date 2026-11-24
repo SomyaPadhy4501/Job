@@ -541,9 +541,11 @@ test('workday: detail requests go to rows normalize would keep, newest first', (
     posting('Software Engineer', 'Posted 1 Day Ago', 'Bengaluru, India'), // not US
     posting('Data Engineer 4', 'Posted 5 Days Ago'),
   ]);
+  // Level 4 and 5 titles are seniority-worded (like III), so they queue behind
+  // the plain title (levelRank), then newest first.
   assert.deepStrictEqual(
     picked.map((j) => j.title),
-    ['Machine Learning Engineer 5 (Senior Manager, IC)', 'Data Engineer 4', 'Software Engineer']
+    ['Software Engineer', 'Machine Learning Engineer 5 (Senior Manager, IC)', 'Data Engineer 4']
   );
 });
 
