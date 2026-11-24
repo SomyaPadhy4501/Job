@@ -6,4 +6,6 @@ node_modules/
 /target/
 # Built from extension/ by web/scripts/pack-extension.mjs
 /web/public/downloads/
-/web/dist/downloads/
+/web/dist/
+.claude/worktrees/
+.claude/settings.local.json
