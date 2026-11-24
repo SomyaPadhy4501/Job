@@ -140,6 +140,20 @@ const FAMILIES: &[(&str, &[&str])] = &[
     ),
 ];
 
+/// Resume-title words too common to say which job a resume is for.
+const TITLE_STOPWORDS: &[&str] = &[
+    "resume",
+    "cv",
+    "the",
+    "and",
+    "for",
+    "engineer",
+    "software",
+    "developer",
+    "new",
+    "grad",
+];
+
 pub struct Candidate<'a> {
     pub id: Uuid,
     pub title: &'a str,
@@ -192,6 +206,22 @@ pub fn rank(job_title: &str, candidates: &[Candidate<'_>]) -> Vec<(Uuid, u32)> {
             for tag in c.tags {
                 let tag = padded(tag);
                 if tag.trim().len() > 1 && job_words.contains(tag.as_str()) {
+                    score += 5;
+                }
+            }
+            // Resumes are named now ("Backend SWE"), not tagged: title words found
+            // in the job title break ties between resumes of the same family.
+            let title = padded(c.title);
+            let mut seen: Vec<&str> = Vec::new();
+            for word in title.split_whitespace() {
+                if word.chars().count() < 3
+                    || TITLE_STOPWORDS.contains(&word)
+                    || seen.contains(&word)
+                {
+                    continue;
+                }
+                seen.push(word);
+                if job_words.contains(&format!(" {word} ")) {
                     score += 5;
                 }
             }
@@ -250,6 +280,37 @@ mod tests {
         assert_eq!(rank("Software Engineer, New Grad", &cands)[0].0, ids[0]);
         // Nothing specific: the default wins.
         assert_eq!(rank("Product Designer", &cands)[0].0, ids[0]);
+    }
+
+    #[test]
+    fn resume_title_words_break_ties() {
+        fn named(id: Uuid, title: &str) -> Candidate<'_> {
+            Candidate {
+                id,
+                title,
+                tags: &[],
+                is_default: false,
+            }
+        }
+        let ids: Vec<Uuid> = (0..3).map(|_| Uuid::new_v4()).collect();
+        let job = "Backend Engineer, Payments";
+        let cands = [named(ids[0], "Frontend SWE"), named(ids[1], "Backend SWE")];
+        assert_eq!(rank(job, &cands)[0].0, ids[1]);
+        // Same family: the title word "Payments" decides.
+        let cands = [
+            named(ids[1], "Backend SWE"),
+            named(ids[2], "Payments Backend SWE"),
+        ];
+        assert_eq!(rank(job, &cands)[0].0, ids[2]);
+        // A tie still goes to the default resume.
+        let cands = [
+            named(ids[0], "Backend SWE"),
+            Candidate {
+                is_default: true,
+                ..named(ids[1], "Backend SWE")
+            },
+        ];
+        assert_eq!(rank(job, &cands)[0].0, ids[1]);
     }
 
     #[test]
