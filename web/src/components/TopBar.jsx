@@ -88,7 +88,7 @@ export default function TopBar({ total, isFetching, onRefresh }) {
         )}
       </div>
     </header>
-    {user && !dismissed && path !== '/autofill' && (
+    {user && !dismissed && path !== '/autofill' && path !== '/welcome' && (
       <div className="prompt-banner" role="note">
         <span>
           <strong>New:</strong> fill job applications in one click with your resumes, and help grow the board with the

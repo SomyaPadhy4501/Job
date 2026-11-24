@@ -84,7 +84,7 @@ export function useSignedIn() {
     qc.removeQueries({ predicate: (q) => !PUBLIC_KEYS.includes(q.queryKey[0]) });
     qc.setQueryData(ME, { user: data.user, owner: data.owner, recentSignIn: true });
     // A brand-new account starts on the welcome page for the extension.
-    if (data.isNew) navigate('/autofill?welcome=1');
+    if (data.isNew) navigate('/welcome');
   };
 }
 

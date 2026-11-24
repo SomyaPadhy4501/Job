@@ -18,7 +18,8 @@
     { "source": "/settings",       "destination": "/index.html" },
     { "source": "/settings/:path*","destination": "/index.html" },
     { "source": "/privacy",        "destination": "/index.html" },
-    { "source": "/autofill",       "destination": "/index.html" }
+    { "source": "/autofill",       "destination": "/index.html" },
+    { "source": "/welcome",        "destination": "/index.html" }
   ],
   "headers": [
     {

@@ -94,6 +94,9 @@ function reducer(state, action) {
       // may no longer exist at the new density (or worse, point to a
       // misleading window of results).
       return { ...state, limit: normalizeLimit(action.value), page: 1 };
+    case 'defaults':
+      // A person's saved board defaults, applied when the URL names no filter.
+      return { ...state, ...action.values, page: 1 };
     case 'clamp':
       return { ...state, page: Math.min(Math.max(1, state.page), Math.max(1, action.max)) };
     default:

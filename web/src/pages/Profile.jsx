@@ -53,6 +53,16 @@ const EEO_LABELS = {
   disability: 'Disability',
 };
 
+export const BOARD_EMPTY = { role: '', level: '', sponsorship: '', restriction: '', view: '' };
+export const BOARD_OPTIONS = {
+  role: [['', 'Any role type'], ['SWE', 'SWE / SDE'], ['MLE', 'ML Engineer'], ['AI', 'AI / Research'], ['DS', 'Data Scientist'], ['DATA_ENG', 'Data Engineer'], ['SRE', 'DevOps / SRE'], ['SECURITY', 'Security'], ['MOBILE', 'Mobile']],
+  level: [['', 'Any level (entry + mid)'], ['entry', 'Entry-level only'], ['mid', 'Mid-level (1-2 YOE)'], ['early', 'Entry or mid']],
+  sponsorship: [['', 'Sponsors visas (confirmed)'], ['ANY', 'Any sponsorship'], ['NO', 'Sponsorship: NO'], ['UNKNOWN', 'Sponsorship: UNKNOWN']],
+  restriction: [['', 'Hide no-sponsorship / ITAR / clearance'], ['all', 'Show all roles'], ['only', 'Only restricted roles']],
+  view: [['', 'Group by company'], ['list', 'Flat list']],
+};
+export const BOARD_LABELS = { role: 'Role type', level: 'Level', sponsorship: 'Sponsorship', restriction: 'Clearance / citizenship roles', view: 'Layout' };
+
 const EMPTY_EDU = { school: '', degree: '', field: '', gpa: '', startDate: '', endDate: '' };
 const EMPTY_JOB = { company: '', title: '', location: '', startDate: '', endDate: '', current: null, description: '' };
 
@@ -71,7 +81,7 @@ function ProfilePage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (data) setDraft(structuredClone(data.profile));
+    if (data) setDraft({ ...structuredClone(data.profile), board: { ...BOARD_EMPTY, ...data.profile.board } });
   }, [data]);
 
   const save = useMutation({
@@ -235,6 +245,12 @@ function ProfilePage() {
             options={[['', 'Not set (leave for me)'], ['decline', 'Decline to answer'], ...EEO[k].map((o) => [o, o])]}
             onChange={(v) => set(`eeo.${k}`, v || null)}
           />
+        ))}
+      </Section>
+
+      <Section title="Job board" note="How the job list opens for you. You can still change the filters on the board any time.">
+        {Object.keys(BOARD_OPTIONS).map((k) => (
+          <SelectField key={k} label={BOARD_LABELS[k]} value={draft.board[k]} options={BOARD_OPTIONS[k]} onChange={(v) => set(`board.${k}`, v)} />
         ))}
       </Section>
 

@@ -6,6 +6,7 @@ import CompanyGroups from '../components/CompanyGroups.jsx';
 import Pager from '../components/Pager.jsx';
 import { useJobs, useCompanies } from '../hooks/useJobs.js';
 import useUrlFilters from '../hooks/useUrlFilters.js';
+import { usePrivateQuery } from '../account.js';
 
 export default function Board() {
   // Filters live in the URL query string (see useUrlFilters). Reloading the
@@ -13,6 +14,17 @@ export default function Board() {
   // then serves the prior rows instantly while it revalidates in the
   // background. No cold-boot flash on refresh.
   const [filters, dispatch] = useUrlFilters();
+  // Open with the person's saved defaults (Profile → Job board), unless the
+  // URL already says which filters to use.
+  const plainUrl = useRef(!window.location.search);
+  const profile = usePrivateQuery(['profile'], '/api/me/profile');
+  useEffect(() => {
+    const board = profile.data?.profile?.board;
+    if (!plainUrl.current || !board) return;
+    plainUrl.current = false;
+    const values = Object.fromEntries(Object.entries(board).filter(([, v]) => v));
+    if (Object.keys(values).length) dispatch({ type: 'defaults', values });
+  }, [profile.data]);
   const grouped = filters.view === 'grouped';
   // In grouped mode the job query only supplies the role total (TopBar, new-
   // jobs toast), so it asks for a single row; the companies query drives the

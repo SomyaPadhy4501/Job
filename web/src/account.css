@@ -174,3 +174,33 @@ fieldset.section legend { font-weight: 600; font-size: 15px; padding: 0 6px; }
 .copy-row code { background: var(--pill-bg); padding: 4px 8px; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
 .checklist { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .checklist .done { color: var(--yes-fg); }
+
+/* ─── Landing (signed out) ───────────────────────────────────────────────── */
+.landing { min-height: 100vh; display: flex; flex-direction: column; max-width: 1100px; margin: 0 auto; padding: 24px; }
+.landing-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; }
+.landing-body { flex: 1; display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: center; padding: 48px 0; }
+.landing-pitch h1 { font-size: 36px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 20px; }
+.landing-pitch ul { padding-left: 20px; color: var(--text-muted); font-size: 15px; display: flex; flex-direction: column; gap: 10px; }
+.landing-footer { color: var(--text-muted); font-size: 13px; }
+
+/* ─── Welcome steps ──────────────────────────────────────────────────────── */
+.welcome-flow { display: flex; flex-direction: column; gap: 16px; }
+.stepper { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.stepper button {
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--panel);
+  border-radius: var(--radius-pill); padding: 6px 14px 6px 6px; font: inherit; color: var(--text-muted); cursor: pointer;
+}
+.step-num {
+  width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--pill-bg); font-weight: 700; font-size: 12px;
+}
+.stepper .is-current button { border-color: var(--accent); color: var(--accent-fg); }
+.stepper .is-current .step-num { background: var(--accent); color: #fff; }
+.stepper .is-done .step-num { background: var(--yes-bg); color: var(--yes-fg); }
+.step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+.subhead { margin-top: 18px !important; }
+
+@media (max-width: 720px) {
+  .landing-body { grid-template-columns: 1fr; gap: 24px; padding: 24px 0; }
+  .landing-pitch h1 { font-size: 26px; }
+}

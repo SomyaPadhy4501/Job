@@ -4,36 +4,55 @@ import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Autofill from './pages/Autofill.jsx';
+import Welcome from './pages/Welcome.jsx';
+import Landing from './pages/Landing.jsx';
 import TopBar from './components/TopBar.jsx';
+import { useAccount } from './account.js';
 import { Link, usePath } from './router.jsx';
 
 const PAGES = {
   '/resumes': Resumes,
   '/profile': Profile,
   '/settings': Settings,
-  '/privacy': Privacy,
   '/autofill': Autofill,
+  '/welcome': Welcome,
 };
+
+// Pages anyone can open without signing in.
+const PUBLIC = { '/privacy': Privacy };
 
 export default function App() {
   const path = usePath().replace(/\/+$/, '') || '/';
+  const { data, isLoading } = useAccount();
+
+  if (PUBLIC[path]) return <Shell><Privacy /></Shell>;
+  // Everything else needs an account: signed-out visitors get the sign-in page.
+  if (isLoading) return <Shell><div className="card"><div className="skeleton skeleton-row" /></div></Shell>;
+  if (!data?.user) return <Landing />;
+
   if (path === '/') return <Board />;
   const Page = PAGES[path];
   return (
+    <Shell>
+      {Page ? (
+        <Page />
+      ) : (
+        <div className="card">
+          <h2>Page not found</h2>
+          <p>
+            <Link to="/">Back to the jobs</Link>
+          </p>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+function Shell({ children }) {
+  return (
     <div className="app">
       <TopBar />
-      <main className="main page">
-        {Page ? (
-          <Page />
-        ) : (
-          <div className="card">
-            <h2>Page not found</h2>
-            <p>
-              <Link to="/">Back to the jobs</Link>
-            </p>
-          </div>
-        )}
-      </main>
+      <main className="main page">{children}</main>
     </div>
   );
 }

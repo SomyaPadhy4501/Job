@@ -39,6 +39,36 @@ pub struct Profile {
     pub skills: Vec<String>,
     pub eeo: Eeo,
     pub misc: Misc,
+    pub board: Board,
+}
+
+/// How this person wants the job board to open: their default filters.
+/// Empty means the board's own default.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Board {
+    pub role: String,
+    pub level: String,
+    pub sponsorship: String,
+    pub restriction: String,
+    pub view: String,
+}
+
+const BOARD_ROLES: &[&str] = &[
+    "", "SWE", "MLE", "AI", "DS", "DATA_ENG", "SRE", "SECURITY", "MOBILE",
+];
+const BOARD_LEVELS: &[&str] = &["", "entry", "mid", "early"];
+const BOARD_SPONSORSHIP: &[&str] = &["", "YES", "ANY", "NO", "UNKNOWN"];
+const BOARD_RESTRICTION: &[&str] = &["", "hide", "all", "only"];
+const BOARD_VIEW: &[&str] = &["", "grouped", "list"];
+
+fn one_of(field: &'static str, value: &mut String, allowed: &[&str]) -> Check {
+    *value = clean_line(value);
+    if allowed.contains(&value.as_str()) {
+        Ok(())
+    } else {
+        Err(ProfileError::BadChoice(field))
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -180,6 +210,8 @@ pub enum ProfileError {
     TooMany(&'static str, usize),
     #[error("the profile is over 64 KB")]
     TooLarge,
+    #[error("{0} isn't one of the listed options")]
+    BadChoice(&'static str),
 }
 
 type Check = Result<(), ProfileError>;
@@ -394,6 +426,13 @@ impl Profile {
             200,
         )?;
 
+        let b = &mut self.board;
+        one_of("Role type", &mut b.role, BOARD_ROLES)?;
+        one_of("Level", &mut b.level, BOARD_LEVELS)?;
+        one_of("Sponsorship filter", &mut b.sponsorship, BOARD_SPONSORSHIP)?;
+        one_of("Restriction filter", &mut b.restriction, BOARD_RESTRICTION)?;
+        one_of("Board view", &mut b.view, BOARD_VIEW)?;
+
         let size = serde_json::to_vec(self)
             .map(|v| v.len())
             .unwrap_or(usize::MAX);
@@ -529,6 +568,25 @@ mod tests {
         assert_eq!(v["misc"]["over18"], true);
         assert_eq!(v["eeo"]["hispanicLatino"], Value::Null);
         assert!(v["education"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn board_defaults_take_only_listed_options() {
+        let mut p = Profile::default();
+        p.board.role = " MLE ".into();
+        p.board.sponsorship = "ANY".into();
+        p.validate().unwrap();
+        assert_eq!(p.board.role, "MLE");
+        assert_eq!(
+            serde_json::to_value(&p).unwrap()["board"]["sponsorship"],
+            "ANY"
+        );
+        p.board.level = "senior".into();
+        assert_eq!(p.validate(), Err(ProfileError::BadChoice("Level")));
+        // Old profiles without the section still read.
+        let old: Profile =
+            serde_json::from_value(json!({"identity": {"firstName": "Jane"}})).unwrap();
+        assert_eq!(old.board, Board::default());
     }
 
     #[test]
