@@ -16,9 +16,11 @@ function json(body) {
 }
 
 const requests = [];
+let throttle = false;
 global.fetch = async (url, init = {}) => {
   url = String(url);
   requests.push(url);
+  if (throttle && url.startsWith(WD)) return new Response('slow down', { status: 429 });
   if (url === `${WD}/jobs`) {
     const { searchText } = JSON.parse(init.body);
     if (searchText !== 'Full-stack Engineer 4') return json({ total: 0, jobPostings: [] });
@@ -99,6 +101,26 @@ test('nothing found anywhere: rows come back unchanged', async () => {
   const before = row('Nobody Corp', 'Software Engineer', 'Boston, MA, USA', '3');
   const [r] = await resolveOriginalLinks([before]);
   assert.deepEqual(r, before);
+});
+
+test('the first Workday 429 ends Workday lookups for the run, without waiting', async () => {
+  throttle = true;
+  requests.length = 0;
+  const started = Date.now();
+  const rows = await resolveOriginalLinks([
+    row('Capital One', 'Full-stack Engineer 4', 'New York, NY, USA', '5'),
+    row('Capital One', 'Full-stack Engineer 3', 'McLean, VA, USA', '6'),
+  ]);
+  throttle = false;
+  assert.ok(Date.now() - started < 2000);
+  assert.equal(rows[0].apply_url, 'https://builtin.com/job/x/5');
+  assert.equal(rows[1].apply_url, 'https://builtin.com/job/x/6');
+  assert.equal(requests.filter((u) => u.startsWith(WD)).length, 1);
+});
+
+test('out of time: lookups stop and rows keep their Built In link', async () => {
+  const [r] = await resolveOriginalLinks([row('Capital One', 'Full-stack Engineer 4', 'New York, NY, USA', '8')], { budgetMs: -1 });
+  assert.equal(r.apply_url, 'https://builtin.com/job/x/8');
 });
 
 // ─── src/scripts/fix-builtin-links.js: what happens to stored rows ───────────

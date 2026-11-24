@@ -99,7 +99,12 @@ async function main() {
   }
 
   const builtin = rows.filter((r) => BUILTIN_LINK.test(r.apply_url));
-  const resolved = await resolveOriginalLinks(builtin.map((r) => ({ ...r, description: '' })));
+  // Runs alone, so it can take most of the workflow's 20 minutes, not the
+  // scraper's 4. Rows not reached keep their link; run it again for the rest.
+  const resolved = await resolveOriginalLinks(
+    builtin.map((r) => ({ ...r, description: '' })),
+    { budgetMs: 15 * 60_000 },
+  );
   const p = plan(rows, resolved);
 
   console.log(
