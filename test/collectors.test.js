@@ -490,17 +490,17 @@ test('pcsx: detail URL is derived from the search URL', () => {
   );
 });
 
-test('pcsx: spends detail requests only on rows the pipeline would keep, newest first', () => {
+test('pcsx: spends detail requests on rows the pipeline could keep, likely-in-range titles first', () => {
   const { pickForDetail } = require('../src/collectors/pcsx');
   const row = (id, title, location, ts) => ({ external_id: id, job_title: title, location, date_posted: ts });
   const picked = pickForDetail([
     row('1', 'Software Engineer II', 'Redmond, WA, US', 100),
-    row('2', 'Principal Software Engineer', 'Redmond, WA, US', 900), // senior: rejected later anyway
+    row('2', 'Principal Software Engineer', 'Redmond, WA, US', 900), // seniority word: its description decides, so it queues last
     row('3', 'Software Engineer', 'Bangalore, India', 800), // not US
     row('4', 'Software Engineer', 'Seattle, WA, US', 300),
     row('5', 'Office Manager', 'Redmond, WA, US', 700), // not a software role
   ]);
-  assert.deepStrictEqual(picked.map((r) => r.external_id), ['4', '1']);
+  assert.deepStrictEqual(picked.map((r) => r.external_id), ['4', '1', '2']);
 });
 
 test('pcsx: descriptions are filled in place and one failure does not lose the rest', async () => {

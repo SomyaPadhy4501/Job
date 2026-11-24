@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // Collector for employers hosted on SmartRecruiters.
 //
@@ -125,15 +125,16 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     if (LEVEL_REJECT.has(level)) continue;
 
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', p.company?.name || displayName || slug)) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
 
     candidates.push({ posting: p, title, level });
   }
 
   // Newest first, so that when detailCap bites it's the oldest rows that go
-  // without a description.
+  // without a description. Likely-in-range titles (levelRank) go first.
   candidates.sort(
     (a, b) =>
+      levelRank(a.title) - levelRank(b.title) ||
       new Date(b.posting.releasedDate || 0).getTime() -
       new Date(a.posting.releasedDate || 0).getTime()
   );

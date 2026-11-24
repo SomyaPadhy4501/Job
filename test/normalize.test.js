@@ -248,27 +248,30 @@ test('an ", IC" pay-band label does not make an individual-contributor role seni
   }
 });
 
-test('genuine management and seniority titles are still rejected', () => {
-  const { passesLevel } = require('../src/services/normalize');
+test('management titles are rejected at the title gate; seniority words wait for the posting', () => {
+  const { passesLevel, levelVerdict } = require('../src/services/normalize');
   for (const title of [
     'Director - AI Engineering',
     'Senior Manager- AI Engineer',
     'Distinguished AI Engineer',
     'Engineering Manager (IC)', // no comma: not a band label, still a manager
-    'Senior Software Engineer (Remote)',
   ]) {
     assert.strictEqual(passesLevel(title, 'permissive'), false, title);
   }
+  // A seniority word gets its description read; with nothing in range in it,
+  // the role is still dropped (levelVerdict).
+  assert.strictEqual(passesLevel('Senior Software Engineer (Remote)', 'permissive'), true);
+  assert.strictEqual(levelVerdict({ title: 'Senior Software Engineer (Remote)', description: 'Build APIs.', years: null }).keep, false);
 });
 
 // ─── Titles the role filter used to miss (2026-11-02 Ashby audit) ────────────
 
 test('AI-lab and startup engineering titles count as software', () => {
-  const { classifyRole, passesLevel } = require('../src/services/normalize');
+  const { classifyRole, passesLevel, levelVerdict } = require('../src/services/normalize');
   // Seen on OpenAI, Anthropic, Ramp, Linear and PostHog boards.
   assert.strictEqual(classifyRole('Member of Technical Staff (AI Inference Engineer)', 'ashby'), 'SWE');
   assert.strictEqual(passesLevel('Member of Technical Staff', 'permissive'), true, '"Technical Staff" is not a Staff level');
-  assert.strictEqual(passesLevel('Staff Software Engineer', 'permissive'), false);
+  assert.strictEqual(levelVerdict({ title: 'Staff Software Engineer', description: '', years: null }).keep, false, 'Staff with nothing in range');
   assert.strictEqual(classifyRole('Forward Deployed Engineer', 'ashby'), 'SWE');
   assert.strictEqual(classifyRole('Training: ML Framework Engineer', 'ashby'), 'MLE');
   assert.strictEqual(classifyRole('Researcher, Alignment', 'ashby'), 'AI');

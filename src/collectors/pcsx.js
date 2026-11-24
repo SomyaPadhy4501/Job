@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel, inUS } = require('../services/normalize');
+const { looksSoftware, passesLevel, inUS, levelRank } = require('../services/normalize');
 
 // Generic Phenom-Cloud "PCSX" collector. The same API shape powers
 // apply.careers.microsoft.com AND careers.qualcomm.com (and likely other
@@ -112,10 +112,10 @@ function pickForDetail(rows, max = DETAIL_MAX) {
       (r) =>
         r.external_id &&
         (!CONFIG.filterSoftwareOnly || looksSoftware(r.job_title)) &&
-        passesLevel(r.job_title, CONFIG.entryLevelMode || 'permissive', r.company_name) &&
+        passesLevel(r.job_title, CONFIG.entryLevelMode || 'permissive') &&
         inUS(r.location, r.countries)
     )
-    .sort((a, b) => (Number(b.date_posted) || 0) - (Number(a.date_posted) || 0))
+    .sort((a, b) => levelRank(a.job_title) - levelRank(b.job_title) || (Number(b.date_posted) || 0) - (Number(a.date_posted) || 0))
     .slice(0, max);
 }
 

@@ -24,6 +24,21 @@ const { normalizeForMatch } = require('./clearance');
 const NARRATIVE_BEFORE =
   /(?:\bfor\b|more than|over the (?:past|last)|in the (?:past|last)|history of|founded|celebrating|been (?:named|recognized))\s*$/i;
 
+// The same lead-ins also introduce real requirements, when experience follows
+// the number: "What we're looking for: 8+ years of software engineering
+// experience", "more than 5 years of experience". Reading those as company
+// history dropped the requirement, so Databricks' "Staff Fullstack Engineer"
+// read as asking for 2 years (2026-11-23). Up to five words may sit between.
+const EXPERIENCE_AFTER =
+  /^\d{1,2}\s*\+?\s*(?:(?:-|–|—|to)\s*\d{1,2}\s*\+?\s*)?years?['’]?\s+(?:of\s+)?(?:[\w/&+.#-]+\s+){0,5}?experience\b/i;
+
+// "Bachelor's degree and 2 years", "Master's degree with 0-2 years": what a
+// candidate holding that degree needs, as opposed to the longer path offered
+// without one (Walmart: "Option 2: 4 years' experience"). Same sentence only,
+// and "a 4-year degree" is a degree's length, not experience.
+const DEGREE_YEARS =
+  /\b(?:bachelor|master)['’]?s?\b[^.;:]{0,120}?\b(\d{1,2})\s*\+?\s*(?:(?:-|–|—|to)\s*\d{1,2}\s*\+?\s*)?years?\b(?![\s-]*(?:degree|program|diploma|course))/gi;
+
 // Degree durations — "a 4 year degree", "4-year program". Distinct from
 // "Bachelor's degree + 3 years of experience", which is a real requirement, so
 // this only fires when the number is directly bound to the degree noun.
@@ -65,6 +80,10 @@ const MAX_REASONABLE_YEARS = 25; // guards against "25 years, we've been pioneer
 // no number are kept — the title filters in normalize.js still apply to them.
 const MAX_YOE = 2;
 
+// A posting that asks for this many years anywhere is a senior role, whatever
+// smaller numbers it also mentions (see levelVerdict in normalize.js).
+const SENIOR_YEARS = 5;
+
 function isNarrative(before) {
   return NARRATIVE_BEFORE.test(before.slice(-28));
 }
@@ -75,7 +94,7 @@ function collect(text, regex, handler) {
   while ((m = regex.exec(text)) !== null) {
     const before = text.slice(Math.max(0, m.index - 40), m.index);
     const after = text.slice(m.index, m.index + 70);
-    if (isNarrative(before)) continue;
+    if (isNarrative(before) && !EXPERIENCE_AFTER.test(after)) continue;
     if (DEGREE_BOUND.test(after)) continue;
     if (NOT_EXPERIENCE_AFTER.test(after)) continue;
     if (!YEARS_OF_SHAPE.test(after) && !REQUIREMENT_CONTEXT.test(before + after)) continue;
@@ -83,13 +102,23 @@ function collect(text, regex, handler) {
   }
 }
 
-function extractExperience(text) {
+// Every stated requirement, summarised:
+//   min     the bar to be considered at all (what extractExperience returns);
+//   max     the top of any range;
+//   top     the highest minimum stated anywhere;
+//   degree  the requirement bound to a bachelor's or master's degree, if any.
+// `top` separates "Bachelor's and 2 years" from "2+ years of Go" sitting in a
+// role that also asks for "8+ years of software engineering": both have min 2,
+// only the second is senior. `degree` keeps Walmart's "Bachelor's and 2 years,
+// or 4 years without a degree" at 2.
+function experienceProfile(text) {
   if (!text || typeof text !== 'string') return null;
   const t = normalizeForMatch(text);
   if (!t) return null;
 
   const mins = [];
   const maxes = [];
+  const spans = [];
 
   // Ranges are unambiguous, so take them first and let them define both ends.
   collect(t, RANGE, (m) => {
@@ -100,9 +129,12 @@ function extractExperience(text) {
     if (hi < lo) return;
     mins.push(lo);
     maxes.push(hi);
+    spans.push([m.index, m.index + m[0].length]);
   });
 
+  // A range's upper end is not a second minimum: "2-4 years" asks for 2.
   collect(t, SINGLE, (m) => {
+    if (spans.some(([a, b]) => m.index > a && m.index < b)) return;
     const n = Number(m[1]);
     if (!Number.isFinite(n) || n > MAX_REASONABLE_YEARS) return;
     mins.push(n);
@@ -110,13 +142,30 @@ function extractExperience(text) {
 
   if (!mins.length) return null;
 
+  const degrees = [];
+  DEGREE_YEARS.lastIndex = 0;
+  for (let m; (m = DEGREE_YEARS.exec(t)) !== null;) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n <= MAX_REASONABLE_YEARS) degrees.push(n);
+  }
+
   // Take the LOWEST stated requirement. Postings routinely list several
   // ("3+ years backend, 5+ years distributed systems"); the lowest is the bar
   // for being considered at all. Erring low also matches the priority here —
   // wrongly hiding a reachable job costs more than showing a stretch one.
   const min = Math.min(...mins);
   const max = maxes.length ? Math.max(...maxes) : null;
-  return { min, max: max != null && max >= min ? max : null };
+  return {
+    min,
+    max: max != null && max >= min ? max : null,
+    top: Math.max(...mins),
+    degree: degrees.length ? Math.min(...degrees) : null,
+  };
+}
+
+function extractExperience(text) {
+  const p = experienceProfile(text);
+  return p ? { min: p.min, max: p.max } : null;
 }
 
 // Map extracted years to the board's two level flags.
@@ -138,4 +187,4 @@ function exceedsMaxYoe(years) {
   return !!years && typeof years.min === 'number' && years.min > MAX_YOE;
 }
 
-module.exports = { extractExperience, levelFromYears, exceedsMaxYoe, MAX_YOE };
+module.exports = { extractExperience, experienceProfile, levelFromYears, exceedsMaxYoe, MAX_YOE, SENIOR_YEARS };

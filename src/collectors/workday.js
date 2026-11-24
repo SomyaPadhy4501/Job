@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // Public Workday "CxS" JSON endpoints. Each company has a tenant + wd shard + site path:
 //   https://{tenant}.wd{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs   (POST list)
@@ -175,11 +175,10 @@ function parsePostedOn(s) {
 // bites it is the oldest rows that go without — and those keep the description
 // they got when they were new (see upsertJob).
 //
-// The employer goes to the level gate too: Palo Alto Networks' "Staff" titles
-// are not senior (see looksSeniorReject), and they need their description read
-// here, since it is the stated years that decide whether they stay.
-function pickCandidates(list, company = {}) {
-  const employer = company.displayName || company.slug;
+// Seniority-worded titles ("Staff", "Senior", "III") get a request too: the
+// years their description states decide whether they stay (levelVerdict). They
+// queue behind entry and plain titles (levelRank), so the cap bites them first.
+function pickCandidates(list) {
   return list
     .filter(
       (j) =>
@@ -190,9 +189,9 @@ function pickCandidates(list, company = {}) {
         // "Visa Sponsorship through PayPal is not available" went unread.
         looksUSLocation(resolveLocation(j)) &&
         (!CONFIG.filterSoftwareOnly || looksSoftware(j.title)) &&
-        passesLevel(j.title, CONFIG.entryLevelMode || 'permissive', employer)
+        passesLevel(j.title, CONFIG.entryLevelMode || 'permissive')
     )
-    .sort((a, b) => postedAgeDays(a.postedOn) - postedAgeDays(b.postedOn));
+    .sort((a, b) => levelRank(a.title) - levelRank(b.title) || postedAgeDays(a.postedOn) - postedAgeDays(b.postedOn));
 }
 
 // Workday words recency as "Posted Today", "Posted Yesterday", "Posted 5 Days
@@ -216,7 +215,7 @@ async function fetchCompany(company) {
 
   const list = await fetchList(company);
 
-  const candidates = pickCandidates(list, company);
+  const candidates = pickCandidates(list);
   const enrichTargets = candidates.slice(0, DEFAULT_ENRICH_MAX);
 
   const descByPath = new Map();

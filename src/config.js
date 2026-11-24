@@ -1501,6 +1501,27 @@ const COMPANIES = [
 
   // Pinpoint board named by a new-grad list link (2026-11-23): 2 kept, 2 US software of 14, 8 approvals.
   { source: 'pinpoint', slug: 'confluence', displayName: 'Confluence Technologies' },
+  // ── Boards the browser extension used to cover (2026-11-23) ───────────────
+  // Collected here instead, so they run in GitHub Actions with the computer off.
+  // The Phenom career sites (careers.fiserv.com, careers.truist.com, …) are
+  // front ends over Workday: their public /widgets search names each job's
+  // Workday apply link, which gives tenant / shard / site. Not probed (Workday
+  // was rate-limiting the machine). AmEx and Nokia serve Oracle Candidate
+  // Experience on their own domains with the API on an oraclecloud.com host.
+  // Still extension-only: Tesla and Wayfair (they block automated clients),
+  // Yelp (iCIMS) and Corning (no apply link in its search API).
+  { source: 'oracle_hcm', slug: 'american-express', apiHost: 'egug.fa.us2.oraclecloud.com', siteNumber: 'CX_1', uiBaseUrl: 'https://careers.americanexpress.com/en/sites/CX_1', displayName: 'American Express' },  // 5 kept (5 YES), 41 US software of 420, 1321 approvals
+  { source: 'oracle_hcm', slug: 'navy-federal', apiHost: 'jobs.navyfederal.org', siteNumber: 'nfcu', uiBaseUrl: 'https://jobs.navyfederal.org/hcmUI/CandidateExperience/en/sites/nfcu', displayName: 'Navy Federal Credit Union' },  // 1 kept, 15 US software of 152, 292 approvals
+  { source: 'oracle_hcm', slug: 'nokia', apiHost: 'fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com', siteNumber: 'CX_1', uiBaseUrl: 'https://jobs.nokia.com/en/sites/CX_1', displayName: 'Nokia of America' },  // 1 kept, 9 US software of 500, 549 approvals
+  { source: 'workday', slug: 'fiserv-ext', tenant: 'fiserv', wd: '5', site: 'EXT', displayName: 'Fiserv' },  // 781 approvals (alias fiserv-solutions)
+  { source: 'workday', slug: 'truist-careers', tenant: 'truist', wd: '1', site: 'Careers', displayName: 'Truist' },  // 545 approvals
+  { source: 'workday', slug: 'swa-external', tenant: 'swa', wd: '1', site: 'external', displayName: 'Southwest Airlines' },  // 180 approvals
+  { source: 'workday', slug: 'asurion-asurion_careers', tenant: 'asurion', wd: '5', site: 'Asurion_Careers', displayName: 'Asurion' },  // 169 approvals
+  { source: 'workday', slug: 'asurion-asurioncareers_us', tenant: 'asurion', wd: '5', site: 'AsurionCareers_US', displayName: 'Asurion' },
+  { source: 'workday', slug: 'jda-jda_careers', tenant: 'jda', wd: '5', site: 'JDA_Careers', displayName: 'Blue Yonder' },  // 163 approvals
+  { source: 'workday', slug: 'warnerbros-global', tenant: 'warnerbros', wd: '5', site: 'global', displayName: 'Warner Bros. Discovery' },  // 126 approvals (alias warnermedia-services)
+  { source: 'workday', slug: 'xboxgaming-blizzard_external_careers', tenant: 'xboxgaming', wd: '1', site: 'Blizzard_External_Careers', displayName: 'Blizzard Entertainment' },  // 100 approvals
+  { source: 'workday', slug: 'boseallaboutme-bose_careers', tenant: 'boseallaboutme', wd: '503', site: 'Bose_Careers', displayName: 'Bose' },  // 51 approvals (alias bose-corporation)
 ];
 
 const CONFIG = {

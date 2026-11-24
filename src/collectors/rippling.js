@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // Collector for employers hosted on Rippling's ATS.
 //
@@ -78,10 +78,12 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     const title = (j.name || '').trim();
     if (!title || !j.uuid) continue;
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', displayName || slug)) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
     candidates.push(j);
   }
 
+  // Likely-in-range titles first (stable sort keeps the board's order).
+  candidates.sort((a, b) => levelRank(a.name) - levelRank(b.name));
   const toEnrich = candidates.slice(0, detailCap);
   const details = await runWithConcurrency(toEnrich, DETAIL_CONCURRENCY, (j) =>
     fetchDetail(slug, j.uuid)

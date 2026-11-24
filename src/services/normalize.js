@@ -3,11 +3,29 @@
 const { classifySponsorship } = require('./classifier');
 const { classifyCategory } = require('./category');
 const { deriveRestriction } = require('./clearance');
-const { extractExperience, levelFromYears, exceedsMaxYoe } = require('./experience');
+const { experienceProfile, levelFromYears, exceedsMaxYoe, MAX_YOE, SENIOR_YEARS } = require('./experience');
+
+// Some APIs send the markup itself escaped: Greenhouse's content=true returns
+// "&lt;p&gt;8+&amp;nbsp;years…". Stripping tags before unescaping left the tags
+// in the stored text and "&nbsp;" between the number and "years", so the years
+// were never read. Escaped markup is unescaped first.
+const ESCAPED_TAG = /&lt;\/?[a-z][a-z0-9]*[^&]{0,200}?&gt;/i;
+
+function decodeEntities(s) {
+  return s
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
+}
 
 function stripHtml(html) {
   if (!html) return '';
-  return String(html)
+  let s = String(html);
+  if (ESCAPED_TAG.test(s)) s = decodeEntities(s);
+  return s
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
@@ -17,6 +35,8 @@ function stripHtml(html) {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&#(\d{1,6});/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]{1,6});/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -398,24 +418,35 @@ function looksSoftware(title, source) {
 const CORE_ROLE_HEAD =
   /\b(?:software\s+(?:engineer|developer)|data\s+(?:scientist|engineer)|machine\s+learning\s+engineer|ml\s+engineer|applied\s+scientist|(?:backend|frontend|full[\s-]?stack)\s+(?:engineer|developer)|site\s+reliability\s+engineer|devops\s+engineer)\b/i;
 
+// Level is decided from what the posting says, not from its title alone.
+// Titles mean different things at different employers: Palo Alto Networks
+// hires new grads as "Staff Software Engineer", Walmart's "Software Engineer
+// III" asks for 2 years, and startups call a 2-year role "Senior". Three kinds
+// of title words:
+//   - internships and people-management / executive titles: rejected
+//     whatever the posting says (INTERN_REJECT, MANAGEMENT_REJECT);
+//   - seniority words (SENIORITY_WORDS): usually too senior, so the posting
+//     must put the role in range: stated years, or a new-grad track
+//     (levelVerdict);
+//   - everything else: kept unless the posting asks for more than MAX_YOE.
+
 // Interns are rejected outright — user wants full-time only.
-// "II", "III", "IV", "V" as standalone tokens mean mid+ — reject.
-// "Senior/Sr/Staff/Principal/Lead/Director/Manager/Head/VP" — reject.
-// Exception: bare "Staff" at the employers in STAFF_NOT_SENIOR_EMPLOYERS, and
-// in titles that name a new-grad track (see looksSeniorReject).
 const INTERN_REJECT = [
   /\bintern(ship)?s?\b/, /\bco-?op\b/, /\bsummer\s+20\d\d\b/,
 ];
 
-// II is allowed through — at most companies "Software Engineer II" means 1-3 YOE
-// which matches the user's target range. III/IV/V/VI are always senior.
-const SENIOR_REJECT = [
-  // "Member of Technical Staff" is a level-less title at AI labs, not Staff.
-  /\bsenior\b/, /\bsr\.?\b/, /(?<!technical\s+)\bstaff\b/, /\bprincipal\b/, /\bdistinguished\b/,
-  /\blead\b/, /\bdirector\b/, /\bmanager\b/, /\bhead of\b/,
-  /\bvp\b/, /\bvice\s+president\b/, /\barchitect\b/, /\bsupervisor\b/,
+const MANAGEMENT_REJECT = [
+  /\bmanager\b/, /\bdirector\b/, /\bhead of\b/, /\bvp\b/, /\bvice\s+president\b/,
+  /\bsupervisor\b/, /\bdistinguished\b/,
   /\bchief\b/, // "Programs Chief Engineer", "Chief of Staff", etc.
-  /\s(iii|iv|v|vi)\b/i, // space + III/IV/…  (II is intentionally NOT rejected)
+];
+
+// "II" is not here: at most companies it means 1-3 years, the user's range.
+const SENIORITY_WORDS = [
+  // "Member of Technical Staff" is a level-less title at AI labs, not Staff.
+  /\bsenior\b/, /\bsr\.?\b/, /(?<!technical\s+)\bstaff\b/, /\bprincipal\b/,
+  /\blead\b/, /\barchitect\b/,
+  /\s(iii|iv|v|vi)\b/i, // space + III/IV/…
   /\s-\s*(iii|iv|v|vi)\b/i,
 ];
 
@@ -448,44 +479,35 @@ function looksIntern(title) {
 // sponsoring — while keeping their unlabelled twins.
 const IC_BAND_LABEL = /\([^)]*,\s*ic\s*\)/g;
 
-// "Staff" is a senior rung at most employers (Google and Stripe ask 8+ years),
-// so SENIOR_REJECT drops it by title. Palo Alto Networks' ladder runs Software
-// Engineer → Staff → Senior Staff → Principal, and it hires new grads into
-// "Staff Software Engineer". The generic rule threw those roles away before
-// their descriptions, and the years they ask for, were ever read (on 2026-11-23,
-// all of its plain-Staff US software postings).
-//
-// At an employer listed here the bare word is not a seniority marker. The title
-// passes, the collector fetches the description, and the 0-2 year cap (MAX_YOE
-// in experience.js) decides, so a Staff role asking for 5+ years is still
-// dropped. "Senior Staff" still fails on "senior", and "Principal" on its own
-// rule. Matched against the start of the employer name, so an aggregator's
-// "Palo Alto Networks, Inc." counts too.
-const STAFF_NOT_SENIOR_EMPLOYERS = [/^palo alto networks\b/i];
-
-// A title that names its own new-grad / early-career track outranks the bare
-// "Staff" level word at any employer: "Staff Software Engineer (New Grad)" is the
-// new-grad role, whatever the ladder calls it. Narrower than ENTRY_POSITIVE on
-// purpose: "Associate" or "Engineer I" says nothing about a Staff title.
+// A new-grad / early-career track named in the title: "Staff Software Engineer
+// (New Grad)" is the new-grad role, whatever the ladder calls it.
 const NEW_GRAD_TRACK =
   /\b(?:new\s+(?:college\s+)?grad(?:uate)?s?|recent\s+grad(?:uate)?s?|university\s+(?:grad(?:uate)?s?|hire|program)|early[\s-]career|entry[\s-]level|campus\s+hire)\b/;
 
-// The same word SENIOR_REJECT matches. "Member of Technical Staff" is already
-// level-less, so it is left alone here as well.
-const BARE_STAFF = /(?<!technical\s+)\bstaff\b/g;
+// The same, said in the description. Only phrases addressed to the candidate:
+// "early career" or "university" alone also turn up in company boilerplate
+// about its programmes, beside senior roles.
+const NEW_GRAD_TEXT =
+  /\b(?:new\s+(?:college\s+)?grad(?:uate)?s?|recent\s+(?:college\s+|university\s+)?grad(?:uate)?s?|recently\s+graduated|graduating\s+(?:in|by|between)\s+(?:20\d\d|spring|summer|fall|winter|december|may|june)|class\s+of\s+20\d\d|entry[\s-]level\s+(?:role|position|candidates?|engineers?|opportunit(?:y|ies))|no\s+(?:prior\s+)?(?:professional\s+)?(?:work\s+)?experience\s+(?:is\s+)?required)\b/i;
 
-function staffIsSeniority(lowerTitle, company) {
-  if (NEW_GRAD_TRACK.test(lowerTitle)) return false;
-  const c = String(company || '').trim();
-  return !STAFF_NOT_SENIOR_EMPLOYERS.some((r) => r.test(c));
+function lowerTitle(title) {
+  return (title || '').toLowerCase().replace(IC_BAND_LABEL, ' ');
 }
 
-// `company` is optional. Callers that know the employer pass it so the
-// exceptions above apply; without it the generic rules run unchanged.
-function looksSeniorReject(title, company) {
-  let t = (title || '').toLowerCase().replace(IC_BAND_LABEL, ' ');
-  if (!staffIsSeniority(t, company)) t = t.replace(BARE_STAFF, ' ');
-  return SENIOR_REJECT.some((r) => r.test(t));
+function looksManagement(title) {
+  const t = lowerTitle(title);
+  return MANAGEMENT_REJECT.some((r) => r.test(t));
+}
+
+function hasSeniorityWord(title) {
+  const t = lowerTitle(title);
+  return SENIORITY_WORDS.some((r) => r.test(t));
+}
+
+// The title alone reads senior or managerial. Informational: whether such a
+// posting stays is levelVerdict's call.
+function looksSeniorReject(title) {
+  return looksManagement(title) || hasSeniorityWord(title);
 }
 
 function looksExplicitEntry(title) {
@@ -498,13 +520,48 @@ function looksMidLevel(title) {
   return MID_POSITIVE.some((r) => r.test(t));
 }
 
-function passesLevel(title, mode, company) {
+// Title-only gate. Collectors call it to decide which postings get a per-job
+// description request, and normalizeJob calls it first. It rejects only what
+// no description can change (internships, management); seniority words pass so
+// their descriptions get read.
+function passesLevel(title, mode) {
   // Always drop internships — user is looking for full-time roles.
   if (looksIntern(title)) return false;
   if (mode === 'off') return true;
-  if (looksSeniorReject(title, company)) return false;
+  if (looksManagement(title)) return false;
   if (mode === 'strict') return looksExplicitEntry(title);
   return true; // 'permissive'
+}
+
+// Order for spending a capped per-run description budget: titles naming an
+// entry track first, plain titles next, seniority words last.
+function levelRank(title) {
+  if (NEW_GRAD_TRACK.test(lowerTitle(title)) || looksExplicitEntry(title)) return 0;
+  return hasSeniorityWord(title) ? 2 : 1;
+}
+
+// The level decision, from everything the posting says. `years` is
+// experienceProfile(title + description); `description` is plain text.
+//   - a stated minimum above MAX_YOE: out, whatever the title;
+//   - a seniority word in the title: kept only if the posting puts the role in
+//     range, by a new-grad track (title or text), or a main requirement within
+//     MAX_YOE with nothing of SENIOR_YEARS+ anywhere. The main requirement is
+//     the one tied to a degree when given ("Bachelor's and 2 years, or 4 years
+//     without"), else the highest stated: Palantir's "3+ years of professional
+//     development; 1+ years of networking" is 3, not 1;
+//   - otherwise kept. Plain titles keep the lowest stated minimum on purpose:
+//     wrongly hiding a reachable job costs more than showing a stretch one.
+function levelVerdict({ title, description, years }) {
+  if (exceedsMaxYoe(years)) return { keep: false, reason: `over ${MAX_YOE} years of experience` };
+  if (!hasSeniorityWord(title)) return { keep: true };
+  if (NEW_GRAD_TRACK.test(lowerTitle(title)) || NEW_GRAD_TEXT.test(description || '')) {
+    return { keep: true, reason: 'new-grad track' };
+  }
+  const main = years ? (years.degree != null ? years.degree : years.top) : null;
+  if (main != null && main <= MAX_YOE && !(years.top >= SENIOR_YEARS)) {
+    return { keep: true, reason: `asks for ${main} year${main === 1 ? '' : 's'}` };
+  }
+  return { keep: false, reason: 'senior title, nothing in the posting puts it in range' };
 }
 
 // Dedupe key has to survive cosmetic drift between sources for the same role:
@@ -564,18 +621,23 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   const role_type = classifyRole(job_title, raw.source);
   if (filterSoftwareOnly && role_type === 'OTHER') return null;
   if (filterUSOnly && !inUS(location, raw.countries)) return null;
-  if (!passesLevel(job_title, entryLevelMode || 'permissive', company_name)) return null;
+  const mode = entryLevelMode || 'permissive';
+  if (!passesLevel(job_title, mode)) return null;
 
   // Years of experience stated in the description, e.g. "3+ years of
   // professional android development experience". Titles alone leave most rows
   // unlabelled — the majority read only "Software Engineer" — so a stated
   // number is the better signal where one exists.
-  const years = extractExperience(`${job_title}\n${description}`);
+  const years = experienceProfile(`${job_title}\n${description}`);
 
   // Hard ceiling: 0-2 years only (MAX_YOE). Applies to every source, curated
   // overrides included — a level label doesn't outrank the posting's own text.
   // 375 of 1,599 visible rows asked for 3+ years before this (2026-11-02).
   if (exceedsMaxYoe(years)) return null;
+
+  // A seniority word in the title ("Staff", "Senior", "III") needs the posting
+  // to put the role in range: stated years, or a new-grad track.
+  if (mode !== 'off' && !levelVerdict({ title: job_title, description, years }).keep) return null;
 
   // A source can supply a pre-labeled sponsorship (e.g. the New-Grad-2027 repo
   // tags every posting). Trust it over the rule-based classifier when present.
@@ -604,7 +666,7 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   let is_entry_level;
   if (raw.entry_level_override != null) is_entry_level = raw.entry_level_override ? 1 : 0;
   else if (yearsLevel) is_entry_level = yearsLevel.is_entry_level;
-  else is_entry_level = looksExplicitEntry(job_title) ? 1 : 0;
+  else is_entry_level = looksExplicitEntry(job_title) || NEW_GRAD_TEXT.test(description) ? 1 : 0;
 
   // Mid-level stamp: Uber supplies this via its authoritative level field.
   // Otherwise years, then title. Don't double-stamp if entry.
@@ -664,8 +726,11 @@ module.exports = {
   looksSoftware,
   classifyRole,
   looksIntern,
+  looksManagement,
   looksSeniorReject,
   looksExplicitEntry,
   looksMidLevel,
   passesLevel,
+  levelRank,
+  levelVerdict,
 };

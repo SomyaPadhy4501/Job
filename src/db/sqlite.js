@@ -142,7 +142,7 @@ function migrate(database) {
   // eslint-disable-next-line global-require
   const { classifyRole, passesLevel } = require('../services/normalize');
   const allRows = database
-    .prepare('SELECT id, source, company_name, job_title, role_type FROM jobs')
+    .prepare('SELECT id, source, job_title, role_type FROM jobs')
     .all();
   let reclassified = 0;
   const updRole = database.prepare('UPDATE jobs SET role_type = ? WHERE id = ?');
@@ -157,8 +157,9 @@ function migrate(database) {
       // Drop rows that would fail the current collector-time filters. We
       // assume FILTER_SOFTWARE=true (the default) — any OTHER row isn't
       // supposed to be in the DB. Also drop rows whose title no longer
-      // passes the senior/intern rejects.
-      if (nextRole === 'OTHER' || !passesLevel(r.job_title, 'permissive', r.company_name)) {
+      // passes the intern / management rejects (prune-rejected judges
+      // seniority words against the description).
+      if (nextRole === 'OTHER' || !passesLevel(r.job_title, 'permissive')) {
         killIds.push(r.id);
       }
     }

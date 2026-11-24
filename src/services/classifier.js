@@ -180,6 +180,7 @@ const EMPLOYER_ALIASES = {
   'barclays': 'barclays-services',
   'bloomberg': 'bloomberg-lp',
   'boeing': 'boeing-company',
+  'bose': 'bose-corporation',
   'broadcom': 'broadcom-corporation',
   'chevron': 'chevron-corporation',
   'ciena': 'ciena-corporation',
@@ -192,6 +193,7 @@ const EMPLOYER_ALIASES = {
   'cvs-health': 'caremark',
   'expedia-group': 'expedia',
   'fedex': 'federal-express-corporation', // FedEx Corporate Services filed here by FY2025
+  'fiserv': 'fiserv-solutions',
   'flextronics': 'flextronics-international-usa',
   'honeywell': 'honeywell-international',
   'hpe': 'hewlett-packard-enterprise-company',
@@ -225,6 +227,7 @@ const EMPLOYER_ALIASES = {
   'vanguard': 'vanguard-group',
   'verizon': 'verizon-data-services',
   'walmart': 'wal-mart-associates',
+  'warner-bros-discovery': 'warnermedia-services',
   'yahoo': 'yahoo-holdings', // Oath Holdings through FY2023
   'zebra': 'zebra-technologies-corporation',
   // Tech companies and startups

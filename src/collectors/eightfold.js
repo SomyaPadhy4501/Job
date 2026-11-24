@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // Generic collector for career sites powered by Eightfold AI.
 //
@@ -147,7 +147,7 @@ async function fetchEightfold({
     if (lvl?.reject) continue;
 
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', displayName || slug)) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
 
     candidates.push({ position: p, title, lvl });
   }
@@ -155,8 +155,10 @@ async function fetchEightfold({
   // The API returns no useful ordering, so sort newest-first ourselves. This
   // only matters because of detailCap below: when it bites, the rows that lose
   // their description should be the oldest ones, not an arbitrary slice.
+  // Likely-in-range titles (levelRank) go ahead of seniority-worded ones.
   candidates.sort(
     (a, b) =>
+      levelRank(a.title) - levelRank(b.title) ||
       (b.position.t_update || b.position.t_create || 0) -
       (a.position.t_update || a.position.t_create || 0)
   );

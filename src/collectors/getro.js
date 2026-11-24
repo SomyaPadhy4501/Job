@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // Generic collector for VC portfolio job boards powered by Getro
 // (jobs.craftventures.com, jobs.generalcatalyst.com, jobs.khoslaventures.com, …).
@@ -194,10 +194,13 @@ async function fetchCompany({ networkId, boardHost, slug, displayName, maxPages,
     const title = j.title || '';
     if (!title || !j.url) continue;
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) continue;
-    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive', j.organization?.name)) continue;
+    if (!passesLevel(title, CONFIG.entryLevelMode || 'permissive')) continue;
     candidates.push(j);
   }
 
+  // Likely-in-range titles first; results are already newest-first and the
+  // sort is stable.
+  candidates.sort((a, b) => levelRank(a.title) - levelRank(b.title));
   const toEnrich = candidates.slice(0, detailCap);
   const enriched = await runWithConcurrency(toEnrich, DETAIL_CONCURRENCY, (j) =>
     enrichDescription(boardHost, j)

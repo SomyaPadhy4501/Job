@@ -2,7 +2,7 @@
 
 const { runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // Apple Careers (jobs.apple.com) is server-rendered React: every page embeds
 // its data as `window.__staticRouterHydrationData = JSON.parse("…")`, so plain
@@ -198,10 +198,10 @@ async function fetchCompany() {
   const candidates = [...byId.values()]
     .filter((r) => !CONFIG.filterSoftwareOnly || looksSoftware(r.postingTitle))
     .filter((r) => passesLevel(r.postingTitle, CONFIG.entryLevelMode || 'permissive'))
-    .sort((a, b) => String(b.postDateInGMT || '').localeCompare(String(a.postDateInGMT || '')));
+    .sort((a, b) => levelRank(a.postingTitle) - levelRank(b.postingTitle) || String(b.postDateInGMT || '').localeCompare(String(a.postDateInGMT || '')));
 
-  // Newest first, so when DETAIL_MAX bites it is the oldest rows that keep only
-  // the short summary.
+  // Likely-in-range titles first (levelRank), then newest, so when DETAIL_MAX
+  // bites it is senior-worded and older rows that keep only the short summary.
   const toEnrich = candidates.slice(0, DETAIL_MAX);
   const details = await runWithConcurrency(toEnrich, DETAIL_CONCURRENCY, async (r) => {
     await sleep(PAGE_DELAY_MS);

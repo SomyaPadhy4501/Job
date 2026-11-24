@@ -19,33 +19,25 @@ const CHECK_MINUTES = 15;   // periodic re-check, catches wake-from-sleep
 const CLOSE_AFTER_MS = 3000; // after a tab's jobs are sent, in case a late batch follows
 const FALLBACK_CLOSE_MIN = 3; // closes whatever is left (pages that found nothing)
 
-// Starter boards: H-1B sponsors whose job systems have no server-side
-// collector (Oracle Candidate Experience, Phenom, Jibe, Apple), found by
-// scripts/discover-sponsors.js and verified to capture in Chromium. Tesla and
-// Wayfair block automated browsers and were verified on a real run instead.
+// Starter boards: sites only a real browser can read. Everything the server
+// can collect runs in GitHub Actions instead, computer on or off. On
+// 2026-11-23 the Phenom sites (Fiserv, Truist, Southwest, Asurion, Blue
+// Yonder, WBD, Blizzard, Bose) moved to their Workday boards, AmEx, Nokia and
+// Navy Federal to oracle_hcm, Rivian to the Jibe collector, and Apple, Chewy,
+// Cigna, Thermo Fisher and CarGurus already had collectors. Left here:
+//   Tesla, Wayfair  block every automated client; captured from a real browser
+//   Yelp            iCIMS, no collector
+//   Corning         its search API hides the apply link
+//   AutoZone        Oracle, but its tech roles sit behind ~500 store postings,
+//                   past what oracle_hcm reads; the page's keyword search finds them
+// An existing install keeps the boards it already saved; remove the moved ones
+// in the popup to stop opening them.
 const STARTER_BOARDS = [
     'https://www.tesla.com/careers/search/?country=US',
-    'https://jobs.apple.com/en-us/search?location=united-states-USA&search=software%20engineer',
     'https://www.wayfair.com/careers/jobs',
-    'https://careers.americanexpress.com/en/sites/CX_1/jobs?keyword=software%20engineer',
-    'https://jobs.nokia.com/en/sites/CX_1/jobs?keyword=software',
-    'https://careers.autozone.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs?keyword=software',
-    'https://jobs.navyfederal.org/hcmUI/CandidateExperience/en/sites/nfcu/jobs?keyword=software',
-    'https://careers.fiserv.com/us/en/search-results?keywords=software%20engineer',
-    'https://careers.chewy.com/us/en/search-results?keywords=software%20engineer',
-    'https://jobs.thecignagroup.com/us/en/search-results?keywords=software%20engineer',
-    'https://careers.truist.com/us/en/search-results?keywords=software%20engineer',
-    'https://careers.rivian.com/careers-home/jobs?keywords=software',
-    'https://careers.blueyonder.com/us/en/search-results?keywords=software%20engineer',
-    'https://careers.wbd.com/global/en/search-results?keywords=software%20engineer',
-    'https://careers.blizzard.com/global/en/search-results?keywords=software%20engineer',
-    'https://careers.cargurus.com/us/en/search-results?keywords=software%20engineer',
     'https://www.yelp.careers/us/en/search-results?keywords=software%20engineer',
-    'https://careers.asurion.com/us/en/search-results?keywords=software%20engineer',
-    'https://careers.southwestair.com/us/en/search-results?keywords=software%20engineer',
-    'https://jobs.thermofisher.com/global/en/search-results?keywords=software%20engineer',
     'https://careers.corning.com/us/en/search-results?keywords=software%20engineer',
-    'https://careers.bose.com/us/en/search-results?keywords=software%20engineer',
+    'https://careers.autozone.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs?keyword=software',
 ];
 
 const defaults = {

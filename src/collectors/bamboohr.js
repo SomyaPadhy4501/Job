@@ -2,7 +2,7 @@
 
 const { fetchJson, runWithConcurrency } = require('./http');
 const { CONFIG } = require('../config');
-const { looksSoftware, passesLevel } = require('../services/normalize');
+const { looksSoftware, passesLevel, levelRank } = require('../services/normalize');
 
 // BambooHR public careers site — unauthenticated JSON behind the hosted
 // careers page:
@@ -55,9 +55,11 @@ async function fetchCompany({ slug, displayName, maxDetail }) {
     const title = String(i.jobOpeningName || '').trim();
     if (!i.id || !title) return false;
     if (CONFIG.filterSoftwareOnly && !looksSoftware(title)) return false;
-    return passesLevel(title, CONFIG.entryLevelMode || 'permissive', displayName || slug);
+    return passesLevel(title, CONFIG.entryLevelMode || 'permissive');
   });
 
+  // Likely-in-range titles first (levelRank), so the cap bites senior-worded ones.
+  candidates.sort((a, b) => levelRank(a.jobOpeningName) - levelRank(b.jobOpeningName));
   const toEnrich = candidates.slice(0, maxDetail || DEFAULT_MAX_DETAIL);
   const details = await runWithConcurrency(toEnrich, DETAIL_CONCURRENCY, (i) =>
     fetchJson(`${base}/${encodeURIComponent(i.id)}/detail`, {

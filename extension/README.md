@@ -46,8 +46,13 @@ source.
 Verified on 2026-10-31 against Workday (NVIDIA), Eightfold, Workable, Amazon,
 Ashby (813 rows from one page load), Oracle Candidate Experience (American
 Express, Nokia, AutoZone, Navy Federal), Phenom (Chewy, Cigna, Truist, Fiserv
-and 11 more) and Jibe (Rivian). The starter board list in `background.js` is
-those boards. **Tesla and Wayfair are untested**, because both block every
+and 11 more) and Jibe (Rivian). Most of those boards now run server-side, in
+GitHub Actions with the computer off (2026-11-23): the Phenom sites through
+their Workday boards, AmEx, Nokia and Navy Federal through `oracle_hcm`, Rivian
+through the Jibe collector. The starter list in `background.js` keeps only
+what a server can't read: Tesla, Wayfair, Yelp, Corning and AutoZone. An
+existing install keeps its saved boards; remove the moved ones in the popup.
+**Tesla and Wayfair are untested**, because both block every
 automated client, including the one used for these tests. If the badge shows
 nothing on Tesla, the response shape needs a small adapter in `extract.js`.
 

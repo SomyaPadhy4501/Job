@@ -11,8 +11,8 @@
 //   node src/scripts/prune-rejected.js
 //   DATABASE_URL=... node src/scripts/prune-rejected.js --apply
 
-const { classifyRole, passesLevel, looksUS, inUS, US_STATES } = require('../services/normalize');
-const { MAX_YOE } = require('../services/experience');
+const { classifyRole, passesLevel, levelVerdict, looksSeniorReject, looksUS, inUS, US_STATES } = require('../services/normalize');
+const { MAX_YOE, experienceProfile } = require('../services/experience');
 const { CONFIG } = require('../config');
 
 const APPLY = process.argv.includes('--apply');
@@ -71,10 +71,19 @@ function storedCountries({ source, location }) {
 }
 
 function reason(row) {
+  const mode = CONFIG.entryLevelMode || 'permissive';
   if (CONFIG.filterSoftwareOnly && classifyRole(row.job_title, row.source) === 'OTHER') return 'not a software role';
-  if (!passesLevel(row.job_title, CONFIG.entryLevelMode || 'permissive', row.company_name)) return 'senior / intern / supervisor';
+  if (!passesLevel(row.job_title, mode)) return 'intern / management';
   // yoe_min is the lowest requirement stated in the description (-1 = none).
   if (Number(row.yoe_min) > MAX_YOE) return `over ${MAX_YOE} years of experience`;
+  // A seniority word in the title ("Staff", "Senior", "III") needs the stored
+  // description to put the role in range, as normalizeJob requires. Only those
+  // titles pay for reading the description.
+  if (mode !== 'off' && looksSeniorReject(row.job_title)) {
+    const description = String(row.description || '');
+    const verdict = levelVerdict({ title: row.job_title, description, years: experienceProfile(`${row.job_title}\n${description}`) });
+    if (!verdict.keep) return verdict.reason;
+  }
   if (CONFIG.filterUSOnly && !inUS(row.location, storedCountries(row))) return 'not US';
   return null;
 }
@@ -83,7 +92,7 @@ async function main() {
   let rows;
   let del;
   let close = () => {};
-  const SELECT = 'SELECT id, source, company_name, job_title, location, yoe_min FROM jobs';
+  const SELECT = 'SELECT id, source, company_name, job_title, location, yoe_min, description FROM jobs';
   if (USE_PG) {
     // eslint-disable-next-line global-require
     const { Pool } = require('pg');
