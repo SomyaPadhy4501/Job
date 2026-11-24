@@ -20,5 +20,8 @@
     "express": "^4.19.2",
     "node-cron": "^3.0.3",
     "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.15"
   }
 }

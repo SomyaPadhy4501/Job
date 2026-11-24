@@ -40,6 +40,23 @@
   </div>
 
   <div class="log" id="log"><span class="muted">No captures yet. Open a careers page.</span></div>
+  <section aria-labelledby="autofill-title">
+    <h2 id="autofill-title">Autofill</h2>
+    <label for="autofillToken">Personal autofill token</label>
+    <input type="password" autocomplete="off" id="autofillToken">
+    <div class="row"><button id="connect">Connect</button><button id="disconnect">Disconnect</button></div>
+    <p id="account" role="status"></p>
+    <label for="defaultResume">Default resume for equally matching jobs</label>
+    <select id="defaultResume" disabled></select>
+    <label title="When you browse a careers page (Tesla, company sites), the job listings it loads are sent to the job board so everyone can find them. Only public listings: never application forms, sign-in pages or LinkedIn/Indeed/Glassdoor."><input type="checkbox" id="shareListings"> Share job listings I browse with the job board</label>
+    <button id="fillPage" class="primary">Autofill this page</button>
+    <button id="allowFrames" hidden></button>
+    <p id="fillStatus" class="muted" role="status">Greenhouse, Lever, Ashby and Workday forms show an Autofill button by themselves. On any other site (Tesla, Amazon, company career sites), open the application form and press this once; Chrome asks before the extension can use that site.</p>
+    <details id="sitesBox" hidden>
+      <summary>Sites you allowed</summary>
+      <div id="sites"></div>
+    </details>
+  </section>
   <script src="popup.js"></script>
 </body>
 </html>

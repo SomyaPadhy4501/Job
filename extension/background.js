@@ -1,7 +1,7 @@
 // Service worker: de-duplicates captured rows, posts them to the portal's
 // /admin/ingest in batches, keeps a short capture log for the popup, and opens
 // the saved boards once a day.
-importScripts('schedule.js');
+importScripts('schedule.js', 'application-pages.js', 'autofill-api.js');
 
 const BATCH = 500;          // rows per request, at most…
 const BATCH_BYTES = 2_500_000; // …and bytes: Vercel rejects bodies over ~4.5 MB
@@ -112,7 +112,21 @@ async function handleJobs(msg, tabId) {
   const host = new URL(msg.pageUrl).hostname;
 
   if (!s.portalUrl || !s.token) {
-    await addLog({ host, found: fresh.length, error: 'Set portal URL and token in the popup' });
+    // Not the owner: share with the board through the user's own extension
+    // token, if they opted in (the content script only sends rows then).
+    const { shareListings } = await chrome.storage.local.get({ shareListings: false });
+    if (!shareListings || isSensitiveUrl(msg.pageUrl)) return;
+    try {
+      const r = await globalThis.AutofillShare(msg.pageUrl, fresh);
+      fresh.forEach((row) => sentIds.add(row.external_id));
+      await addLog({ host, found: fresh.length, inserted: r.inserted, updated: r.updated, rejected: r.rejected + r.refused, shared: true });
+      if (tabId != null) {
+        chrome.action.setBadgeBackgroundColor({ color: '#1a7f37', tabId });
+        chrome.action.setBadgeText({ text: String(r.inserted + r.updated), tabId });
+      }
+    } catch (err) {
+      await addLog({ host, found: fresh.length, error: err.message, shared: true });
+    }
     return;
   }
 
@@ -241,6 +255,15 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg?.type === 'jobs') handleJobs(msg, sender.tab?.id).finally(() => closeTabIfBoard(sender.tab?.id));
+  if (msg?.type === 'jobs' && sender.url && !JobApplicationPages.privatePage(sender.url) && !JobApplicationPages.privatePage(msg.pageUrl)) {
+    handleJobs(msg, sender.tab?.id).finally(() => closeTabIfBoard(sender.tab?.id));
+  }
   if (msg?.type === 'openBoards') openBoards({ scheduled: false });
+});
+
+// A site removed in Chrome's extension settings (or from the popup) also
+// loses its registered Autofill script.
+chrome.permissions.onRemoved.addListener(async ({ origins = [] }) => {
+  const ids = origins.map((p) => 'autofill-' + p.replace(/[^a-z0-9]+/gi, '-'));
+  if (ids.length) await chrome.scripting.unregisterContentScripts({ ids }).catch(() => {});
 });
