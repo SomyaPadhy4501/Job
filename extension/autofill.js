@@ -25,7 +25,7 @@
   const framed = window !== window.top;
   const formTop = () =>
     document.querySelector('#application-form,#application_form,form:has(input,textarea,select)');
-  const adapter = AutofillAdapters.create(document, ats);
+  let adapter = AutofillAdapters.create(document, ats);
   const host = document.createElement('div');
   const shadow = host.attachShadow({ mode: 'closed' });
   const element = (tag, value) => {
@@ -169,8 +169,14 @@
       account = data;
       const title = F.clean(document.querySelector('h1')?.textContent || document.title);
       picker.add(new Option('Leave resume empty', ''));
-      const ranked = await rank(data, title, settings.autofillDefault);
+      const [ranked, fields] = await Promise.all([
+        rank(data, title, settings.autofillDefault),
+        // Best effort: the form still fills from its markup without it.
+        api('formSchema', { binding: data.binding }).then((r) => r.fields, () => []),
+      ]);
       if (version !== generation) return;
+      if (fields.length)
+        adapter = AutofillAdapters.create(document, ats, new Map(fields.map((f) => [f.name, f])));
       for (const r of ranked) picker.add(new Option(r.title || r.fileName, r.id));
       picker.value = ranked[0]?.id || '';
       status.textContent = data.user.email + ' · pick the resume for this role, then fill.';

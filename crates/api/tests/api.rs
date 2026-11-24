@@ -1082,3 +1082,17 @@ async fn the_first_sign_in_is_marked_new() {
     assert_eq!(b.sign_in_as(&sub).await.json()["isNew"], true);
     assert_eq!(b.sign_in_as(&sub).await.json()["isNew"], false);
 }
+
+#[tokio::test]
+async fn form_schema_needs_a_token_and_skips_unknown_pages() {
+    let Some(app) = app() else { return };
+    let mut ext = Browser::new(&app);
+    ext.csrf = false;
+    let path = "/api/autofill/form-schema?url=https%3A%2F%2Fwww.tesla.com%2Fcareers";
+    assert_eq!(ext.get(path).await.status, StatusCode::UNAUTHORIZED);
+    ext.bearer = Some(extension_token(&app).await);
+    // Pages with no public schema answer with no fields and fetch nothing.
+    let res = ext.get(path).await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(res.json(), json!({ "fields": [] }));
+}

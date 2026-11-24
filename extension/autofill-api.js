@@ -158,6 +158,18 @@
       if (!Array.isArray(data?.resumes)) throw new Error('Invalid resume ranking response.');
       return { resumes: data.resumes.filter((r) => typeof r?.id === 'string') };
     }
+    // The ATS's own question list for this page (labels, required flags).
+    // The page asking is the page looked up; a portal without the route or a
+    // page with no public schema gives no fields.
+    if (msg.type === 'autofill:formSchema') {
+      const res = await request('form-schema?url=' + encodeURIComponent(sender.url), undefined, true);
+      const data = res ? await res.json() : null;
+      const fields = (Array.isArray(data?.fields) ? data.fields : [])
+        .filter((f) => typeof f?.name === 'string' && typeof f?.label === 'string')
+        .slice(0, 200)
+        .map((f) => ({ name: f.name, label: f.label.slice(0, 500), required: f.required === true }));
+      return { fields };
+    }
     if (msg.type === 'autofill:getResume') {
       if (typeof msg.id !== 'string' || !/^[a-z0-9_-]{1,128}$/i.test(msg.id))
         throw new Error('Invalid resume.');

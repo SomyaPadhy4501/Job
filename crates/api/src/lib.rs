@@ -15,6 +15,7 @@ pub mod account;
 pub mod answers;
 pub mod auth;
 pub mod autofill;
+pub mod form_schema;
 pub mod capture;
 pub mod error;
 pub mod housekeeping;
@@ -305,6 +306,7 @@ pub fn router(state: AppState) -> Router {
             get(autofill::resume_file),
         )
         .route("/api/autofill/answers", post(autofill::save_answers))
+        .route("/api/autofill/form-schema", get(form_schema::form_schema))
         .route("/api/capture/jobs", post(capture::share));
 
     Router::new()
