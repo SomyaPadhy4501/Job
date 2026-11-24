@@ -7,6 +7,8 @@ const NAV = [
   ['/resumes', 'Resumes'],
   ['/profile', 'Profile'],
   ['/autofill', 'Autofill', 'signed-in'],
+  ['/alerts', 'Alerts', 'signed-in'],
+  ['/queue', 'Queue', 'signed-in'],
   ['/settings', 'Settings'],
 ];
 // One notice per update. Change `id` (and the text) when something ships;

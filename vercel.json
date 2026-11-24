@@ -67,6 +67,14 @@
     {
       "source": "/welcome",
       "destination": "/index.html"
+    },
+    {
+      "source": "/alerts",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/queue",
+      "destination": "/index.html"
     }
   ],
   "headers": [

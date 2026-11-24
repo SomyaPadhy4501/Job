@@ -7,6 +7,8 @@ import Privacy from './pages/Privacy.jsx';
 import Autofill from './pages/Autofill.jsx';
 import Welcome from './pages/Welcome.jsx';
 import Landing from './pages/Landing.jsx';
+import Alerts from './pages/Alerts.jsx';
+import Queue from './pages/Queue.jsx';
 import TopBar from './components/TopBar.jsx';
 import { useAccount } from './account.js';
 import { Link, usePath } from './router.jsx';
@@ -21,6 +23,8 @@ const PAGES = {
   '/settings': Settings,
   '/autofill': Autofill,
   '/welcome': Welcome,
+  '/alerts': Alerts,
+  '/queue': Queue,
 };
 
 // Pages anyone can open without signing in.

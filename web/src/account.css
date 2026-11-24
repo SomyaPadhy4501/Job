@@ -316,3 +316,15 @@ fieldset.section legend { font-weight: 600; font-size: 15px; padding: 0 6px; }
 .link-like { color: var(--accent); font-weight: 600; text-decoration: underline; }
 .upload-card .field { width: 100%; max-width: 420px; }
 .latex-cta h3 { margin: 0; }
+
+/* Alerts and the apply queue */
+.section-head-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.alert-list, .queue-list, .match-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.alert-list > li, .queue-list > li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.alert-list p, .queue-list p { margin: 2px 0 0; }
+.alert-main { flex: 1 1 320px; min-width: 0; overflow-wrap: anywhere; }
+.alert-list .row-actions, .queue-list .row-actions { margin-top: 0; align-items: flex-start; }
+.match-list { gap: 4px; margin-top: 8px; }
+.alert-form { margin: 8px 0 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.queue-prepared, .queue-needs_you { background: var(--unknown-bg); color: var(--unknown-fg); }
+.queue-submitted_by_you { background: var(--yes-bg); color: var(--yes-fg); }
