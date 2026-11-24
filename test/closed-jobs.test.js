@@ -270,6 +270,18 @@ test('collectAll: sources without a full listing are never judged', async () => 
   assert.equal(store.rows.length, 4);
 });
 
+test('collectAll: closing runs after the retention sweep, so rows past retention never skew it', async () => {
+  const { answers, store } = setup();
+  const order = [];
+  const list = store.jobsForCompanies;
+  store.pruneStaleJobs = async () => (order.push('prune'), 0);
+  store.jobsForCompanies = async (...a) => (order.push('close'), list(...a));
+  const { collectAll } = fresh('../src/services/collect.js');
+  answers.acme = [job('greenhouse', 'Acme', 0)];
+  await collectAll({ companies: [{ source: 'greenhouse', slug: 'acme', displayName: 'Acme' }] });
+  assert.deepEqual(order, ['prune', 'close']);
+});
+
 test('collectAll: without migration 006 the step is skipped and the run completes', async () => {
   const { answers, store } = setup();
   store.jobsForCompanies = async () => {

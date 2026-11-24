@@ -167,8 +167,6 @@ async function collectAll({ companies = COMPANIES } = {}) {
   const { inserted, updated, failed = 0 } = await bulkUpsert(deduped);
   if (failed > 0) log.warn('collection.rows_failed', { runId, failed });
 
-  const closed = await closeMissing(results, since, runId);
-
   // Retention sweep: delete rows older than the retention window. Hits both
   // dated rows that slipped past normalize (e.g. curated lists that re-publish
   // stale items) and null-dated rows whose last_seen_at has aged out (source
@@ -177,6 +175,11 @@ async function collectAll({ companies = COMPANIES } = {}) {
   if (expired > 0) log.info('collection.expired', { runId, expired });
   const pruned = await pruneStaleJobs(CONFIG.retentionDays);
   if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
+
+  // After the sweep, so only rows still inside retention are judged. Run
+  // before it on 2026-11-24, rows already past retention (no board lists
+  // them) made 107 companies look like they'd lost most of their roles.
+  const closed = await closeMissing(results, since, runId);
 
   await finishRun(runId, {
     companies_ok: companiesOk,
