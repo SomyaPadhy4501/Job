@@ -56,8 +56,7 @@ export default function Welcome() {
       {step === 0 && (
         <>
           <p className="muted">
-            Upload one or more resumes and tag each (SWE, AI Engineer, Platform…). Your profile is filled in from the
-            first one.
+            Upload your resumes and tag each one (SWE, AI Engineer…). Your profile fills in from them.
           </p>
           <Resumes />
           <StepNav onNext={next} nextLabel="Continue" />
@@ -69,8 +68,7 @@ export default function Welcome() {
         <div className="card section">
           <h3>Fill applications in one click</h3>
           <p>
-            The browser extension fills Greenhouse, Lever, Ashby, Workday and other application forms from your profile,
-            with the resume you pick for each job. It never submits for you.
+            The extension fills job forms with your profile and the right resume. You still review and submit.
           </p>
           <div className="row-actions">
             <Link to="/autofill" className="btn">Set up the extension</Link>
@@ -161,7 +159,7 @@ function AboutYou({ onBack, onNext }) {
   return (
     <div className="card section">
       <h3>About you</h3>
-      <p className="muted small">Filled from your resume where possible; check it. These go into the forms you autofill.</p>
+      <p className="muted small">Filled from your resume. Check it.</p>
       <div className="form-grid">
         <Field label="First name" value={draft.identity.firstName} onChange={(v) => set('identity.firstName', v)} autoComplete="given-name" />
         <Field label="Last name" value={draft.identity.lastName} onChange={(v) => set('identity.lastName', v)} autoComplete="family-name" />
@@ -174,7 +172,7 @@ function AboutYou({ onBack, onNext }) {
         <Field label="GitHub" value={draft.links.github} onChange={(v) => set('links.github', v)} placeholder="https://github.com/…" />
       </div>
       <h3 className="subhead">Work authorization (US)</h3>
-      <p className="muted small">Answered exactly as you set them; anything left “Not set” is left for you on each form.</p>
+      <p className="muted small">Anything left unset is left for you on each form.</p>
       <div className="form-grid">
         <Choice wide label="Are you legally authorized to work in the United States?" value={toYesNo(draft.workAuth.authorizedUS)} options={YES_NO} onChange={(v) => set('workAuth.authorizedUS', fromYesNo(v))} />
         <Choice wide label="Will you need visa sponsorship to start work (now)?" value={toYesNo(draft.workAuth.requiresSponsorshipNow)} options={YES_NO} onChange={(v) => set('workAuth.requiresSponsorshipNow', fromYesNo(v))} />
@@ -195,7 +193,7 @@ function BoardPrefs({ onBack, onNext }) {
   return (
     <div className="card section">
       <h3>Your job board</h3>
-      <p className="muted small">How the job list opens for you. You can still change filters on the board any time.</p>
+      <p className="muted small">How the job list opens for you.</p>
       <div className="form-grid">
         {Object.keys(BOARD_OPTIONS).map((k) => (
           <Choice key={k} label={BOARD_LABELS[k]} value={draft.board[k]} options={BOARD_OPTIONS[k]} onChange={(v) => set(`board.${k}`, v)} />

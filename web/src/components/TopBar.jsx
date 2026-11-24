@@ -39,7 +39,7 @@ export default function TopBar({ total, isFetching, onRefresh }) {
     <>
     <header className="topbar">
       <div className="brand">
-        <div className="logo-dot" aria-hidden="true" />
+        <img className="logo" src="/logo.svg" alt="" width="32" height="32" />
         <h1>
           <Link to="/" className="brand-link">US SWE Jobs</Link>
         </h1>
@@ -91,8 +91,7 @@ export default function TopBar({ total, isFetching, onRefresh }) {
     {user && !dismissed && path !== '/autofill' && path !== '/welcome' && (
       <div className="prompt-banner" role="note">
         <span>
-          <strong>New:</strong> fill job applications in one click with your resumes, and help grow the board with the
-          jobs you browse.
+          <strong>New:</strong> fill job applications in one click.
         </span>
         <span className="prompt-actions">
           <Link to="/autofill" className="btn btn-small">Get the extension</Link>

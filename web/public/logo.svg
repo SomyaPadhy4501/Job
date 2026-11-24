@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="US SWE Jobs">
+  <rect width="64" height="64" rx="16" fill="#0a65cc"/>
+  <path d="M25 19.5a3.5 3.5 0 0 1 3.5-3.5h7a3.5 3.5 0 0 1 3.5 3.5V22" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <rect x="13" y="22" width="38" height="27" rx="6" fill="#fff"/>
+  <path d="M24 39.5l6.5-6.5 4.5 4.5 6-6" fill="none" stroke="#0a65cc" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36.5 31h4.5v4.5" fill="none" stroke="#0a65cc" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

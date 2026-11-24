@@ -54,9 +54,8 @@ export function Tokens() {
     <section className="card section">
       <h3>Autofill extension</h3>
       <p className="muted small">
-        Create a token, then paste it into the extension's popup under <strong>Autofill</strong>, along with this site's
-        address ({window.location.origin}). A token can read your profile, resumes and saved answers and save new answers;
-        nothing else. Revoke it here to cut it off.
+        Paste a token into the extension to connect it. It can only read your profile and resumes and save answers.
+        Revoke it any time.
       </p>
       {fresh && (
         <div className="token-once">
@@ -144,9 +143,8 @@ function Answers() {
     <section className="card section">
       <h3>Saved answers</h3>
       <p className="muted small">
-        Answers to questions that aren't in your <Link to="/profile">profile</Link>. The extension fills a question only
-        when its wording matches one saved here, and “Save my answers” in the extension adds to this list. An answer with
-        a company is used for that company only.
+        Your answers to questions not in your <Link to="/profile">profile</Link>. The extension fills them when a form
+        asks the same question, and adds new ones after you submit.
       </p>
       {isLoading ? (
         <div className="skeleton skeleton-row" />
@@ -233,7 +231,7 @@ function AccountActions() {
       <div className="account-actions">
         <div>
           <strong>Download your data</strong>
-          <p className="muted small">Your profile, resume details, saved answers and token list as one JSON file. Resume files download from the Resumes page.</p>
+          <p className="muted small">Your profile, resume details and saved answers as one file.</p>
           {exportData.error && !reauth && <p className="error">{exportData.error.message}</p>}
           <button className="btn btn-small btn-ghost" disabled={exportData.isPending} onClick={() => exportData.mutate()}>
             Download
@@ -241,12 +239,12 @@ function AccountActions() {
         </div>
         <div>
           <strong>Sign out everywhere</strong>
-          <p className="muted small">Ends every session, on every device. Extension tokens keep working until you revoke them.</p>
+          <p className="muted small">Signs you out on every device. Extension tokens keep working.</p>
           <button className="btn btn-small btn-ghost" onClick={() => signOut(true)}>Sign out everywhere</button>
         </div>
         <div>
           <strong>Delete your account</strong>
-          <p className="muted small">Deletes your profile, resumes (including the files), saved answers and tokens. This can't be undone.</p>
+          <p className="muted small">Deletes everything: profile, resumes, answers and tokens. Can't be undone.</p>
           {remove.error && !reauth && <p className="error">{remove.error.message}</p>}
           <div className="inline-form">
             <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder='Type "delete" to confirm' aria-label="Confirm deletion" />

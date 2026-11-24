@@ -35,8 +35,7 @@ function ResumesPage() {
       <div className="page-head">
         <h2>Resumes</h2>
         <p className="muted">
-          Keep a resume per kind of role and tag it (SWE, AI Engineer, Platform…). The extension picks the best match for
-          each job, and your <Link to="/profile">profile</Link> is filled from what it reads.
+          One resume per kind of role, tagged (SWE, AI Engineer…). The extension picks the best match for each job.
         </p>
       </div>
       {storage ? (

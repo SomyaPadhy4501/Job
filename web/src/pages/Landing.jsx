@@ -6,7 +6,7 @@ export default function Landing() {
   return (
     <div className="landing">
       <div className="landing-brand">
-        <div className="logo-dot" aria-hidden="true" />
+        <img className="logo" src="/logo.svg" alt="" width="36" height="36" />
         <span>US SWE Jobs</span>
       </div>
       <div className="landing-body">

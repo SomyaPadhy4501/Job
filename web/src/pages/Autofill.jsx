@@ -65,24 +65,21 @@ function AutofillPage() {
   const hasProfile = (profile.data?.version ?? 0) > 0;
 
   const welcome = new URLSearchParams(window.location.search).has('welcome');
+  const folder = info?.folder || 'job-board-extension';
   return (
     <>
       {welcome && (
         <div className="card welcome">
-          <h2>Welcome! One more step for one-click applications</h2>
+          <h2>You're set up. One last step</h2>
           <p>
-            Your account is ready. Install the extension below (about two minutes), and job application forms fill
-            themselves from your resumes and profile. You can always come back here from the <strong>Autofill</strong>{' '}
-            tab, or <Link to="/">browse jobs</Link> first.
+            Install the extension (about 2 minutes) and job forms fill themselves. Or <Link to="/">browse jobs</Link> first.
           </p>
         </div>
       )}
       <div className="page-head">
         <h2>Autofill extension</h2>
         <p className="muted">
-          Fills job applications for you from your profile and resumes: Greenhouse, Lever, Ashby and Workday by
-          themselves, and any other careers site (Tesla, Amazon, company sites) when you ask. You pick the resume for each
-          job, review everything, and submit yourself. It never submits an application.
+          Fills job applications from your profile and resumes. You review and submit; it never submits for you.
         </p>
       </div>
 
@@ -91,21 +88,92 @@ function AutofillPage() {
         <ul className="checklist">
           <li className={hasResume ? 'done' : ''}>
             {hasResume ? '✓' : '○'} <Link to="/resumes">Upload a resume</Link>
-            {hasResume ? ` (${resumes.data.resumes.length})` : ' — tag each one (SWE, AI Engineer…) so the right one is suggested'}
+            {hasResume ? ` (${resumes.data.resumes.length})` : ''}
           </li>
           <li className={hasProfile ? 'done' : ''}>
-            {hasProfile ? '✓' : '○'} <Link to="/profile">Check your profile</Link>, especially the work-authorization
-            answers. Anything left “Not set” is left for you on each form.
+            {hasProfile ? '✓' : '○'} <Link to="/profile">Fill in your profile</Link>
           </li>
         </ul>
       </section>
 
-      <section className="card notice">
-        <h3>Already installed? Update with one command</h3>
+      <ol className="steps">
+        <li className="card">
+          <h3>Download and unzip</h3>
+          {info === undefined ? (
+            <div className="skeleton skeleton-row" />
+          ) : info ? (
+            <>
+              <a className="btn" href={ZIP} download>
+                Download extension (.zip)
+              </a>
+              <p className="muted small">
+                Version {info.version} · {formatBytes(info.bytes)} · Chrome, Brave, Edge or Arc
+              </p>
+            </>
+          ) : (
+            <p className="notice">The download isn't available on this server build yet.</p>
+          )}
+          <p>
+            Unzip it and keep the <code>{folder}</code> folder somewhere permanent, like Documents.
+          </p>
+        </li>
+
+        <li className="card">
+          <h3>Load it in your browser</h3>
+          <ol className="substeps">
+            <li>
+              Open this in the address bar:
+              <div className="copy-row">
+                <code>{extensionsUrl}</code>
+                <Copy value={extensionsUrl} />
+              </div>
+            </li>
+            <li>
+              Turn on <strong>Developer mode</strong> (top right).
+            </li>
+            <li>
+              Click <strong>Load unpacked</strong> and pick the <code>{folder}</code> folder.
+            </li>
+          </ol>
+        </li>
+
+        <li className="card">
+          <h3>Connect it</h3>
+          <ol className="substeps">
+            <li>
+              Click the extension's icon and paste this site's address:
+              <div className="copy-row">
+                <code>{origin}</code>
+                <Copy value={origin} />
+              </div>
+            </li>
+            <li>
+              Create a token below, paste it in, and click <strong>Connect</strong>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+
+      <Tokens />
+
+      <section className="card section">
+        <h3>How to use it</h3>
+        <ol className="substeps">
+          <li>Open a job's application form.</li>
+          <li>
+            Click <strong>Autofill</strong> on the page, pick a resume, then <strong>Fill this page</strong>. (Other
+            sites: use the extension's icon.)
+          </li>
+          <li>
+            Answer anything under <strong>Needs you</strong> and submit. Afterwards it offers to save your new answers.
+          </li>
+        </ol>
+      </section>
+
+      <section className="card section">
+        <h3>Updating</h3>
         <p>
-          When a new version is out, the extension's icon shows <strong>NEW</strong> and its popup shows this command.
-          Paste it and press Enter: it finds the extension's folder, copies in the new version, and the extension reloads
-          itself. Your connection and settings stay.
+          When the icon shows <strong>NEW</strong>, run one command. Your settings stay.
         </p>
         <p className="muted small">Windows (PowerShell):</p>
         <div className="copy-row">
@@ -117,157 +185,27 @@ function AutofillPage() {
           <code>{`curl -fsSL ${origin}/update-extension.sh | bash`}</code>
           <Copy value={`curl -fsSL ${origin}/update-extension.sh | bash`} />
         </div>
-        <p className="muted small">
-          Coming from version 1.11 or older: the command updates it too, then restart your browser once and connect again
-          with a new token (step 4). That one-time reconnect is because 1.12 gave the extension a fixed ID.
-        </p>
       </section>
-      <ol className="steps">
-        <li className="card">
-          <h3>Download the extension</h3>
-          {info === undefined ? (
-            <div className="skeleton skeleton-row" />
-          ) : info ? (
-            <>
-              <a className="btn" href={ZIP} download>
-                Download extension (.zip)
-              </a>
-              <p className="muted small">
-                Version {info.version} · {formatBytes(info.bytes)} · works in Chrome, Brave, Edge and Arc on a computer.
-              </p>
-            </>
-          ) : (
-            <p className="notice">The download isn't available on this server build yet.</p>
-          )}
-        </li>
-
-        <li className="card">
-          <h3>Unzip it somewhere it can stay</h3>
-          <p>
-            Windows: right-click the file → <strong>Extract All</strong>. Mac: double-click it. You get a folder called{' '}
-            <code>{info?.folder || 'job-board-extension'}</code>.
-          </p>
-          <p className="muted small">
-            Move that folder somewhere permanent, like Documents. The browser runs the extension from that folder, so
-            deleting it removes the extension.
-          </p>
-        </li>
-
-        <li className="card">
-          <h3>Open your browser's extensions page</h3>
-          <p>
-            Paste this into the address bar (browsers don't allow links to it):
-          </p>
-          <div className="copy-row">
-            <code>{extensionsUrl}</code>
-            <Copy value={extensionsUrl} />
-          </div>
-          <p className="muted small">
-            Chrome: <code>chrome://extensions</code> · Brave: <code>brave://extensions</code> · Edge:{' '}
-            <code>edge://extensions</code>
-          </p>
-        </li>
-
-        <li className="card">
-          <h3>Turn on Developer mode</h3>
-          <p>
-            Flip the <strong>Developer mode</strong> switch at the top right of that page (Edge: on the left). It only
-            lets you load extensions from a folder; it doesn't change anything else.
-          </p>
-        </li>
-
-        <li className="card">
-          <h3>Load the folder</h3>
-          <p>
-            Click <strong>Load unpacked</strong> and choose the <code>{info?.folder || 'job-board-extension'}</code>{' '}
-            folder (the one with <code>manifest.json</code> inside). The extension appears in the list.
-          </p>
-          <p className="muted small">
-            Then click the puzzle-piece icon in the toolbar and pin the extension, so its icon is always there.
-          </p>
-        </li>
-
-        <li className="card">
-          <h3>Connect it to your account</h3>
-          <ol className="substeps">
-            <li>
-              Click the extension's icon. In <strong>Job board address</strong>, put this site's address:
-              <div className="copy-row">
-                <code>{origin}</code>
-                <Copy value={origin} />
-              </div>
-            </li>
-            <li>Create a token below and copy it.</li>
-            <li>
-              Back in the extension, paste it into <strong>Autofill token</strong> and click{' '}
-              <strong>Connect</strong>. It should say “Connected as” and your email.
-            </li>
-          </ol>
-          <p className="muted small">
-            Leave “Collect token” and “My boards” empty: those are for the site owner's job collection, not for autofill.
-          </p>
-        </li>
-      </ol>
-
-      <Tokens />
 
       <section className="card section">
         <h3>Help grow the board (optional)</h3>
         <p>
-          Some employers, like Tesla, block automated job collection, so their jobs only reach this board when people
-          browse them. In the extension, tick <strong>Share job listings I browse with the job board</strong>. Then,
-          whenever you open a careers page, the job listings it shows are added here for everyone.
+          Tick <strong>Share job listings I browse</strong> in the extension to add the public jobs you see to this board.
+          Never forms, sign-ins or anything you type.
         </p>
-        <ul className="muted small">
-          <li>Only public job listings are shared: never application forms, sign-in pages, or anything you type.</li>
-          <li>LinkedIn, Indeed and Glassdoor are never shared from your browsing.</li>
-          <li>
-            Listings are checked before they're added (the link must be on the employer's own site or job system), and
-            the board's usual filters apply.
-          </li>
-          <li>It uses your extension token; untick it any time.</li>
-        </ul>
       </section>
 
       <section className="card section">
-        <h3>Use it</h3>
-        <ol className="substeps">
-          <li>
-            Open a job and click the employer's <strong>Apply</strong> button to get to the application form.
-          </li>
-          <li>
-            On Greenhouse, Lever, Ashby and Workday forms an <strong>Autofill</strong> button appears on the page. On any
-            other site, click the extension's icon and then <strong>Autofill this page</strong>; the browser asks once
-            whether it may use that site.
-          </li>
-          <li>
-            Pick the resume for this role (the best match for the job is chosen for you), then click{' '}
-            <strong>Fill this page</strong>.
-          </li>
-          <li>
-            Check what it filled, answer what's listed under <strong>Needs you</strong>, and submit the application
-            yourself. Tick “Save my response” on custom questions to have them filled next time.
-          </li>
-        </ol>
-      </section>
-
-      <section className="card section">
-        <h3>Updating and troubleshooting</h3>
+        <h3>Trouble?</h3>
         <ul>
           <li>
-            <strong>New version:</strong> download the zip again, replace the files in your folder, then click the reload
-            arrow on the extension in <code>{extensionsUrl}</code>.
+            <strong>“Token rejected”:</strong> create a new token above and connect again.
           </li>
           <li>
-            <strong>“Token rejected”:</strong> the token was revoked or mistyped. Create a new one above and connect again.
+            <strong>No Autofill button:</strong> make sure you're on the form itself, not the job description.
           </li>
           <li>
-            <strong>A warning about developer-mode extensions</strong> may show when the browser starts. That's normal
-            for extensions loaded from a folder; keep it.
-          </li>
-          <li>
-            <strong>Nothing appears on a form:</strong> make sure you're on the application form itself, not the job
-            description, then use <strong>Autofill this page</strong> from the extension's icon.
+            <strong>Developer-mode warning</strong> when the browser starts: normal, keep the extension.
           </li>
         </ul>
       </section>

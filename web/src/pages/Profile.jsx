@@ -116,8 +116,7 @@ function ProfilePage() {
       <div className="page-head">
         <h2>Profile</h2>
         <p className="muted">
-          What application forms ask for. Upload a <Link to="/resumes">resume</Link> to fill most of it; anything you type
-          here wins over what a resume says. The extension fills only fields you've set, and never submits a form.
+          What job forms ask for. Most of it comes from your <Link to="/resumes">resume</Link>; anything you type here wins.
         </p>
       </div>
 
@@ -135,7 +134,7 @@ function ProfilePage() {
         {text('contact.phone', 'Phone', { type: 'tel', autoComplete: 'tel-national' })}
       </Section>
 
-      <Section title="Address" note="Search once; forms that ask for your city, state, ZIP or full address get the parts they need.">
+      <Section title="Address" note="Search once and every form gets the part it needs.">
         <AddressSearch
           address={draft.address}
           onPick={(parts) => {
@@ -162,7 +161,7 @@ function ProfilePage() {
         {text('links.website', 'Other website')}
       </Section>
 
-      <Section title="Work authorization (US)" note="Answered exactly as you set them here; anything left “Not set” is left for you on each form.">
+      <Section title="Work authorization (US)" note="Anything left unset is left for you on each form.">
         <YesNo label="Are you legally authorized to work in the United States?" value={draft.workAuth.authorizedUS} onChange={(v) => set('workAuth.authorizedUS', v)} />
         <YesNo
           label="Will you need visa sponsorship to start work (now)?"
@@ -209,7 +208,7 @@ function ProfilePage() {
         </label>
       </Section>
 
-      <Section title="Voluntary self-identification (optional)" note="Used only for the optional EEO questions US forms ask. Leave any of these unset and the extension leaves that question for you.">
+      <Section title="Voluntary self-identification (optional)" note="Optional. Only used for the voluntary questions US forms ask.">
         {Object.keys(EEO).map((k) => (
           <SelectField
             key={k}
@@ -221,7 +220,7 @@ function ProfilePage() {
         ))}
       </Section>
 
-      <Section title="Job board" note="How the job list opens for you. You can still change the filters on the board any time.">
+      <Section title="Job board" note="How the job list opens for you.">
         {Object.keys(BOARD_OPTIONS).map((k) => (
           <SelectField key={k} label={BOARD_LABELS[k]} value={draft.board[k]} options={BOARD_OPTIONS[k]} onChange={(v) => set(`board.${k}`, v)} />
         ))}
@@ -470,8 +469,7 @@ function ResumeHistory() {
       <header className="section-head">
         <h3>Education &amp; experience</h3>
         <p className="muted small">
-          Read from each resume, so it matches the file you send. When you autofill, the history of the resume you attach
-          is used. Fix anything the resume reader got wrong here.
+          Read from each resume. Forms get the history of the resume you attach. Fix anything that was read wrong.
         </p>
       </header>
       <div className="section-body">
