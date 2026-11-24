@@ -29,12 +29,13 @@ on:
           - 'all'
           - 'prune-rejected'
           - 'dedupe-urls'
+          - 'fix-builtin-links'
           - 'backfill-derived'
 
 jobs:
   backfill-derived:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20      # fix-builtin-links looks up every Built In company
 
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +69,20 @@ jobs:
             node src/scripts/dedupe-urls.js --apply
           else
             node src/scripts/dedupe-urls.js
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # Swaps stored Built In links for the employer's own (see the script).
+      # Not part of `all`: it calls Greenhouse, Lever, Ashby and Workday for
+      # every Built In company, so run it on its own.
+      - name: Give Built In rows the employer's link
+        if: ${{ github.event.inputs.step == 'fix-builtin-links' }}
+        run: |
+          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+            node src/scripts/fix-builtin-links.js --apply
+          else
+            node src/scripts/fix-builtin-links.js
           fi
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

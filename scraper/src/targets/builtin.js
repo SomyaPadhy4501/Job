@@ -23,6 +23,7 @@
 
 const { CONFIG } = require('../config');
 const log = require('../logger');
+const { resolveOriginalLinks } = require('./builtin-resolve');
 
 const CITIES = [
   { label: 'Boston',        city: 'Boston',        state: 'Massachusetts' },
@@ -177,7 +178,9 @@ async function run(context) {
         if (!byId.has(r.external_id)) byId.set(r.external_id, r);
       }
     }
-    return [...byId.values()];
+    // Swap Built In's sign-in-gated link for the employer's own where we can
+    // find the posting on their board (see builtin-resolve.js).
+    return resolveOriginalLinks([...byId.values()]);
   } finally {
     await page.close().catch(() => {});
   }

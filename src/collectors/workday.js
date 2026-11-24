@@ -268,4 +268,10 @@ async function fetchCompany(company) {
   }));
 }
 
-module.exports = { fetchCompany, detailUrl, pickCandidates, postedAgeDays, parsePostedOn, source: 'workday' };
+// fetchPages, fetchDetail, applyUrl and resolveLocation are also used by the
+// scraper's Built In resolver (scraper/src/targets/builtin-resolve.js), which
+// searches a tenant for one title instead of listing it.
+module.exports = {
+  fetchCompany, fetchPages, fetchDetail, applyUrl, resolveLocation,
+  detailUrl, pickCandidates, postedAgeDays, parsePostedOn, source: 'workday',
+};
