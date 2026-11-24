@@ -361,16 +361,25 @@ async function showSite() {
   try {
     url = new URL(tab?.url || '');
   } catch {}
-  if (url?.protocol !== 'https:') {
-    $('fillPage').disabled = true;
-    return banner('', 'i', 'Open a job application', 'Autofill works on application forms.');
-  }
+  $('fillPage').disabled = url?.protocol !== 'https:';
+  if (url?.protocol !== 'https:') return banner('', 'i', 'Open a job application', 'Autofill works on application forms.');
   const ready = JobApplicationPages.ats(url.hostname) || (await chrome.permissions.contains({ origins: [url.origin + '/*'] }));
   if (ready) banner('ready', '✓', 'Autofill is ready on this site', 'Use the tab on the right edge of the page, or the button below.');
   else banner('setup', '!', 'Autofill isn’t set up on this site', 'Press Autofill once to allow it here.');
 }
 showSite();
 $('fillPage').addEventListener('click', () => setTimeout(showSite, 300));
+// The side panel stays open across tabs: follow the tab you're on.
+function tabChanged() {
+  $('allowFrames').hidden = true;
+  pendingFrames = [];
+  $('fillStatus').textContent = 'Nothing is ever submitted for you.';
+  showSite();
+}
+chrome.tabs.onActivated.addListener(tabChanged);
+chrome.tabs.onUpdated.addListener((id, info, tab) => {
+  if (tab.active && (info.url || info.status === 'complete')) tabChanged();
+});
 
 // "Find more jobs": the connected job board.
 async function showMoreJobs() {

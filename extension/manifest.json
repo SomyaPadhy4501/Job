@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.21.0",
+  "version": "1.21.1",
   "description": "Sends the job listings a careers page loads to your own job board, and fills job applications from your profile. Personal use; load unpacked.",
   "permissions": [
     "storage",
     "alarms",
     "activeTab",
-    "scripting"
+    "scripting",
+    "sidePanel"
   ],
   "optional_host_permissions": [
     "https://*/*"
@@ -17,11 +18,13 @@
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
+  "side_panel": {
+    "default_path": "popup.html"
+  },
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Job Board Capture",
     "default_icon": {
       "16": "icons/icon16.png",

@@ -3,6 +3,10 @@
 // the saved boards once a day.
 importScripts('schedule.js', 'application-pages.js', 'gmail.js', 'autofill-api.js', 'updates.js', 'workday-collect.js');
 
+// The toolbar icon opens the extension in Chrome's side panel (docked on the
+// right, and it stays open while you switch tabs) instead of a popup.
+chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
 const BATCH = 500;          // rows per request, at most…
 const BATCH_BYTES = 2_500_000; // …and bytes: Vercel rejects bodies over ~4.5 MB
                                // (HTTP 413 — Wayfair's 432 rows with full
