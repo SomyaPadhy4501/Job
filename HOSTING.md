@@ -319,8 +319,9 @@ their own `DATA_KEYS` and bucket).
 | `GOOGLE_CLIENT_ID`   | OAuth client id (Google Cloud → Credentials → Web client). Authorized JavaScript origins: the Vercel URL and `http://localhost:5173`. |
 | `DATA_KEYS`          | `1:<base64 of 32 random bytes>` (`openssl rand -base64 32`). To rotate, add `2:<new key>`; old values stay readable and are re-encrypted on their next write. Losing every key loses every profile and answer. |
 | `DATA_KEY_CURRENT`   | Optional: the key version new writes use (default: the highest). |
-| `STORAGE_DRIVER`     | `r2` |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | A **private** R2 bucket and an API token scoped to that bucket only (Object Read & Write). |
+| `STORAGE_DRIVER`     | `r2` (Cloudflare R2) or `s3` (Backblaze B2 or another S3-compatible service) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | With `STORAGE_DRIVER=r2`: a **private** R2 bucket and an API token scoped to that bucket only (Object Read & Write). R2 needs a card on file, even on the free tier. |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | With `STORAGE_DRIVER=s3`: any S3-compatible **private** bucket. Backblaze B2 (10 GB free, no card): endpoint `https://s3.<region>.backblazeb2.com`, region like `us-west-004` (both shown on the bucket page), and an application key limited to that bucket with Read and Write. |
 | `SIGNUPS_OPEN`       | `false` at launch. `true` lets anyone create an account (publish the privacy page first). |
 | `SIGNUP_ALLOWLIST`   | Comma-separated Google `sub` ids that may sign up while sign-ups are closed (your own). Find yours in the `users` table after one dev sign-in, or decode your Google ID token. |
 | `OWNER_SUBS`         | Comma-separated Google `sub` ids that see the usage panel in Settings. |

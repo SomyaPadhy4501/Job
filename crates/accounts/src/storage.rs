@@ -2,8 +2,14 @@
 //!
 //! - `r2`: a private Cloudflare R2 bucket (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
 //!   `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`; `R2_ENDPOINT` overrides the endpoint
-//!   for an S3-compatible test server). Requests are signed here and sent from
-//!   here: no signed URL ever reaches a browser.
+//!   for an S3-compatible test server).
+//! - `s3`: any other S3-compatible private bucket, such as Backblaze B2
+//!   (`S3_ENDPOINT` like `https://s3.us-west-004.backblazeb2.com`,
+//!   `S3_REGION` like `us-west-004`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`,
+//!   `S3_SECRET_ACCESS_KEY`).
+//!
+//! For both, requests are signed here and sent from here: no signed URL ever
+//! reaches a browser.
 //! - `fs`: a local folder (`STORAGE_FS_ROOT`, default `data/blobs`) for
 //!   development and tests. Refused on Vercel, whose disk is temporary.
 //!
@@ -32,7 +38,7 @@ pub enum StorageError {
 }
 
 pub enum Storage {
-    R2(R2Store),
+    R2(Box<R2Store>),
     Fs(FsStore),
     Disabled(String),
 }
@@ -46,7 +52,11 @@ impl Storage {
             .map(str::trim)
         {
             Some("r2") => match R2Store::from_env() {
-                Ok(store) => Storage::R2(store),
+                Ok(store) => Storage::R2(Box::new(store)),
+                Err(why) => Storage::Disabled(why),
+            },
+            Some("s3") => match R2Store::from_s3_env() {
+                Ok(store) => Storage::R2(Box::new(store)),
                 Err(why) => Storage::Disabled(why),
             },
             Some("fs") if on_vercel => {
@@ -56,9 +66,9 @@ impl Storage {
                 let root = std::env::var("STORAGE_FS_ROOT").unwrap_or_else(|_| "data/blobs".into());
                 Storage::Fs(FsStore::new(root))
             }
-            Some(other) => {
-                Storage::Disabled(format!("unknown STORAGE_DRIVER {other:?}; use r2 or fs"))
-            }
+            Some(other) => Storage::Disabled(format!(
+                "unknown STORAGE_DRIVER {other:?}; use r2, s3 or fs"
+            )),
             None => Storage::Disabled("STORAGE_DRIVER isn't set".into()),
         }
     }
@@ -69,7 +79,7 @@ impl Storage {
 
     pub fn driver(&self) -> &'static str {
         match self {
-            Storage::R2(_) => "r2",
+            Storage::R2(s) => s.driver,
             Storage::Fs(_) => "fs",
             Storage::Disabled(_) => "disabled",
         }
@@ -176,7 +186,9 @@ fn io(e: std::io::Error) -> StorageError {
     StorageError::Backend(e.to_string())
 }
 
+/// An S3-compatible bucket: Cloudflare R2 (`r2`) or any other (`s3`).
 pub struct R2Store {
+    driver: &'static str,
     bucket: Bucket,
     credentials: Credentials,
     http: reqwest::Client,
@@ -210,17 +222,64 @@ impl R2Store {
         )
     }
 
+    /// `STORAGE_DRIVER=s3`: Backblaze B2 or another S3-compatible service.
+    pub fn from_s3_env() -> Result<Self, String> {
+        let var = |name: &str| {
+            std::env::var(name)
+                .ok()
+                .map(|v| v.trim().to_owned())
+                .filter(|v| !v.is_empty())
+        };
+        let names = [
+            "S3_ENDPOINT",
+            "S3_REGION",
+            "S3_BUCKET",
+            "S3_ACCESS_KEY_ID",
+            "S3_SECRET_ACCESS_KEY",
+        ];
+        let missing: Vec<&str> = names.into_iter().filter(|n| var(n).is_none()).collect();
+        if !missing.is_empty() {
+            return Err(format!("missing {}", missing.join(", ")));
+        }
+        let endpoint = var("S3_ENDPOINT").unwrap();
+        if !endpoint.starts_with("https://") {
+            return Err("S3_ENDPOINT must start with https://".into());
+        }
+        let mut store = Self::with_region(
+            &endpoint,
+            &var("S3_BUCKET").unwrap(),
+            &var("S3_ACCESS_KEY_ID").unwrap(),
+            &var("S3_SECRET_ACCESS_KEY").unwrap(),
+            &var("S3_REGION").unwrap(),
+        )?;
+        store.driver = "s3";
+        Ok(store)
+    }
+
     pub fn new(endpoint: &str, bucket: &str, key_id: &str, secret: &str) -> Result<Self, String> {
+        Self::with_region(endpoint, bucket, key_id, secret, "auto")
+    }
+
+    /// `region` is what requests are signed for: `auto` on R2, the bucket's
+    /// region elsewhere (e.g. `us-west-004` on Backblaze B2).
+    pub fn with_region(
+        endpoint: &str,
+        bucket: &str,
+        key_id: &str,
+        secret: &str,
+        region: &str,
+    ) -> Result<Self, String> {
         let url = endpoint
             .parse()
-            .map_err(|e| format!("bad R2 endpoint: {e}"))?;
-        let bucket = Bucket::new(url, UrlStyle::Path, bucket.to_owned(), "auto")
-            .map_err(|e| format!("bad R2 bucket: {e}"))?;
+            .map_err(|e| format!("bad storage endpoint: {e}"))?;
+        let bucket = Bucket::new(url, UrlStyle::Path, bucket.to_owned(), region.to_owned())
+            .map_err(|e| format!("bad storage bucket: {e}"))?;
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(20))
             .build()
             .map_err(|e| e.to_string())?;
         Ok(Self {
+            driver: "r2",
             bucket,
             credentials: Credentials::new(key_id, secret),
             http,
@@ -360,5 +419,27 @@ mod tests {
         assert_eq!(url.host_str(), Some("acct.r2.cloudflarestorage.com"));
         assert!(url.path().starts_with("/resumes/resumes/u/f"));
         assert!(url.query().unwrap().contains("X-Amz-Signature="));
+    }
+
+    #[test]
+    fn s3_compatible_buckets_sign_for_their_region() {
+        let mut store = R2Store::with_region(
+            "https://s3.us-west-004.backblazeb2.com",
+            "job-board-resumes",
+            "keyid",
+            "secret",
+            "us-west-004",
+        )
+        .unwrap();
+        store.driver = "s3";
+        let url = store
+            .bucket
+            .put_object(Some(&store.credentials), "resumes/u/f")
+            .sign(SIGNATURE_TTL);
+        assert_eq!(url.host_str(), Some("s3.us-west-004.backblazeb2.com"));
+        assert!(url.path().starts_with("/job-board-resumes/resumes/u/f"));
+        let query = url.query().unwrap();
+        assert!(query.contains("us-west-004%2Fs3%2Faws4_request"), "{query}");
+        assert_eq!(Storage::R2(Box::new(store)).driver(), "s3");
     }
 }
