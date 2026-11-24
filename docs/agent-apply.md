@@ -19,7 +19,7 @@ wants to apply to. Statuses:
 
 | Status | Meaning | Who sets it |
 |---|---|---|
-| `queued` | The user wants to apply. | the user (web, Telegram `/apply`, alert email link) |
+| `queued` | The user wants to apply. | the user (web, Telegram `/apply`) |
 | `prepared` | The agent did the prep (answers drafted, form filled in a tab, cover letter written). Waiting for the user to review and submit. | agent, user |
 | `needs_you` | The agent got stuck (a question it can't answer, a CAPTCHA, an account to create). | agent, user |
 | `submitted_by_you` | The user submitted it themselves. | **user only** |

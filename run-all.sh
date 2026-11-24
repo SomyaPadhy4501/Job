@@ -18,12 +18,12 @@ cd "$ROOT"
 
 # ── Preflight ───────────────────────────────────────────────────────────────
 if ! command -v node >/dev/null 2>&1; then
-  echo "ERROR: node is not installed. Install Node 18+ and retry." >&2
+  echo "ERROR: node is not installed. Install Node 22.9+ and retry." >&2
   exit 1
 fi
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$NODE_MAJOR" -lt 18 ]; then
-  echo "ERROR: Node $NODE_MAJOR found. Need Node 18+." >&2
+if ! node --help | grep -- '--env-file-if-exists' >/dev/null; then
+  echo "ERROR: Node $NODE_MAJOR found. Need Node 22.9+." >&2
   exit 1
 fi
 
@@ -107,7 +107,7 @@ cat <<EOF
 EOF
 
 # ── Spawn main service ──────────────────────────────────────────────────────
-PORT="$PORT" node src/index.js >> "$MAIN_LOG" 2>&1 &
+PORT="$PORT" node --env-file-if-exists=.env src/index.js >> "$MAIN_LOG" 2>&1 &
 MAIN_PID=$!
 
 # ── Wait for main to be listening (max 30 s) ────────────────────────────────

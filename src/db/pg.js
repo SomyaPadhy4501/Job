@@ -471,6 +471,22 @@ async function queryNewestJobs(filters, companies) {
   return rows;
 }
 
+// Stored text and tags for the given links. Read-only: the AI tagger (see
+// src/services/ai-tagger.js) reuses a stored row's tags when the posting is
+// unchanged instead of asking the model again on every collect.
+async function storedTags(urls) {
+  const out = [];
+  for (let i = 0; i < urls.length; i += 1000) {
+    const { rows } = await getPool().query(
+      `SELECT apply_url, job_title, description, role_type, sponsorship, restriction
+         FROM jobs WHERE apply_url = ANY($1)`,
+      [urls.slice(i, i + 1000)],
+    );
+    out.push(...rows);
+  }
+  return out;
+}
+
 async function getJobById(id) {
   const { rows } = await getPool().query('SELECT * FROM jobs WHERE id = $1', [id]);
   return rows[0] || null;
@@ -523,4 +539,5 @@ module.exports = {
   jobsForCompanies,
   recordMisses,
   describedApplyUrls,
+  storedTags,
 };

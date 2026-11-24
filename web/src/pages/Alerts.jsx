@@ -5,8 +5,9 @@ import RequireAuth from '../components/RequireAuth.jsx';
 import { Link } from '../router.jsx';
 import { webHref } from '../safe-url.js';
 
-// Saved searches that email (or message on Telegram) the new jobs matching
-// them. Filters are the board's own; the server checks every value again.
+// Saved searches that send the new jobs matching them to the user's linked
+// Telegram chat. Filters are the board's own; the server checks every value
+// again, and refuses a new alert until Telegram is linked.
 
 const ROLES = [
   ['', 'Any role type'],
@@ -46,7 +47,7 @@ const EMPTY = {
   name: '',
   filters: { role: '', level: '', sponsorship: 'YES', restriction: 'hide', companies: [], keywords: [], locations: [] },
   frequency: 'daily',
-  channels: ['email'],
+  channels: ['telegram'],
   paused: false,
 };
 
@@ -55,7 +56,7 @@ const toList = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 export default function Alerts() {
   return (
-    <RequireAuth reason="Sign in to get new jobs by email or Telegram.">
+    <RequireAuth reason="Sign in to get new jobs on Telegram.">
       <AlertsPage />
     </RequireAuth>
   );
@@ -66,26 +67,33 @@ function AlertsPage() {
   const chat = usePrivateQuery(['chat'], '/api/me/chat');
   const [editing, setEditing] = useState(null);
   const linked = !!chat.data?.telegram?.linked;
+  const ready = !!chat.data?.telegram?.ready;
 
   return (
     <>
       <div className="page-head">
         <h2>Job alerts</h2>
-        <p className="muted">Get new jobs that match your search, by email or on Telegram.</p>
+        <p className="muted">Get new jobs that match your search on Telegram.</p>
       </div>
-      {data && !data.emailReady && (
-        <p className="notice">Email alerts aren’t switched on for this site yet. Your alerts start once they are.</p>
+      {chat.data && ready && !linked && (
+        <p className="notice">Link Telegram below first. Alerts are sent to your Telegram chat.</p>
       )}
+      <TelegramCard status={chat} />
       <section className="card section">
         <div className="section-head-row">
           <h3>Your alerts</h3>
           {!editing && data && (
-            <button className="btn btn-small" disabled={data.alerts.length >= data.max} onClick={() => setEditing(EMPTY)}>
+            <button
+              className="btn btn-small"
+              disabled={!linked || data.alerts.length >= data.max}
+              title={linked ? undefined : 'Link Telegram first'}
+              onClick={() => setEditing(EMPTY)}
+            >
               New alert
             </button>
           )}
         </div>
-        {editing && <AlertForm initial={editing} telegramLinked={linked} onDone={() => setEditing(null)} />}
+        {editing && <AlertForm initial={editing} onDone={() => setEditing(null)} />}
         {isLoading ? (
           <div className="skeleton skeleton-row" />
         ) : error ? (
@@ -95,12 +103,11 @@ function AlertsPage() {
         ) : (
           <ul className="alert-list">
             {data.alerts.map((a) => (
-              <AlertRow key={a.id} alert={a} onEdit={() => setEditing(a)} />
+              <AlertRow key={a.id} alert={a} linked={linked} onEdit={() => setEditing(a)} />
             ))}
           </ul>
         )}
       </section>
-      <TelegramCard status={chat} />
     </>
   );
 }
@@ -114,7 +121,7 @@ function summary(f) {
   return parts.join(' · ');
 }
 
-function AlertRow({ alert, onEdit }) {
+function AlertRow({ alert, linked, onEdit }) {
   const qc = useQueryClient();
   const [preview, setPreview] = useState(false);
   const save = useMutation({
@@ -125,7 +132,7 @@ function AlertRow({ alert, onEdit }) {
     mutationFn: () => api(`/api/me/alerts/${alert.id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts'] }),
   });
-  const where = alert.channels.length ? alert.channels.map((c) => (c === 'email' ? 'Email' : 'Telegram')).join(' + ') : 'Nowhere';
+  const where = linked ? 'Telegram' : 'Telegram isn’t linked, so nothing is sent';
 
   return (
     <li>
@@ -176,7 +183,7 @@ function Preview({ id }) {
   );
 }
 
-function AlertForm({ initial, telegramLinked, onDone }) {
+function AlertForm({ initial, onDone }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState(initial);
   const [lists, setLists] = useState({
@@ -185,12 +192,11 @@ function AlertForm({ initial, telegramLinked, onDone }) {
     locations: initial.filters.locations.join(', '),
   });
   const setFilter = (k, v) => setDraft({ ...draft, filters: { ...draft.filters, [k]: v } });
-  const toggle = (c) =>
-    setDraft({ ...draft, channels: draft.channels.includes(c) ? draft.channels.filter((x) => x !== c) : [...draft.channels, c] });
   const save = useMutation({
     mutationFn: () => {
       const body = {
         ...draft,
+        channels: ['telegram'],
         filters: { ...draft.filters, companies: toList(lists.companies), keywords: toList(lists.keywords), locations: toList(lists.locations) },
       };
       return initial.id
@@ -247,21 +253,6 @@ function AlertForm({ initial, telegramLinked, onDone }) {
             ))}
           </select>
         </label>
-        <div className="field">
-          <span>Send to</span>
-          <label className="field check">
-            <input type="checkbox" checked={draft.channels.includes('email')} onChange={() => toggle('email')} /> Email
-          </label>
-          <label className="field check">
-            <input
-              type="checkbox"
-              checked={draft.channels.includes('telegram')}
-              disabled={!telegramLinked && !draft.channels.includes('telegram')}
-              onChange={() => toggle('telegram')}
-            />{' '}
-            Telegram{!telegramLinked && <span className="muted small"> (link it below first)</span>}
-          </label>
-        </div>
       </div>
       {save.error && <p className="error">{save.error.message}</p>}
       <div className="row-actions">
