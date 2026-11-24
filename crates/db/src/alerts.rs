@@ -3,8 +3,7 @@
 //!
 //! Alert queries take the user's id like every other user query. The alert
 //! run (`due_alerts`, `claim_alert`, `mark_sent`) works across users: only the
-//! token-gated cron route calls it. `unsubscribe_email` takes an alert id
-//! from a signed link instead of a session.
+//! token-gated cron route calls it.
 
 use serde::Serialize;
 use sqlx::postgres::PgExecutor;
@@ -131,20 +130,6 @@ pub async fn set_all_paused(db: impl PgExecutor<'_>, user_id: Uuid, paused: bool
     .rows_affected())
 }
 
-/// Turns email off for one alert: what an unsubscribe link does. The id
-/// comes from a signed link, so no user id is needed.
-pub async fn unsubscribe_email(db: impl PgExecutor<'_>, id: Uuid) -> Result<bool> {
-    Ok(sqlx::query(
-        "UPDATE job_alerts SET channels = array_remove(channels, 'email'), updated_at = now()
-         WHERE id = $1 AND 'email' = ANY (channels)",
-    )
-    .bind(id)
-    .execute(db)
-    .await?
-    .rows_affected()
-        == 1)
-}
-
 // Instant alerts run after every collect; daily and weekly ones once their
 // period has (nearly) passed. The slack keeps a 3-hourly collect from pushing
 // a daily digest to every 27 hours.
@@ -154,24 +139,17 @@ const DUE: &str = "NOT a.paused AND cardinality(a.channels) > 0 AND u.disabled_a
     OR (a.frequency = 'daily'  AND a.last_run_at < now() - interval '20 hours')
     OR (a.frequency = 'weekly' AND a.last_run_at < now() - interval '6 days 20 hours'))";
 
-/// Alerts due to run, with their owner's email, longest-waiting first.
-pub async fn due_alerts(db: impl PgExecutor<'_>, limit: i64) -> Result<Vec<(AlertRow, String)>> {
-    #[derive(FromRow)]
-    struct Row {
-        #[sqlx(flatten)]
-        alert: AlertRow,
-        email: String,
-    }
-    let rows: Vec<Row> = sqlx::query_as(&format!(
+/// Alerts due to run, longest-waiting first.
+pub async fn due_alerts(db: impl PgExecutor<'_>, limit: i64) -> Result<Vec<AlertRow>> {
+    Ok(sqlx::query_as(&format!(
         "SELECT a.id, a.user_id, a.spec, a.frequency, a.channels, a.paused, a.last_run_at,
-                a.last_sent_at, a.created_at, a.updated_at, u.email
+                a.last_sent_at, a.created_at, a.updated_at
          FROM job_alerts a JOIN users u ON u.id = a.user_id
          WHERE {DUE} ORDER BY a.last_run_at NULLS FIRST, a.created_at LIMIT $1"
     ))
     .bind(limit)
     .fetch_all(db)
-    .await?;
-    Ok(rows.into_iter().map(|r| (r.alert, r.email)).collect())
+    .await?)
 }
 
 pub async fn count_due(db: impl PgExecutor<'_>) -> Result<i64> {

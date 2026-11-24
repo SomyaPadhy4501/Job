@@ -10,7 +10,7 @@
 //! - `/api/me/alerts`, `/api/me/chat`, `/api/me/queue`: job alerts, the linked
 //!   Telegram chat and the apply queue; `/api/telegram/webhook` takes the
 //!   bot's messages, `/api/agent/*` is for an apply agent (bearer token,
-//!   scope `agent`), `/api/alerts/unsubscribe` is the link in every email.
+//!   scope `agent`).
 //!
 //! Every response is `Cache-Control: private, no-store`. The Node routes
 //! (`/jobs`, `/companies`, …) are edge-cached for 30 s; nothing under `/api`
@@ -92,7 +92,7 @@ pub struct Config {
     /// The owner's `COLLECT_TOKEN`; used only server to server.
     pub collect_token: Option<String>,
     pub shares_per_day: i64,
-    /// Email (Resend) and Telegram settings for alerts and chat.
+    /// Telegram settings for alerts and chat.
     pub notify: notify::Settings,
 }
 
@@ -357,12 +357,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/autofill/queue", get(queue::for_extension))
         .route("/api/agent/queue", get(queue::agent_list))
         .route("/api/agent/queue/{id}", post(queue::agent_set))
-        // Telegram, signed links and the alert run: their own secrets, no cookies.
+        // Telegram and the alert run: their own secrets, no cookies.
         .route("/api/telegram/webhook", post(telegram::webhook))
-        .route(
-            "/api/alerts/unsubscribe",
-            get(alerts::unsubscribe_page).post(alerts::unsubscribe),
-        )
         .route("/api/cron/alerts", post(alerts::run));
 
     Router::new()

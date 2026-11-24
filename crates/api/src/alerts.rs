@@ -1,40 +1,35 @@
 //! Saved job alerts: the signed-in user's searches, and the run that sends
-//! their new matches by email (Resend) and Telegram.
+//! their new matches to the user's linked Telegram chat.
 //!
-//! - `/api/me/alerts*` (cookie): list, create, edit, delete, preview.
+//! - `/api/me/alerts*` (cookie): list, create, edit, delete, preview. Making
+//!   an alert needs a linked Telegram chat, so no alert sends nowhere.
 //! - `POST /api/cron/alerts` (`Authorization: Bearer $CRON_SECRET`): called
 //!   by GitHub Actions after each collect. Sends each due alert the jobs it
-//!   hasn't sent yet, at most [`MAX_EMAIL_JOBS`] per email.
-//! - `/api/alerts/unsubscribe?t=…`: a signed link in every email. GET shows a
-//!   button, POST turns the alert's email off (also what Gmail's one-click
-//!   `List-Unsubscribe-Post` sends). No sign-in needed.
+//!   hasn't sent yet, at most [`MAX_CHAT_JOBS`] per message.
 //!
 //! An alert's name and filters are encrypted; only this module reads them.
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{Html, IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use time::format_description::well_known::Rfc3339;
 use time::{Duration, OffsetDateTime};
-use uuid::Uuid;
 
 use accounts::crypto::Field;
-use accounts::token::{ct_eq, hex, hmac_sha256};
+use accounts::token::ct_eq;
 use db::alerts::{AlertRow, AlertWrite, JobFilter, JobQuery, JobRow};
 
 use crate::AppState;
 use crate::auth::Signed;
 use crate::error::{ApiError, ApiResult};
-use crate::http::{JsonBody, parse_id, this_month, today};
-use crate::notify::{self, Email, Sent};
+use crate::http::{JsonBody, parse_id};
+use crate::notify::{self, Sent};
 
 pub const MAX_ALERTS: i64 = 10;
-/// Jobs in one email; more are summed up as "and N more".
-pub const MAX_EMAIL_JOBS: usize = 25;
-/// Jobs in one chat message (Telegram caps a message at 4,096 characters).
+/// Jobs in one chat message (Telegram caps a message at 4,096 characters);
+/// more are summed up as a link to the board.
 pub const MAX_CHAT_JOBS: usize = 10;
 /// Alerts one cron call handles; the caller calls again while some remain.
 /// Small, so a call ends well inside a Vercel function's time limit.
@@ -49,7 +44,7 @@ const LEVELS: &[&str] = &["entry", "mid", "early"];
 const SPONSORSHIP: &[&str] = &["YES", "NO", "UNKNOWN"];
 const RESTRICTION: &[&str] = &["hide", "all", "only"];
 const FREQUENCIES: &[&str] = &["instant", "daily", "weekly"];
-pub const CHANNELS: &[&str] = &["email", "telegram"];
+pub const CHANNELS: &[&str] = &["telegram"];
 
 /// The board's filters, as the web page sends them. Empty means "any".
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -214,7 +209,7 @@ fn default_frequency() -> String {
 }
 
 fn default_channels() -> Vec<String> {
-    vec!["email".into()]
+    vec!["telegram".into()]
 }
 
 struct Checked {
@@ -264,7 +259,6 @@ pub async fn list(State(state): State<AppState>, signed: Signed) -> ApiResult<Js
     Ok(Json(json!({
         "alerts": alerts,
         "max": MAX_ALERTS,
-        "emailReady": n.email_ready(),
         "telegramReady": n.telegram_ready(),
     })))
 }
@@ -277,6 +271,12 @@ pub async fn create(
     let pool = state.pool()?;
     let user_id = signed.user.id;
     let c = check(body)?;
+    if db::chat::chat_link(pool, user_id, "telegram")
+        .await?
+        .is_none()
+    {
+        return Err(ApiError::bad("Link Telegram first; alerts go to your Telegram chat."));
+    }
     if db::alerts::count_alerts(pool, user_id).await? >= MAX_ALERTS {
         return Err(ApiError::Forbidden(format!(
             "You can have {MAX_ALERTS} alerts. Delete one first."
@@ -375,121 +375,7 @@ pub async fn preview(
 }
 
 // ---------------------------------------------------------------------------
-// Unsubscribe links
-
-fn unsubscribe_key(state: &AppState) -> ApiResult<[u8; 32]> {
-    Ok(state.keyring()?.derive("alert-unsubscribe/v1"))
-}
-
-/// `hex(alert id) + hex(first 16 bytes of HMAC)`: 64 characters, no expiry.
-pub fn unsubscribe_token(state: &AppState, alert_id: Uuid) -> ApiResult<String> {
-    let mac = hmac_sha256(&unsubscribe_key(state)?, alert_id.as_bytes());
-    Ok(format!("{}{}", alert_id.simple(), hex(&mac[..16])))
-}
-
-fn alert_of_token(state: &AppState, token: &str) -> ApiResult<Uuid> {
-    let token = token.trim();
-    if token.len() != 64 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(ApiError::NotFound);
-    }
-    let id = Uuid::parse_str(&token[..32]).map_err(|_| ApiError::NotFound)?;
-    let want = unsubscribe_token(state, id)?;
-    if !ct_eq(want.as_bytes(), token.to_ascii_lowercase().as_bytes()) {
-        return Err(ApiError::NotFound);
-    }
-    Ok(id)
-}
-
-pub fn unsubscribe_url(state: &AppState, alert_id: Uuid) -> ApiResult<String> {
-    Ok(format!(
-        "{}/api/alerts/unsubscribe?t={}",
-        state.config.notify.site_url,
-        unsubscribe_token(state, alert_id)?
-    ))
-}
-
-#[derive(Deserialize)]
-pub struct TokenQuery {
-    #[serde(default)]
-    t: String,
-}
-
-fn page(title: &str, body: &str) -> Response {
-    Html(format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
-         <meta name=\"robots\" content=\"noindex\"><title>{title}</title>\
-         <style>body{{font:16px/1.5 system-ui,sans-serif;color:#18191c;max-width:32rem;margin:3rem auto;padding:0 1rem}}\
-         button{{font:inherit;background:#0a65cc;color:#fff;border:0;border-radius:6px;padding:.6rem 1.1rem;cursor:pointer}}\
-         a{{color:#0a65cc}}</style></head><body>{body}</body></html>"
-    ))
-    .into_response()
-}
-
-/// GET: a button, so a mail scanner opening the link changes nothing.
-pub async fn unsubscribe_page(
-    State(state): State<AppState>,
-    Query(q): Query<TokenQuery>,
-) -> Response {
-    if alert_of_token(&state, &q.t).is_err() {
-        return page(
-            "Link not valid",
-            "<h1>This link isn’t valid</h1><p>Turn alerts off on the Alerts page instead.</p>",
-        );
-    }
-    let site = esc(&state.config.notify.site_url);
-    page(
-        "Stop these emails",
-        &format!(
-            "<h1>Stop emails for this alert?</h1>\
-             <form method=\"post\"><button type=\"submit\">Stop these emails</button></form>\
-             <p>You can turn it back on from <a href=\"{site}/alerts\">your alerts</a>.</p>"
-        ),
-    )
-}
-
-/// POST: turns email off for the alert. Gmail's one-click sends this too.
-pub async fn unsubscribe(State(state): State<AppState>, Query(q): Query<TokenQuery>) -> Response {
-    let id = match alert_of_token(&state, &q.t) {
-        Ok(id) => id,
-        Err(e) => return e.into_response(),
-    };
-    let pool = match state.pool() {
-        Ok(p) => p,
-        Err(e) => return e.into_response(),
-    };
-    match db::alerts::unsubscribe_email(pool, id).await {
-        Ok(_) => {
-            let site = esc(&state.config.notify.site_url);
-            page(
-                "Emails stopped",
-                &format!(
-                    "<h1>Done. No more emails for this alert.</h1>\
-                     <p>Change your alerts any time on <a href=\"{site}/alerts\">the Alerts page</a>.</p>"
-                ),
-            )
-        }
-        Err(e) => ApiError::from(e).into_response(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // The alert run
-
-pub fn esc(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            c => out.push(c),
-        }
-    }
-    out
-}
 
 /// Only web links go into a message; anything else becomes the board.
 pub fn safe_url<'a>(url: &'a str, fallback: &'a str) -> &'a str {
@@ -510,78 +396,6 @@ fn job_line(job: &JobRow) -> String {
         Some(loc) => format!("{} — {} · {}", job.company_name, job.job_title, loc),
         None => format!("{} — {}", job.company_name, job.job_title),
     }
-}
-
-fn company_line(job: &JobRow) -> String {
-    match job
-        .location
-        .as_deref()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-    {
-        Some(loc) => format!("{} · {}", job.company_name, loc),
-        None => job.company_name.clone(),
-    }
-}
-
-fn subject(name: &str, n: usize, more: bool) -> String {
-    let count = if more { format!("{n}+") } else { n.to_string() };
-    let noun = if n == 1 && !more { "job" } else { "jobs" };
-    format!("{count} new {noun}: {name}")
-}
-
-/// The email for one alert: HTML and plain text, both with the unsubscribe link.
-pub fn render_email(
-    site: &str,
-    name: &str,
-    frequency: &str,
-    jobs: &[JobRow],
-    more: bool,
-    unsubscribe: &str,
-) -> (String, String, String) {
-    let subject = subject(name, jobs.len(), more);
-    let mut html = format!(
-        "<div style=\"font:15px/1.5 system-ui,sans-serif;color:#18191c;max-width:600px\">\
-         <h2 style=\"font-size:18px;margin:0 0 12px\">New jobs for “{}”</h2><ul style=\"padding-left:18px\">",
-        esc(name)
-    );
-    let mut text = format!("New jobs for “{name}”\n\n");
-    for job in jobs {
-        let url = safe_url(&job.apply_url, site);
-        html.push_str(&format!(
-            "<li style=\"margin:0 0 10px\"><a href=\"{}\" style=\"color:#0a65cc\">{}</a><br>\
-             <span style=\"color:#555\">{}</span> · <a href=\"{site}/queue?add={}\" style=\"color:#0a65cc\">Add to my apply queue</a></li>",
-            esc(url),
-            esc(&job.job_title),
-            esc(&company_line(job)),
-            job.id,
-        ));
-        text.push_str(&format!("- {}\n  {url}\n", job_line(job)));
-    }
-    html.push_str("</ul>");
-    if more {
-        html.push_str(&format!(
-            "<p>More matched. <a href=\"{site}/\" style=\"color:#0a65cc\">See them all on the board</a>.</p>"
-        ));
-        text.push_str(&format!("\nMore matched: {site}/\n"));
-    }
-    let how = match frequency {
-        "instant" => "after each update",
-        "weekly" => "weekly",
-        _ => "daily",
-    };
-    html.push_str(&format!(
-        "<p style=\"color:#555;font-size:13px;border-top:1px solid #d5d9df;padding-top:10px\">\
-         You get this {how} for your alert “{}”. \
-         <a href=\"{site}/alerts\" style=\"color:#0a65cc\">Change your alerts</a> · \
-         <a href=\"{}\" style=\"color:#0a65cc\">Stop these emails</a></p></div>",
-        esc(name),
-        esc(unsubscribe),
-    ));
-    text.push_str(&format!(
-        "\nYou get this {how} for your alert “{name}”.\nChange your alerts: {site}/alerts\nStop these emails: {unsubscribe}\n"
-    ));
-    (subject, html, text)
 }
 
 /// The chat message for one alert, plain text.
@@ -624,26 +438,15 @@ pub fn require_cron(state: &AppState, headers: &HeaderMap) -> ApiResult<()> {
 pub struct RunStats {
     pub processed: u32,
     pub nothing_new: u32,
-    pub emails: u32,
     pub chats: u32,
-    /// Matches kept for the next run: no channel could deliver them.
+    /// Matches kept for the next run: no linked chat could take them.
     pub held: u32,
     pub remaining: i64,
-}
-
-/// One email under the daily and monthly caps, or `false` when either is used up.
-async fn take_email_quota(state: &AppState) -> ApiResult<bool> {
-    let pool = state.pool()?;
-    let n = &state.config.notify;
-    let day = db::bump_counter(pool, "global", "alert_email", &today(), 1).await?;
-    let month = db::bump_counter(pool, "global", "alert_email", &this_month(), 1).await?;
-    Ok(day <= n.emails_per_day && month <= n.emails_per_month)
 }
 
 async fn run_one(
     state: &AppState,
     row: &AlertRow,
-    email: &str,
     now: OffsetDateTime,
     stats: &mut RunStats,
 ) -> ApiResult<()> {
@@ -664,7 +467,7 @@ async fn run_one(
             first_seen_after: Some(&iso(after)),
             visible_since: &visible,
             not_sent_by: Some(row.id),
-            limit: MAX_EMAIL_JOBS as i64 + 1,
+            limit: MAX_CHAT_JOBS as i64 + 1,
         },
     )
     .await?;
@@ -672,35 +475,10 @@ async fn run_one(
         stats.nothing_new += 1;
         return Ok(());
     }
-    let more = jobs.len() > MAX_EMAIL_JOBS;
-    jobs.truncate(MAX_EMAIL_JOBS);
+    let more = jobs.len() > MAX_CHAT_JOBS;
+    jobs.truncate(MAX_CHAT_JOBS);
     let site = state.config.notify.site_url.clone();
     let mut sent: Vec<i32> = Vec::new();
-
-    if row.channels.iter().any(|c| c == "email") && state.config.notify.email_ready() {
-        if take_email_quota(state).await? {
-            let unsub = unsubscribe_url(state, row.id)?;
-            let (subject, html, text) =
-                render_email(&site, &spec.name, &row.frequency, &jobs, more, &unsub);
-            let mail = Email {
-                to: email,
-                subject: &subject,
-                html: &html,
-                text: &text,
-                unsubscribe: &unsub,
-            };
-            if notify::send_email(state, &mail).await == Sent::Yes {
-                stats.emails += 1;
-                sent.extend(jobs.iter().map(|j| j.id));
-            }
-            // Resend takes 2 requests a second.
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        } else {
-            eprintln!("alerts: the daily or monthly email cap is used up; holding emails");
-        }
-    } else if row.channels.iter().any(|c| c == "email") {
-        eprintln!("alerts: RESEND_API_KEY or ALERTS_FROM is unset; email skipped");
-    }
 
     if row.channels.iter().any(|c| c == "telegram")
         && let Some(chat_id) = crate::chat::address_of(state, row.user_id, "telegram").await?
@@ -708,15 +486,13 @@ async fn run_one(
         let text = render_chat(&site, &spec.name, &jobs, more);
         if notify::send_telegram(state, &chat_id, &text).await == Sent::Yes {
             stats.chats += 1;
-            sent.extend(jobs.iter().take(MAX_CHAT_JOBS).map(|j| j.id));
+            sent.extend(jobs.iter().map(|j| j.id));
         }
     }
 
     if sent.is_empty() {
         stats.held += 1;
     } else {
-        sent.sort_unstable();
-        sent.dedup();
         db::alerts::mark_sent(pool, row.id, &sent).await?;
     }
     Ok(())
@@ -730,9 +506,9 @@ pub async fn run(State(state): State<AppState>, headers: HeaderMap) -> ApiResult
     let now = OffsetDateTime::now_utc();
     db::alerts::prune_sent(pool).await?;
     let mut stats = RunStats::default();
-    for (row, email) in db::alerts::due_alerts(pool, RUN_BATCH).await? {
+    for row in db::alerts::due_alerts(pool, RUN_BATCH).await? {
         // One alert's failure (a key that can't decrypt it) doesn't stop the rest.
-        if let Err(e) = run_one(&state, &row, &email, now, &mut stats).await {
+        if let Err(e) = run_one(&state, &row, now, &mut stats).await {
             eprintln!("alerts: alert run failed: {e:?}");
         }
     }
@@ -788,32 +564,6 @@ mod tests {
     fn iso_matches_the_collectors_format() {
         let t = OffsetDateTime::from_unix_timestamp(1_764_000_000).unwrap();
         assert_eq!(iso(t), "2025-11-24T16:00:00Z");
-    }
-
-    #[test]
-    fn email_escapes_and_carries_the_unsubscribe_link() {
-        let jobs = vec![
-            job(7, "https://jobs.example/7"),
-            job(8, "javascript:alert(1)"),
-        ];
-        let (subject, html, text) = render_email(
-            "https://site.example",
-            "Backend <b>",
-            "daily",
-            &jobs,
-            true,
-            "https://site.example/api/alerts/unsubscribe?t=x",
-        );
-        assert_eq!(subject, "2+ new jobs: Backend <b>");
-        assert!(html.contains("Acme &lt;Inc&gt;"));
-        assert!(html.contains("Backend &lt;b&gt;"));
-        assert!(!html.contains("javascript:"), "only web links");
-        assert!(html.contains("/queue?add=7"));
-        assert!(html.contains("unsubscribe?t=x"));
-        assert!(
-            text.contains("Stop these emails: https://site.example/api/alerts/unsubscribe?t=x")
-        );
-        assert!(text.contains("More matched"));
     }
 
     #[test]

@@ -5,8 +5,8 @@ import RequireAuth from '../components/RequireAuth.jsx';
 import { webHref } from '../safe-url.js';
 
 // The apply queue: jobs the user means to apply to. Jobs arrive from the
-// board's "Add to queue" button, alert emails ("Add to my apply queue"), the
-// Telegram bot (/apply) or a pasted link. Nothing here, or anywhere, submits an application: the user opens
+// board's "Add to queue" button, the Telegram bot (/apply) or a pasted
+// link. Nothing here, or anywhere, submits an application: the user opens
 // the job and submits it, then marks it applied.
 
 const STATUS = {
@@ -45,7 +45,7 @@ function QueuePage() {
         ) : error ? (
           <p className="error">{error.message}</p>
         ) : open.length === 0 ? (
-          <p className="muted small">Nothing queued. Press “Add to queue” on any job on the board, or add one from an alert email, the Telegram bot, or a link above.</p>
+          <p className="muted small">Nothing queued. Press “Add to queue” on any job on the board, or add one from the Telegram bot or a link above.</p>
         ) : (
           <ul className="queue-list">
             {open.map((item) => (
@@ -68,7 +68,7 @@ function QueuePage() {
   );
 }
 
-// `/queue?add=1234`, the link in alert emails: asks before adding.
+// `/queue?add=1234`: a link that adds one job; asks before adding.
 function AddFromLink() {
   const qc = useQueryClient();
   const [jobId] = useState(() => Number(new URLSearchParams(window.location.search).get('add')) || null);
