@@ -66,10 +66,53 @@ function requestInsecureJson(url, { method = 'GET', headers = {}, body } = {}) {
   });
 }
 
+// Rate limits are per IP across a whole platform (every Workday tenant shares
+// one limit), so one 429 means every request to that platform should wait,
+// not just the one that got it. Each retrying on its own kept six tenants
+// hammering the limit together: on 2026-11-24 248 of 256 Workday employers
+// failed in one run. Keyed by the last two host labels (myworkdayjobs.com).
+const cooldownUntil = new Map();
+const MAX_COOLDOWN_MS = 60_000;
+// Extra attempts for a 429 alone: with the shared pause they usually succeed.
+const RATE_LIMIT_RETRIES = 4;
+// Circuit breaker: after this many 429s in a row from one platform (no
+// success in between), its remaining requests this run fail at once. An IP
+// blocked for an hour would otherwise keep every tenant waiting until GitHub
+// kills the job, losing the whole run instead of one platform.
+const GIVE_UP_AFTER = 25;
+const strikes = new Map();
+
+function platformOf(url) {
+  try {
+    return new URL(url).hostname.split('.').slice(-2).join('.');
+  } catch {
+    return '';
+  }
+}
+
+async function waitForCooldown(platform) {
+  const until = cooldownUntil.get(platform) || 0;
+  const wait = until - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
+function startCooldown(platform, ms) {
+  const until = Date.now() + Math.min(ms, MAX_COOLDOWN_MS);
+  if (until > (cooldownUntil.get(platform) || 0)) cooldownUntil.set(platform, until);
+}
+
 // Shared fetch wrapper with timeout + basic retries.
 async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body } = {}) {
   let lastErr;
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  const platform = platformOf(url);
+  let rateLimited = 0;
+  for (let attempt = 0; attempt <= retries + rateLimited; attempt++) {
+    if ((strikes.get(platform) || 0) >= GIVE_UP_AFTER) {
+      const err = new Error(`HTTP 429 for ${url} (${platform} rate-limited this run; gave up)`);
+      err.status = 429;
+      throw err;
+    }
+    await waitForCooldown(platform);
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), CONFIG.requestTimeoutMs);
     try {
@@ -99,20 +142,22 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
         err.retryAfter = Number(res.headers.get('retry-after')) || 0;
         throw err;
       }
-      return await res.json();
+      const data = await res.json();
+      strikes.set(platform, 0);
+      return data;
     } catch (err) {
       clearTimeout(t);
       lastErr = err;
       if (err.status === 404) throw err; // no point retrying 404
-      if (attempt < retries) {
+      if (err.status === 429) {
         // A 429 needs seconds, not the half-second used for transient errors.
-        // Workday rate-limits by IP across every tenant at once, so with
-        // hundreds of tenants a too-short retry turns one 429 into a failed
-        // employer. Honour Retry-After when given (capped at 30 s).
-        const wait = err.status === 429
-          ? Math.min(30, err.retryAfter || 5 * (attempt + 1) ** 2) * 1000
-          : 500 * (attempt + 1);
-        await new Promise((r) => setTimeout(r, wait));
+        // Honour Retry-After when given; pause the whole platform, and allow
+        // a few more attempts than other errors get.
+        if (rateLimited < RATE_LIMIT_RETRIES) rateLimited++;
+        strikes.set(platform, (strikes.get(platform) || 0) + 1);
+        startCooldown(platform, (err.retryAfter || 5 * 2 ** Math.min(attempt, 3)) * 1000);
+      } else if (attempt < retries + rateLimited) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
       }
     }
   }
@@ -137,4 +182,10 @@ async function runWithConcurrency(items, limit, worker) {
   return out;
 }
 
-module.exports = { fetchJson, runWithConcurrency };
+// For tests: forget cooldowns and strikes between cases.
+function resetRateLimits() {
+  cooldownUntil.clear();
+  strikes.clear();
+}
+
+module.exports = { fetchJson, runWithConcurrency, resetRateLimits, GIVE_UP_AFTER };
