@@ -687,7 +687,9 @@ const COMPANIES = [
   // (cisco.wd5 Cisco_Careers, below with the probe-boards.js entries).
   { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
   { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
-  { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
+  // IBM left this list on 2026-11-24 for its own careers search API
+  // (src/collectors/ibm.js).
+  { source: 'ibm', slug: 'ibm', displayName: 'IBM' },
   // LinkedIn has no other route: it posts only on linkedin.com (see HANDOFF).
   // Wayfair moved to the jsonld source above on 2026-11-24.
   { source: 'adzuna', slug: 'linkedin', displayName: 'LinkedIn', company: 'LinkedIn' },
@@ -1251,7 +1253,8 @@ const COMPANIES = [
   { source: 'greenhouse', slug: 'squarespace', displayName: 'Squarespace' },  // 6 US software of 26 postings, 28 H-1B approvals
   { source: 'greenhouse', slug: '8451', displayName: '84 51' },  // 4 US software of 14 postings, 27 H-1B approvals
   { source: 'greenhouse', slug: 'five9', displayName: 'Five9' },  // 7 US software of 83 postings, 27 H-1B approvals
-  { source: 'greenhouse', slug: 'mindbody', displayName: 'Mindbody' },  // 3 US software of 18 postings, 27 H-1B approvals
+  // Moved from Greenhouse to Ashby (Greenhouse 404 since 2026-11).
+  { source: 'ashby', slug: 'mindbody', displayName: 'Mindbody' },  // 3 US software of 18 postings, 27 H-1B approvals
   { source: 'greenhouse', slug: 'verisign', displayName: 'Verisign' },  // 5 US software of 16 postings, 26 H-1B approvals
   { source: 'greenhouse', slug: 'credible', displayName: 'Credible Labs' },  // 1 US software of 14 postings, 26 H-1B approvals
   { source: 'greenhouse', slug: 'intersystems', displayName: 'InterSystems Corporation' },  // 4 US software of 101 postings, 25 H-1B approvals

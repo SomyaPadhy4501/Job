@@ -9,6 +9,7 @@ const pcsx = require('./pcsx');
 const capgemini = require('./capgemini');
 const wipro = require('./wipro');
 const goldmanSachs = require('./goldman_sachs');
+const ibm = require('./ibm');
 const amazon = require('./amazon');
 const apple = require('./apple');
 const microsoft = require('./microsoft');
@@ -50,6 +51,7 @@ const REGISTRY = {
   [capgemini.source]: capgemini,
   [wipro.source]: wipro,
   [goldmanSachs.source]: goldmanSachs,
+  [ibm.source]: ibm,
   [amazon.source]: amazon,
   [apple.source]: apple,
   [microsoft.source]: microsoft,
