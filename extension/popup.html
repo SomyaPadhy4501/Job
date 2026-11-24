@@ -41,11 +41,20 @@
   .log { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 160px; overflow: auto; font-size: 12px; }
   .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .update { border-color: #c4b5fd; background: #f5f3ff; }
+  .cmd { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 11.5px; background: #fff; border: 1px solid #ddd6fe; border-radius: 6px; padding: 6px 8px; }
 </style>
 </head>
 <body>
   <header><span class="dot"></span><strong>US SWE Jobs</strong><span class="muted" style="margin-left:auto">Autofill</span></header>
   <main>
+    <section class="card update" id="updateCard" hidden aria-labelledby="update-title">
+      <h2 id="update-title">Version <span id="updateVersion"></span> is available</h2>
+      <p class="muted" id="updateHow"></p>
+      <div class="cmd"><code id="updateCmd"></code><button id="updateCopy">Copy</button></div>
+      <p class="muted">The extension updates and reloads itself within a minute; your settings and connection stay.</p>
+    </section>
     <section class="card" aria-labelledby="autofill-title">
       <h2 id="autofill-title">Fill an application</h2>
       <button id="fillPage" class="primary">Autofill this page</button>

@@ -1,7 +1,7 @@
 // Service worker: de-duplicates captured rows, posts them to the portal's
 // /admin/ingest in batches, keeps a short capture log for the popup, and opens
 // the saved boards once a day.
-importScripts('schedule.js', 'application-pages.js', 'config.js', 'gmail.js', 'autofill-api.js');
+importScripts('schedule.js', 'application-pages.js', 'config.js', 'gmail.js', 'autofill-api.js', 'updates.js');
 
 const BATCH = 500;          // rows per request, at most…
 const BATCH_BYTES = 2_500_000; // …and bytes: Vercel rejects bodies over ~4.5 MB
@@ -220,6 +220,7 @@ async function scheduleAlarms() {
 
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === 'closeBoards') return closeBoardsWindow();
+  if (a.name !== 'check') return; // updates.js handles its own alarms
   return checkSchedule();
 });
 
@@ -258,4 +259,14 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 chrome.permissions.onRemoved.addListener(async ({ origins = [] }) => {
   const ids = origins.map((p) => 'autofill-' + p.replace(/[^a-z0-9]+/gi, '-'));
   if (ids.length) await chrome.scripting.unregisterContentScripts({ ids }).catch(() => {});
+});
+
+// The popup asks for a fresh update check when it opens.
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg?.type !== 'checkUpdate' || sender.id !== chrome.runtime.id) return;
+  ExtensionUpdates.check().then(
+    (version) => reply({ version, running: ExtensionUpdates.running }),
+    () => reply({ version: null, running: ExtensionUpdates.running })
+  );
+  return true;
 });

@@ -100,11 +100,28 @@ function AutofillPage() {
         </ul>
       </section>
 
-      <p className="notice">
-        <strong>Updating from version 1.11 or older?</strong> Version 1.12 has a new extension ID, so Chrome treats it as a
-        new extension: remove the old one on the extensions page, load the new folder, then connect again with a new
-        token (step 4). Your profile, resumes and saved answers stay in your account.
-      </p>
+      <section className="card notice">
+        <h3>Already installed? Update with one command</h3>
+        <p>
+          When a new version is out, the extension's icon shows <strong>NEW</strong> and its popup shows this command.
+          Paste it and press Enter: it finds the extension's folder, copies in the new version, and the extension reloads
+          itself. Your connection and settings stay.
+        </p>
+        <p className="muted small">Windows (PowerShell):</p>
+        <div className="copy-row">
+          <code>{`irm ${origin}/update-extension.ps1 | iex`}</code>
+          <Copy value={`irm ${origin}/update-extension.ps1 | iex`} />
+        </div>
+        <p className="muted small">Mac (Terminal):</p>
+        <div className="copy-row">
+          <code>{`curl -fsSL ${origin}/update-extension.sh | bash`}</code>
+          <Copy value={`curl -fsSL ${origin}/update-extension.sh | bash`} />
+        </div>
+        <p className="muted small">
+          Coming from version 1.11 or older: the command updates it too, then restart your browser once and connect again
+          with a new token (step 4). That one-time reconnect is because 1.12 gave the extension a fixed ID.
+        </p>
+      </section>
       <ol className="steps">
         <li className="card">
           <h3>Download the extension</h3>

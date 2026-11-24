@@ -301,3 +301,27 @@ $('gmailDisconnect').onclick = async () => {
   showGmail('Disconnected.');
 };
 showGmail();
+
+// "Version X is available": the one-line command for this computer.
+async function showUpdate() {
+  const r = await chrome.runtime.sendMessage({ type: 'checkUpdate' }).catch(() => null);
+  const { updateAvailable } = await chrome.storage.local.get('updateAvailable');
+  const version = r?.version || updateAvailable?.version;
+  if (!version) return;
+  const portal = (updateAvailable?.portal || $('portalUrl').value || 'https://job-two-xi.vercel.app').replace(/\/+$/, '');
+  const mac = /Mac/i.test(navigator.platform);
+  $('updateVersion').textContent = version;
+  $('updateCmd').textContent = mac
+    ? `curl -fsSL ${portal}/update-extension.sh | bash`
+    : `irm ${portal}/update-extension.ps1 | iex`;
+  $('updateHow').textContent = mac
+    ? 'Copy this, paste it into Terminal and press Return:'
+    : 'Copy this, paste it into PowerShell (Start menu → type “PowerShell”) and press Enter:';
+  $('updateCard').hidden = false;
+}
+$('updateCopy').onclick = async () => {
+  await navigator.clipboard.writeText($('updateCmd').textContent);
+  $('updateCopy').textContent = 'Copied';
+  setTimeout(() => ($('updateCopy').textContent = 'Copy'), 1500);
+};
+showUpdate();
