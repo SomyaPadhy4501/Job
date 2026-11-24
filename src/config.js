@@ -1531,6 +1531,10 @@ const COMPANIES = [
   { source: 'workday', slug: 'warnerbros-global', tenant: 'warnerbros', wd: '5', site: 'global', displayName: 'Warner Bros. Discovery' },  // 126 approvals (alias warnermedia-services)
   { source: 'workday', slug: 'xboxgaming-blizzard_external_careers', tenant: 'xboxgaming', wd: '1', site: 'Blizzard_External_Careers', displayName: 'Blizzard Entertainment' },  // 100 approvals
   { source: 'workday', slug: 'boseallaboutme-bose_careers', tenant: 'boseallaboutme', wd: '503', site: 'Bose_Careers', displayName: 'Bose' },  // 51 approvals (alias bose-corporation)
+  // Tenants known only by name until 2026-11-24, probed directly. (TD Bank was already wired above.)
+  { source: 'workday', slug: 'cat-caterpillarcareers', tenant: 'cat', wd: '5', site: 'CaterpillarCareers', displayName: 'Caterpillar' },  // 658 approvals
+  { source: 'workday', slug: 'verizon-verizon-careers', tenant: 'verizon', wd: '12', site: 'verizon-careers', displayName: 'Verizon' },  // 466 approvals (verizon-data-services)
+  { source: 'workday', slug: 'wexinc-wexinc', tenant: 'wexinc', wd: '5', site: 'WEXInc', displayName: 'WEX' },  // 25 approvals
 ];
 
 const CONFIG = {
