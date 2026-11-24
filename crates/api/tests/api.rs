@@ -1382,21 +1382,37 @@ async fn each_resume_keeps_its_own_history_for_the_extension() {
         "description": "Built the ranking model."
     });
     let res = web
-        .json(Method::PUT, &path, json!({ "education": [], "experience": [job] }))
+        .json(
+            Method::PUT,
+            &path,
+            json!({ "education": [], "experience": [job] }),
+        )
         .await;
-    assert_eq!(res.status, StatusCode::OK, "{}", String::from_utf8_lossy(&res.body));
+    assert_eq!(
+        res.status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&res.body)
+    );
     let shown = web.get(&format!("/api/me/resumes/{id}")).await.json();
     assert_eq!(shown["parsed"]["experience"][0]["company"], "Acme");
     assert_eq!(shown["parsed"]["education"], json!([]));
 
     // Same date rules as the profile.
     let bad = json!({ "education": [], "experience": [{ "company": "X", "startDate": "June" }] });
-    assert_eq!(web.json(Method::PUT, &path, bad).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        web.json(Method::PUT, &path, bad).await.status,
+        StatusCode::BAD_REQUEST
+    );
     // Another user's resume isn't found.
     let mut other = Browser::new(&app);
     other.sign_in_as("someone-else").await;
     let theirs = other
-        .json(Method::PUT, &path, json!({ "education": [], "experience": [] }))
+        .json(
+            Method::PUT,
+            &path,
+            json!({ "education": [], "experience": [] }),
+        )
         .await;
     assert_eq!(theirs.status, StatusCode::NOT_FOUND);
 

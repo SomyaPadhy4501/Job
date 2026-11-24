@@ -394,7 +394,15 @@ pub async fn put_history(
     let encrypted = state
         .keyring()?
         .encrypt_json(Field::ResumeParsed, &user_id, &parsed);
-    db::set_resume_parse(pool, user_id, id, "parsed", PARSER_VERSION, Some(&encrypted)).await?;
+    db::set_resume_parse(
+        pool,
+        user_id,
+        id,
+        "parsed",
+        PARSER_VERSION,
+        Some(&encrypted),
+    )
+    .await?;
     let resume = db::get_resume(pool, user_id, id)
         .await?
         .ok_or(ApiError::NotFound)?;
