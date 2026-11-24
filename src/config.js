@@ -247,7 +247,6 @@ const COMPANIES = [
   { source: 'lever', slug: 'teleo', displayName: 'Teleo' }, // YC Winter 2020
   { source: 'lever', slug: 'thunkable', displayName: 'Thunkable' }, // YC W16
   { source: 'lever', slug: 'tovala', displayName: 'Tovala' }, // YC W16
-  { source: 'lever', slug: 'twodots', displayName: 'Two Dots' }, // YC Summer 2022
   { source: 'lever', slug: 'unusual', displayName: 'Unusual' }, // YC Fall 2024
   { source: 'lever', slug: 'voltalabs', displayName: 'Volta Labs' }, // YC Winter 2019
   { source: 'lever', slug: 'getzuma', displayName: 'Zuma' }, // YC Summer 2021
@@ -383,7 +382,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'finni-health', displayName: 'Finni Health' }, // YC W23
   { source: 'ashby', slug: 'firecrawl', displayName: 'Firecrawl' }, // YC Summer 2022
   { source: 'ashby', slug: 'fleek', displayName: 'Fleek' }, // YC W22
-  { source: 'ashby', slug: 'fleetline', displayName: 'Fleetline' }, // YC Summer 2025
   { source: 'ashby', slug: 'fleetworks', displayName: 'FleetWorks' }, // YC Summer 2023
   { source: 'ashby', slug: 'flint', displayName: 'Flint' }, // YC Summer 2020
   { source: 'ashby', slug: 'flowtel', displayName: 'Flowtel' }, // YC Winter 2025
@@ -546,7 +544,6 @@ const COMPANIES = [
   { source: 'ashby', slug: 'brightwheel', displayName: 'Brightwheel' },
   { source: 'ashby', slug: 'built-robotics', displayName: 'Built Robotics' },
   { source: 'ashby', slug: 'bunch', displayName: 'Bunch' },
-  { source: 'ashby', slug: 'cedar', displayName: 'Cedar' },
   { source: 'ashby', slug: 'centivo', displayName: 'Centivo' },
   { source: 'ashby', slug: 'charthop', displayName: 'ChartHop' },
   { source: 'ashby', slug: 'chief', displayName: 'Chief' },
@@ -1053,7 +1050,6 @@ const COMPANIES = [
   { source: 'gem', slug: 'tank-payments', displayName: 'Tank Payments' },
   { source: 'gem', slug: 'growthbook', displayName: 'GrowthBook' },
   { source: 'pinpoint', slug: 'safetywing', displayName: 'SafetyWing' },
-  { source: 'recruitee', slug: 'snapmagic', displayName: 'SnapMagic' },
 
   // ─── Well-known tech, AI, quant and enterprise employers (scripts/probe-boards.js names, 2026-11-02) ───
   // From a hand-written list of ~300 companies the board didn't collect,
