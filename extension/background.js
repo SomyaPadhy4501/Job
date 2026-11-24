@@ -162,6 +162,18 @@ async function openBoards({ scheduled }) {
   // Never open LinkedIn / Indeed / Glassdoor on a schedule (see extract.js).
   const boards = (s.boards || []).filter((u) => !isSensitiveUrl(u)).slice(0, MAX_BOARDS);
   if (!boards.length) return;
+  // Without the collect token (or opted-in sharing) the pages capture
+  // nothing, so opening them only looked like a run: on 2026-11-24 the log
+  // said "5 boards opened" for days while no Tesla row reached the board.
+  const { shareListings } = await chrome.storage.local.get({ shareListings: false });
+  if (!s.token && !shareListings) {
+    await addLog({
+      host: scheduled ? 'scheduled run' : 'manual run',
+      found: 0,
+      error: 'nothing would be sent. Paste the collect token above and Save',
+    });
+    return;
+  }
   if (scheduled) await chrome.storage.local.set({ lastRunAt: new Date().toISOString() });
 
   const win = await chrome.windows.create({ url: boards[0], focused: false, state: 'normal' });

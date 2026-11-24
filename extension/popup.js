@@ -31,7 +31,11 @@ chrome.storage.local.get(defaults).then((s) => {
   $('lastRun').textContent = s.lastRunAt
     ? `Last automatic run: ${new Date(s.lastRunAt).toLocaleString()}`
     : 'Automatic run has not happened yet.';
-  if (!s.token) $('lastRun').textContent = 'Add your collect token, then Save, to start the daily run.';
+  if (!s.token) {
+    // Without it nothing captured on these boards (Tesla, LinkedIn…) is sent.
+    $('lastRun').textContent = 'No collect token: nothing captured here reaches the board. Paste it above, then Save.';
+    $('lastRun').style.color = '#cf222e';
+  }
   renderLog(s.log);
 });
 
