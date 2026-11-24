@@ -2,6 +2,8 @@
 // JSON-LD / __NEXT_DATA__ from the DOM, runs the generic extractor, and hands
 // usable rows to the background worker. Never makes a request of its own.
 (async () => {
+  const { privatePage, publicResponse } = globalThis.JobApplicationPages;
+  if (privatePage(location.href)) return;
   // Same gate as hook.js, plus any host on the user's own board list.
   const JOB_HOST = /^(?:careers?|jobs?|apply|talent|explore|work|join|hiring|opportunities)\.|(?:^|\.)(?:myworkdayjobs|ashbyhq|greenhouse|lever|smartrecruiters|workable|recruitee|pinpointhq|bamboohr|icims|avature|eightfold|oraclecloud|taleo|successfactors|jobvite|phenompeople|rippling|gem|linkedin|indeed|glassdoor)\.(?:com|io|co|net|ai)$/i;
   const JOB_PATH = /career|jobs?\b|\/job\/|search-results|positions|openings|vacanc|requisition/i;
@@ -56,6 +58,7 @@
     timer = setTimeout(flush, 2500);
   }
   async function flush() {
+    if (privatePage(location.href)) { pendingJson = []; pendingLd = []; return; }
     const c = ctx();
     let rows = usable([
       ...pendingJson.flatMap((j) => extractFromJson(j, c)),
@@ -64,14 +67,25 @@
     pendingJson = [];
     pendingLd = [];
     if (!rows.length) return;
+    // Capture runs for the owner (collect token) or for someone who opted in
+    // to "Share job listings I browse". Otherwise it neither probes job pages
+    // nor forwards anything (an autofill-only install stays quiet).
+    const { token, enabled, shareListings } = await chrome.storage.local.get({
+      token: '',
+      enabled: true,
+      shareListings: false,
+    });
+    if (!(token || shareListings) || !enabled || location.href !== c.pageUrl || privatePage(location.href)) return;
     if (SENSITIVE) {
+      // Never shared from other people's browsing; the owner's own opt-in only.
+      if (!token) return;
       // LinkedIn / Indeed / Glassdoor: only with the user's opt-in, and only
       // what this page already loaded — no probes, no detail requests.
       const { allowSensitive } = await chrome.storage.local.get({ allowSensitive: false });
       if (!allowSensitive) return;
       const tpl = KNOWN_TEMPLATES[location.hostname];
       if (tpl) rows = rows.map((r) => (isPlaceholder(r) ? { ...r, apply_url: fillTemplate(tpl, r) } : r));
-      chrome.runtime.sendMessage({ type: 'jobs', pageUrl: location.href, rows });
+      if (location.href === c.pageUrl && !privatePage(location.href)) chrome.runtime.sendMessage({ type: 'jobs', pageUrl: location.href, rows });
       return;
     }
     try {
@@ -84,7 +98,7 @@
     } catch {
       /* rows still go out; they just lack experience / restriction text */
     }
-    chrome.runtime.sendMessage({ type: 'jobs', pageUrl: location.href, rows });
+    if (location.href === c.pageUrl && !privatePage(location.href)) chrome.runtime.sendMessage({ type: 'jobs', pageUrl: location.href, rows });
   }
 
   // ─── Descriptions for list-only boards ──────────────────────────────────
@@ -105,7 +119,8 @@
   const REQUEST_TIMEOUT_MS = 10_000;
   const DETAIL_BUDGET_MS = 45_000;
   const timedFetch = (url, opts = {}) =>
-    fetch(url, { ...opts, credentials: 'include', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    privatePage(location.href) ? Promise.reject(new Error('Application page')) :
+      fetch(url, { ...opts, credentials: 'include', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
 
   async function addDescriptions(rows) {
     const key = `desc:${location.hostname}`;
@@ -205,6 +220,7 @@
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data || e.data.__jobCapture !== true) return;
     try {
+      if (!publicResponse(location.href, e.data.url)) return;
       pendingJson.push(JSON.parse(e.data.text));
       schedule();
     } catch {
@@ -213,6 +229,7 @@
   });
 
   function scanDom() {
+    if (privatePage(location.href)) return;
     const blocks = [];
     for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
       try { blocks.push(JSON.parse(s.textContent)); } catch { /* skip malformed */ }
@@ -220,7 +237,7 @@
     pendingLd.push(...blocks);
     // Next.js pages ship their initial data inline rather than fetching it.
     const next = document.getElementById('__NEXT_DATA__');
-    if (next) {
+    if (next && publicResponse(location.href, 'global')) {
       try { pendingJson.push(JSON.parse(next.textContent)); } catch { /* skip */ }
     }
     schedule();

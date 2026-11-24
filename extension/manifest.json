@@ -1,11 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.7.1",
-  "description": "Sends the job listings a careers page loads to your own job board. Personal use; load unpacked.",
+  "version": "1.9.0",
+  "description": "Sends the job listings a careers page loads to your own job board, and fills job applications from your profile. Personal use; load unpacked.",
   "permissions": [
     "storage",
-    "alarms"
+    "alarms",
+    "activeTab",
+    "scripting"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
   ],
   "host_permissions": [
     "https://*.vercel.app/*",
@@ -36,11 +41,25 @@
         "<all_urls>"
       ],
       "js": [
+        "application-pages.js",
         "extract.js",
         "content.js"
       ],
       "run_at": "document_start",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.myworkdayjobs.com/*",
+        "https://*.myworkdaysite.com/*",
+        "https://jobs.ashbyhq.com/*",
+        "https://boards.greenhouse.io/*",
+        "https://job-boards.greenhouse.io/*",
+        "https://jobs.lever.co/*"
+      ],
+      "js": ["autofill-fields.js", "autofill-adapters.js", "autofill.js"],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }
