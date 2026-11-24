@@ -292,4 +292,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { PARSE, boardOf };
+module.exports = { PARSE, boardOf, SCRAPER, SKIP, SKIP_NAME };

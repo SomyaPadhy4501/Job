@@ -1549,10 +1549,38 @@ const COMPANIES = [
   { source: 'workday', slug: 'wexinc-wexinc', tenant: 'wexinc', wd: '5', site: 'WEXInc', displayName: 'WEX' },  // 25 approvals
 ];
 
+// Workday employers found by scripts/discover-workday.js in Common Crawl and
+// checked live (src/data/workday-discovered.json), beyond the ones above. They
+// run on their own schedule (workday-wide.yml) and only search for software
+// roles, a few requests each, since most are hospitals, retailers and banks.
+const WIDE_SEARCHES = ['software engineer', 'software developer', 'data engineer', 'machine learning'];
+
+function discoveredWorkday(rows, companies) {
+  const known = new Set(companies.filter((c) => c.source === 'workday').map((c) => c.tenant));
+  return rows
+    .filter((r) => r.softwareHits > 0 && !known.has(r.tenant))
+    .map((r) => ({
+      source: 'workday',
+      slug: `${r.tenant}-${r.site.toLowerCase()}`,
+      tenant: r.tenant,
+      wd: r.wd,
+      site: r.site,
+      displayName: r.displayName,
+      cadence: 'wide',
+      searchOnly: true,
+      searches: WIDE_SEARCHES,
+      searchCap: 40,
+      enrichMax: 20,
+    }));
+}
+
+COMPANIES.push(...discoveredWorkday(require('./data/workday-discovered.json').companies, COMPANIES));
+
 // What the regular collect (collect.yml, /admin/collect) runs: everything
-// except `cadence: 'daily'` entries. Those sit on metered free plans and run
-// only from their own daily workflow, via `npm run collect -- --source <name>`.
-const SCHEDULED_COMPANIES = COMPANIES.filter((c) => c.cadence !== 'daily');
+// without a `cadence`. 'daily' entries sit on metered free plans; 'wide' ones
+// are the discovered Workday employers. Each runs from its own workflow, via
+// `npm run collect -- --source <name>` or `--cadence <name>`.
+const SCHEDULED_COMPANIES = COMPANIES.filter((c) => !c.cadence);
 
 const CONFIG = {
   port: Number(process.env.PORT || 3000),
@@ -1601,4 +1629,4 @@ const CONFIG = {
   cacheTtlMs: 30_000,
 };
 
-module.exports = { COMPANIES, SCHEDULED_COMPANIES, CONFIG };
+module.exports = { COMPANIES, SCHEDULED_COMPANIES, CONFIG, discoveredWorkday };

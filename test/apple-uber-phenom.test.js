@@ -16,7 +16,9 @@ const assert = require('node:assert');
 const apple = require('../src/collectors/apple');
 const uber = require('../src/collectors/uber');
 const phenom = require('../scraper/src/targets/phenom');
-const { resetRateLimits } = require('../src/collectors/http');
+const { resetRateLimits, NODE_HTTP_PLATFORMS } = require('../src/collectors/http');
+
+NODE_HTTP_PLATFORMS.clear(); // Workday through the faked fetch below
 const { normalizeJob } = require('../src/services/normalize');
 
 const DAY = 24 * 60 * 60 * 1000;

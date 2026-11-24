@@ -8,7 +8,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { fetchCompany } = require('../src/collectors/workday');
-const { resetRateLimits } = require('../src/collectors/http');
+const { resetRateLimits, NODE_HTTP_PLATFORMS } = require('../src/collectors/http');
+
+NODE_HTTP_PLATFORMS.clear(); // Workday through the faked fetch below
 
 const realFetch = global.fetch;
 const json = (body) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
@@ -44,4 +46,27 @@ test('only fresh postings without a stored description are read in full', async 
   assert.equal(rows.length, 3, 'every posting is still returned');
   assert.equal(rows.find((r) => r.apply_url === known).description, '', 'stored description is kept by upsert, not re-read');
   assert.match(rows.find((r) => /New_R1/.test(r.apply_url)).description, /Build things/);
+});
+
+test('a search-only employer is searched, never listed in full, within its caps', async () => {
+  const searches = [];
+  let details = 0;
+  global.fetch = async (url, init) => {
+    if (init?.method === 'POST') {
+      const { searchText, offset } = JSON.parse(init.body);
+      searches.push(`${searchText}@${offset}`);
+      // Every page is full, so only searchCap stops the paging.
+      return json({
+        total: 500,
+        jobPostings: Array.from({ length: 20 }, (_, i) => posting(`Software Engineer ${searchText} ${offset + i}`, `/job/Austin-TX/${searchText.replace(/ /g, '-')}_${offset + i}`, 'Posted Today')),
+      });
+    }
+    details++;
+    return json({ jobPostingInfo: { jobDescription: '<p>x</p>' } });
+  };
+  const rows = await fetchCompany({ ...company, searchOnly: true, searches: ['software engineer', 'data engineer'], searchCap: 40, enrichMax: 5 });
+
+  assert.deepEqual(searches, ['software engineer@0', 'software engineer@20', 'data engineer@0', 'data engineer@20']);
+  assert.equal(rows.length, 80);
+  assert.equal(details, 5);
 });

@@ -1,0 +1,44 @@
+name: workday-wide
+
+# The Workday employers found by scripts/discover-workday.js (Common Crawl,
+# checked live; src/data/workday-discovered.json): ~2,000 companies beyond the
+# hand-configured ones that collect.yml reads every few hours. Twice a day,
+# software searches only (src/config.js discoveredWorkday), so a run is a few
+# requests per employer. Workday's requests go through Node's https module
+# (src/collectors/http.js), since Cloudflare refuses Node's fetch.
+on:
+  schedule:
+    - cron: '23 5,17 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: workday-wide
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect discovered Workday employers
+        run: npm run collect -- --cadence wide
+        env:
+          DATABASE_URL:      ${{ secrets.DATABASE_URL }}
+          REQUIRE_DATABASE_URL: '1'
+          FILTER_US:         'true'
+          FILTER_SOFTWARE:   'true'
+          ENTRY_LEVEL_MODE:  'permissive'
+          RETENTION_DAYS:    '14'
+          VISIBLE_DAYS:      '7'

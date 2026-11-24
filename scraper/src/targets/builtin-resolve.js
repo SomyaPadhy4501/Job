@@ -20,7 +20,7 @@
 // the same row the employer's own collector stores: the upsert finds it by
 // link and the board shows one copy, not two.
 
-const { runWithConcurrency } = require('../../../src/collectors/http');
+const { runWithConcurrency, send } = require('../../../src/collectors/http');
 const greenhouse = require('../../../src/collectors/greenhouse');
 const lever = require('../../../src/collectors/lever');
 const ashby = require('../../../src/collectors/ashby');
@@ -45,7 +45,7 @@ let workdayBlocked = false;
 
 async function workdayJson(url, body) {
   if (workdayBlocked) throw new Error('Workday rate-limited this run');
-  const res = await fetch(url, {
+  const res = await send(url, {
     method: body ? 'POST' : 'GET',
     headers: { 'user-agent': 'job-aggregator/1.0', accept: 'application/json', 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,

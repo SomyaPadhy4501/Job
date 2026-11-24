@@ -1,7 +1,45 @@
 'use strict';
 
+const http = require('http');
 const https = require('https');
 const { CONFIG } = require('../config');
+
+// Workday's Cloudflare answers Node's fetch (undici) with 429 since
+// 2026-11-24, from GitHub's runners and a home connection alike, while the
+// same request with the same user agent through Node's https module gets JSON
+// (checked against T-Mobile and NVIDIA). Platforms here go through the module.
+// Tests that fake global.fetch clear this set.
+const NODE_HTTP_PLATFORMS = new Set(['myworkdayjobs.com']);
+
+// The parts of a fetch Response the collectors read, over http(s).request.
+function nodeFetch(url, { method = 'GET', headers = {}, body, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('http:') ? http : https;
+    const h = body != null ? { ...headers, 'content-length': Buffer.byteLength(body) } : headers;
+    const req = lib.request(url, { method, headers: h, signal }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', reject);
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          status: res.statusCode,
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          headers: { get: (name) => res.headers[name.toLowerCase()] ?? null },
+          text: async () => text,
+          json: async () => JSON.parse(text),
+        });
+      });
+    });
+    req.on('error', reject);
+    if (body != null) req.write(body);
+    req.end();
+  });
+}
+
+function send(url, init) {
+  return NODE_HTTP_PLATFORMS.has(platformOf(url)) ? nodeFetch(url, init) : fetch(url, init);
+}
 
 // Hostname-scoped TLS bypass. Used only for hosts listed in INSECURE_TLS_HOSTS —
 // currently just Microsoft's misconfigured careers endpoint, which serves a
@@ -151,7 +189,7 @@ async function fetchJson(
         clearTimeout(t);
         return await requestInsecureJson(url, { method, headers: init.headers, body: init.body });
       }
-      const res = await fetch(url, init);
+      const res = await send(url, init);
       clearTimeout(t);
       if (res.status === 404) {
         const err = new Error(`Not found: ${url}`);
@@ -212,4 +250,4 @@ function resetRateLimits() {
   noted429.clear();
 }
 
-module.exports = { fetchJson, runWithConcurrency, resetRateLimits, GIVE_UP_AFTER };
+module.exports = { fetchJson, runWithConcurrency, resetRateLimits, GIVE_UP_AFTER, send, nodeFetch, NODE_HTTP_PLATFORMS };

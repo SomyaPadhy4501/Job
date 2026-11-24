@@ -15,6 +15,8 @@ function json(body) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 }
 
+require('../src/collectors/http').NODE_HTTP_PLATFORMS.clear(); // Workday through the faked fetch below
+
 const requests = [];
 let throttle = false;
 global.fetch = async (url, init = {}) => {

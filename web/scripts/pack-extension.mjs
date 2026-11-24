@@ -123,7 +123,7 @@ console.log(`packed ${entries.length} files from ${source} → downloads/job-boa
 // extension with the next deploy.
 const require = createRequire(import.meta.url);
 const { COMPANIES } = require(join(here, '../../src/config.js'));
-const tenants = COMPANIES.filter((c) => c.source === 'workday' && c.tenant && c.wd && c.site).map(
+const tenants = COMPANIES.filter((c) => c.source === 'workday' && c.tenant && c.wd && c.site && !c.cadence).map(
   ({ slug, displayName, tenant, wd, site, searches }) => ({ slug, displayName, tenant, wd, site, ...(searches ? { searches } : {}) })
 );
 writeFileSync(join(out, 'workday-tenants.json'), JSON.stringify({ tenants }) + '\n');

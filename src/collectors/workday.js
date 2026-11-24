@@ -88,6 +88,10 @@ const SEARCHES = ['software engineer', 'software developer', 'machine learning',
 const SEARCH_CAP = 100;
 
 async function fetchList(company) {
+  // Employers found by discovery (cadence 'wide') only search for software
+  // roles: most are hospitals, retailers or banks, and listing them in full
+  // across ~2,000 tenants would be mostly wasted requests.
+  if (company.searchOnly) return fetchBySearch(company, []);
   // One page first to learn the total. Large tenants skip the unfiltered
   // listing entirely — 25 requests of mostly non-software rows — and go
   // straight to the searches.
@@ -101,7 +105,7 @@ async function fetchBySearch(company, seed) {
   const byPath = new Map(seed.map((j) => [j.externalPath, j]));
   for (const q of company.searches || SEARCHES) {
     // eslint-disable-next-line no-await-in-loop
-    const { items } = await fetchPages(company, q, SEARCH_CAP);
+    const { items } = await fetchPages(company, q, company.searchCap || SEARCH_CAP);
     for (const j of items) if (!byPath.has(j.externalPath)) byPath.set(j.externalPath, j);
   }
   return [...byPath.values()];
@@ -239,7 +243,7 @@ async function fetchCompany(company) {
     if (age !== 9999 && age > maxAge) return false;
     return !described.has(applyUrl(company, j.externalPath));
   });
-  const enrichTargets = candidates.slice(0, DEFAULT_ENRICH_MAX);
+  const enrichTargets = candidates.slice(0, company.enrichMax || DEFAULT_ENRICH_MAX);
 
   const descByPath = new Map();
   await runWithConcurrency(enrichTargets, DETAIL_CONCURRENCY, async (j) => {

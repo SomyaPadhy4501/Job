@@ -6,7 +6,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { fetchJson, resetRateLimits, GIVE_UP_AFTER } = require('../src/collectors/http');
+const { fetchJson, resetRateLimits, GIVE_UP_AFTER, NODE_HTTP_PLATFORMS } = require('../src/collectors/http');
+
+NODE_HTTP_PLATFORMS.clear(); // Workday through the faked fetch below
 
 const realFetch = global.fetch;
 const json = (body) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });

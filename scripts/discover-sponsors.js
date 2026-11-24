@@ -83,9 +83,9 @@ function norm(s) {
 // prefix of it: "capital-one" covers "capital-one-services". Short or generic
 // first words are not allowed to cover anything on their own.
 const GENERIC = new Set(['american', 'united', 'national', 'global', 'general', 'first', 'new', 'international', 'data', 'tech', 'technology', 'digital', 'systems', 'solutions', 'services', 'health', 'university', 'bank']);
-function buildCovered() {
+function buildCovered(companies = COMPANIES) {
   const keys = new Set();
-  for (const c of COMPANIES) {
+  for (const c of companies) {
     for (const n of [c.displayName, c.slug, c.company, c.tenant]) {
       const k = norm(n);
       if (k && k.length >= 4 && !GENERIC.has(k)) keys.add(k);
@@ -334,4 +334,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseWorkdaySites, detectAts, candidatesFor, buildCovered, probeWorkday, probeCareersPage };
+module.exports = { parseWorkdaySites, detectAts, candidatesFor, buildCovered, probeWorkday, probeCareersPage, display, GENERIC, WD_SKIP_SITE };

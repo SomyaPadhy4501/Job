@@ -1,0 +1,539 @@
+# Config entries (tenant is the sponsor name)
+  { source: 'workday', slug: 'tmobile-external', tenant: 'tmobile', wd: '1', site: 'external', displayName: 'Tmobile' },  // 875 approvals (tmobile-usa), 8 crawled URLs
+  { source: 'workday', slug: 'asml-asmlext1', tenant: 'asml', wd: '3', site: 'asmlext1', displayName: 'Asml' },  // 509 approvals (asml-us-lp), 1 crawled URLs
+  { source: 'workday', slug: 'nike-nke', tenant: 'nike', wd: '1', site: 'nke', displayName: 'Nike' },  // 481 approvals (nike), 20 crawled URLs
+  { source: 'workday', slug: 'fca-fca_earlycareers', tenant: 'fca', wd: '3', site: 'FCA_earlycareers', displayName: 'Fca' },  // 457 approvals (fca-us), 25 crawled URLs
+  { source: 'workday', slug: 'equifax-external', tenant: 'equifax', wd: '5', site: 'External', displayName: 'Equifax' },  // 394 approvals (equifax), 21 crawled URLs
+  { source: 'workday', slug: 'dell-external', tenant: 'dell', wd: '1', site: 'External', displayName: 'Dell' },  // 393 approvals (dell-usa), 6 crawled URLs
+  { source: 'workday', slug: 'vmware-vmware', tenant: 'vmware', wd: '1', site: 'VMware', displayName: 'Vmware' },  // 320 approvals (vmware), 10 crawled URLs
+  { source: 'workday', slug: 'iqvia-iqvia', tenant: 'iqvia', wd: '1', site: 'IQVIA', displayName: 'Iqvia' },  // 251 approvals (iqvia), 3172 crawled URLs
+  { source: 'workday', slug: 'cohesity-cohesity_careers', tenant: 'cohesity', wd: '5', site: 'cohesity_careers', displayName: 'Cohesity' },  // 225 approvals (cohesity), 4 crawled URLs
+  { source: 'workday', slug: 'equinix-external', tenant: 'equinix', wd: '1', site: 'External', displayName: 'Equinix' },  // 219 approvals (equinix), 5 crawled URLs
+  { source: 'workday', slug: 'ohiohealth-ohiohealthjobs', tenant: 'ohiohealth', wd: '5', site: 'OhioHealthJobs', displayName: 'Ohiohealth' },  // 199 approvals (ohiohealth), 10 crawled URLs
+  { source: 'workday', slug: '7eleven-7eleven', tenant: '7eleven', wd: '3', site: '7eleven', displayName: '7eleven' },  // 177 approvals (7eleven), 114 crawled URLs
+  { source: 'workday', slug: 'bdo-bdo', tenant: 'bdo', wd: '3', site: 'BDO', displayName: 'Bdo' },  // 141 approvals (bdo-usa), 27 crawled URLs
+  { source: 'workday', slug: 'broadinstitute-broad_institute', tenant: 'broadinstitute', wd: '1', site: 'broad_institute', displayName: 'Broad Institute' },  // 140 approvals (broad-institute), 3 crawled URLs
+  { source: 'workday', slug: 'athenahealth-external', tenant: 'athenahealth', wd: '1', site: 'External', displayName: 'Athenahealth' },  // 132 approvals (athenahealth), 130 crawled URLs
+  { source: 'workday', slug: 'ingrammicro-ingrammicro', tenant: 'ingrammicro', wd: '5', site: 'IngramMicro', displayName: 'Ingram Micro' },  // 130 approvals (ingram-micro), 74 crawled URLs
+  { source: 'workday', slug: 'omnissa-omnissa_external_career_site', tenant: 'omnissa', wd: '501', site: 'Omnissa_External_Career_Site', displayName: 'Omnissa' },  // 120 approvals (omnissa), 23 crawled URLs
+  { source: 'workday', slug: 'pfizer-pfizercareers', tenant: 'pfizer', wd: '1', site: 'PfizerCareers', displayName: 'Pfizer' },  // 117 approvals (pfizer), 1135 crawled URLs
+  { source: 'workday', slug: 'symbotic-symbotic', tenant: 'symbotic', wd: '504', site: 'symbotic', displayName: 'Symbotic' },  // 110 approvals (symbotic), 2 crawled URLs
+  { source: 'workday', slug: 'worldpay-worldpay_external_careers_site', tenant: 'worldpay', wd: '5', site: 'Worldpay_External_Careers_Site', displayName: 'Worldpay' },  // 108 approvals (worldpay), 61 crawled URLs
+  { source: 'workday', slug: 'qualys-careers', tenant: 'qualys', wd: '5', site: 'Careers', displayName: 'Qualys' },  // 100 approvals (qualys), 30 crawled URLs
+  { source: 'workday', slug: 'aptiv-aptiv_careers', tenant: 'aptiv', wd: '5', site: 'aptiv_careers', displayName: 'Aptiv' },  // 98 approvals (aptiv-corporation), 30 crawled URLs
+  { source: 'workday', slug: 'bjswholesaleclub-bjscareers', tenant: 'bjswholesaleclub', wd: '1', site: 'BJsCareers', displayName: 'Bjs Wholesale Club' },  // 97 approvals (bjs-wholesale-club), 79 crawled URLs
+  { source: 'workday', slug: 'zendesk-zendesk', tenant: 'zendesk', wd: '1', site: 'zendesk', displayName: 'Zendesk' },  // 92 approvals (zendesk), 138 crawled URLs
+  { source: 'workday', slug: 'align-a-lign', tenant: 'align', wd: '503', site: 'A-LIGN', displayName: 'Align' },  // 92 approvals (align-technology), 1 crawled URLs
+  { source: 'workday', slug: 'altera-altera', tenant: 'altera', wd: '1', site: 'Altera', displayName: 'Altera' },  // 90 approvals (altera-corporation), 519 crawled URLs
+  { source: 'workday', slug: 'wgu-external', tenant: 'wgu', wd: '5', site: 'External', displayName: 'Wgu' },  // 87 approvals (wgu-corporation), 215 crawled URLs
+  { source: 'workday', slug: 'proofpoint-proofpointcareers', tenant: 'proofpoint', wd: '5', site: 'ProofpointCareers', displayName: 'Proofpoint' },  // 79 approvals (proofpoint), 68 crawled URLs
+  { source: 'workday', slug: 'shipt-shipt_external', tenant: 'shipt', wd: '1', site: 'Shipt_External', displayName: 'Shipt' },  // 79 approvals (shipt), 5 crawled URLs
+  { source: 'workday', slug: 'entegris-entegriscareers', tenant: 'entegris', wd: '1', site: 'EntegrisCareers', displayName: 'Entegris' },  // 79 approvals (entegris), 3 crawled URLs
+  { source: 'workday', slug: 'sanford-sanfordhealth', tenant: 'sanford', wd: '5', site: 'SanfordHealth', displayName: 'Sanford' },  // 75 approvals (sanford), 245 crawled URLs
+  { source: 'workday', slug: 'bloomenergy-bloomenergycareers', tenant: 'bloomenergy', wd: '1', site: 'BloomEnergyCareers', displayName: 'Bloom Energy' },  // 73 approvals (bloom-energy-corporation), 2 crawled URLs
+  { source: 'workday', slug: 'ringcentral-ringcentral_careers', tenant: 'ringcentral', wd: '1', site: 'RingCentral_Careers', displayName: 'Ringcentral' },  // 73 approvals (ringcentral), 16 crawled URLs
+  { source: 'workday', slug: 'blackline-blacklinecareers', tenant: 'blackline', wd: '108', site: 'BlackLineCareers', displayName: 'Blackline' },  // 72 approvals (blackline-systems), 23 crawled URLs
+  { source: 'workday', slug: 'creditacceptance-credit_acceptance', tenant: 'creditacceptance', wd: '5', site: 'Credit_Acceptance', displayName: 'Credit Acceptance' },  // 68 approvals (credit-acceptance-corporation), 7 crawled URLs
+  { source: 'workday', slug: 'capri-michael_kors', tenant: 'capri', wd: '1', site: 'Michael_Kors', displayName: 'Capri' },  // 68 approvals (capri-usa-group), 22 crawled URLs
+  { source: 'workday', slug: 'cloudera-external_career', tenant: 'cloudera', wd: '5', site: 'External_Career', displayName: 'Cloudera' },  // 67 approvals (cloudera), 103 crawled URLs
+  { source: 'workday', slug: 'liveramp-liverampcareers', tenant: 'liveramp', wd: '5', site: 'LiveRampCareers', displayName: 'Liveramp' },  // 64 approvals (liveramp), 18 crawled URLs
+  { source: 'workday', slug: 'tencent-tencent_careers', tenant: 'tencent', wd: '1', site: 'Tencent_Careers', displayName: 'Tencent' },  // 62 approvals (tencent-america), 68 crawled URLs
+  { source: 'workday', slug: 'kimberlyclark-global', tenant: 'kimberlyclark', wd: '1', site: 'GLOBAL', displayName: 'Kimberly Clark' },  // 61 approvals (kimberly-clark-usa), 11 crawled URLs
+  { source: 'workday', slug: 'kohls-kohlscareers', tenant: 'kohls', wd: '504', site: 'kohlscareers', displayName: 'Kohls' },  // 59 approvals (kohls), 6 crawled URLs
+  { source: 'workday', slug: 'morningstar-morningstar', tenant: 'morningstar', wd: '5', site: 'morningstar', displayName: 'Morningstar' },  // 58 approvals (morningstar), 101 crawled URLs
+  { source: 'workday', slug: 'turo-turo_careers', tenant: 'turo', wd: '12', site: 'Turo_careers', displayName: 'Turo' },  // 57 approvals (turo), 29 crawled URLs
+  { source: 'workday', slug: 'lsi-arxada_careers', tenant: 'lsi', wd: '3', site: 'Arxada_Careers', displayName: 'Lsi' },  // 56 approvals (lsi-corporation), 4 crawled URLs
+  { source: 'workday', slug: 'uline-uline_careers', tenant: 'uline', wd: '1', site: 'Uline_Careers', displayName: 'Uline' },  // 55 approvals (uline), 572 crawled URLs
+  { source: 'workday', slug: 'automationanywhere-automationanywherejobs', tenant: 'automationanywhere', wd: '5', site: 'AutomationAnywhereJobs', displayName: 'Automation Anywhere' },  // 53 approvals (automation-anywhere), 3 crawled URLs
+  { source: 'workday', slug: 'mavenir-mavenir_careers', tenant: 'mavenir', wd: '1', site: 'Mavenir_Careers', displayName: 'Mavenir' },  // 52 approvals (mavenir-systems), 4 crawled URLs
+  { source: 'workday', slug: 'oclc-oclc_careers', tenant: 'oclc', wd: '1', site: 'OCLC_Careers', displayName: 'Oclc' },  // 52 approvals (oclc), 3 crawled URLs
+  { source: 'workday', slug: 'parexel-parexel_external_careers', tenant: 'parexel', wd: '1', site: 'Parexel_External_Careers', displayName: 'Parexel' },  // 51 approvals (parexel-international), 12 crawled URLs
+  { source: 'workday', slug: 'sonos-sonos', tenant: 'sonos', wd: '1', site: 'Sonos', displayName: 'Sonos' },  // 51 approvals (sonos), 12 crawled URLs
+  { source: 'workday', slug: 'gsk-gskcareers', tenant: 'gsk', wd: '5', site: 'GSKCareers', displayName: 'Gsk' },  // 47 approvals (gsk-solutions), 456 crawled URLs
+  { source: 'workday', slug: 'calix-external', tenant: 'calix', wd: '1', site: 'External', displayName: 'Calix' },  // 46 approvals (calix), 41 crawled URLs
+  { source: 'workday', slug: 'hdsupply-external', tenant: 'hdsupply', wd: '1', site: 'external', displayName: 'Hd Supply' },  // 45 approvals (hd-supply), 24 crawled URLs
+  { source: 'workday', slug: 'santander-santandercareers', tenant: 'santander', wd: '3', site: 'SantanderCareers', displayName: 'Santander' },  // 45 approvals (santander-holdings-usa), 406 crawled URLs
+  { source: 'workday', slug: 'fortrea-fortrea', tenant: 'fortrea', wd: '1', site: 'Fortrea', displayName: 'Fortrea' },  // 45 approvals (fortrea), 39 crawled URLs
+  { source: 'workday', slug: 'fluenceenergy-fluenceenergy-jobs', tenant: 'fluenceenergy', wd: '12', site: 'fluenceenergy-jobs', displayName: 'Fluence Energy' },  // 43 approvals (fluence-energy), 5 crawled URLs
+  { source: 'workday', slug: 'rollsroyce-professional', tenant: 'rollsroyce', wd: '3', site: 'professional', displayName: 'Rolls Royce' },  // 42 approvals (rolls-royce-solutions-america), 128 crawled URLs
+  { source: 'workday', slug: 'bannerhealth-careers', tenant: 'bannerhealth', wd: '108', site: 'Careers', displayName: 'Banner Health' },  // 41 approvals (banner-health), 32 crawled URLs
+  { source: 'workday', slug: 'aspentech-aspentech', tenant: 'aspentech', wd: '5', site: 'aspentech', displayName: 'Aspentech' },  // 41 approvals (aspentech-corporation), 22 crawled URLs
+  { source: 'workday', slug: 'hntb-hntb_careers', tenant: 'hntb', wd: '5', site: 'hntb_careers', displayName: 'Hntb' },  // 41 approvals (hntb-corporation), 32 crawled URLs
+  { source: 'workday', slug: 'logitech-logitech', tenant: 'logitech', wd: '5', site: 'Logitech', displayName: 'Logitech' },  // 41 approvals (logitech), 20 crawled URLs
+  { source: 'workday', slug: 'trinity-trinity_university', tenant: 'trinity', wd: '1', site: 'Trinity_University', displayName: 'Trinity' },  // 41 approvals (trinity-partners), 19 crawled URLs
+  { source: 'workday', slug: 'kellyservices-corporatecareers-kellyservices-com', tenant: 'kellyservices', wd: '503', site: 'corporatecareers-kellyservices-com', displayName: 'Kelly Services' },  // 41 approvals (kelly-services), 6 crawled URLs
+  { source: 'workday', slug: 'sensata-sensata-careers', tenant: 'sensata', wd: '1', site: 'Sensata-Careers', displayName: 'Sensata' },  // 40 approvals (sensata-technologies), 17 crawled URLs
+  { source: 'workday', slug: 'ecolab-ecolab_external', tenant: 'ecolab', wd: '1', site: 'Ecolab_External', displayName: 'Ecolab' },  // 40 approvals (ecolab-usa), 5 crawled URLs
+  { source: 'workday', slug: 'cognex-external_career_site', tenant: 'cognex', wd: '1', site: 'External_Career_Site', displayName: 'Cognex' },  // 39 approvals (cognex-corporation), 8 crawled URLs
+  { source: 'workday', slug: 'aristocrat-aristocratexternalcareerssite', tenant: 'aristocrat', wd: '3', site: 'AristocratExternalCareersSite', displayName: 'Aristocrat' },  // 38 approvals (aristocrat-technologies), 25 crawled URLs
+  { source: 'workday', slug: 'cardlytics-cardlyticsexternalcareersite', tenant: 'cardlytics', wd: '5', site: 'CardlyticsExternalCareerSite', displayName: 'Cardlytics' },  // 38 approvals (cardlytics), 13 crawled URLs
+  { source: 'workday', slug: 'sunrun-sunrun_careers', tenant: 'sunrun', wd: '5', site: 'Sunrun_Careers', displayName: 'Sunrun' },  // 38 approvals (sunrun), 81 crawled URLs
+  { source: 'workday', slug: 'lennar-lennar_jobs', tenant: 'lennar', wd: '1', site: 'Lennar_Jobs', displayName: 'Lennar' },  // 38 approvals (lennar-corporation), 4 crawled URLs
+  { source: 'workday', slug: 'regalrexnord-careers', tenant: 'regalrexnord', wd: '1', site: 'Careers', displayName: 'Regal Rexnord' },  // 37 approvals (regal-rexnord-corporation), 6 crawled URLs
+  { source: 'workday', slug: 'driscolls-driscolls', tenant: 'driscolls', wd: '5', site: 'driscolls', displayName: 'Driscolls' },  // 36 approvals (driscolls), 4 crawled URLs
+  { source: 'workday', slug: 'roberthalf-roberthalfstaffingcareers', tenant: 'roberthalf', wd: '1', site: 'RobertHalfStaffingCareers', displayName: 'Robert Half' },  // 36 approvals (robert-half), 8 crawled URLs
+  { source: 'workday', slug: 'elanco-external_career', tenant: 'elanco', wd: '5', site: 'External_Career', displayName: 'Elanco' },  // 35 approvals (elanco-us), 148 crawled URLs
+  { source: 'workday', slug: 'eisai-eisai', tenant: 'eisai', wd: '5', site: 'eisai', displayName: 'Eisai' },  // 34 approvals (eisai), 6 crawled URLs
+  { source: 'workday', slug: 'bestwestern-careers', tenant: 'bestwestern', wd: '1', site: 'careers', displayName: 'Best Western' },  // 33 approvals (best-western-international), 28 crawled URLs
+  { source: 'workday', slug: 'goodrx-careers', tenant: 'goodrx', wd: '1', site: 'careers', displayName: 'Goodrx' },  // 33 approvals (goodrx), 26 crawled URLs
+  { source: 'workday', slug: 'proceptbiorobotics-procept', tenant: 'proceptbiorobotics', wd: '108', site: 'PROCEPT', displayName: 'Procept Biorobotics' },  // 32 approvals (procept-biorobotics-corporation), 88 crawled URLs
+  { source: 'workday', slug: 'frostbank-external', tenant: 'frostbank', wd: '5', site: 'External', displayName: 'Frost Bank' },  // 32 approvals (frost-bank), 30 crawled URLs
+  { source: 'workday', slug: 'corpay-ext_001', tenant: 'corpay', wd: '3', site: 'Ext_001', displayName: 'Corpay' },  // 31 approvals (corpay), 13 crawled URLs
+  { source: 'workday', slug: 'andersen-andersen_external_career_site', tenant: 'andersen', wd: '12', site: 'Andersen_External_Career_Site', displayName: 'Andersen' },  // 30 approvals (andersen-corporation), 3 crawled URLs
+  { source: 'workday', slug: 'swift-join-swift', tenant: 'swift', wd: '3', site: 'Join-Swift', displayName: 'Swift' },  // 30 approvals (swift-technologies), 7 crawled URLs
+  { source: 'workday', slug: 'nasdaq-global_external_site', tenant: 'nasdaq', wd: '1', site: 'Global_External_Site', displayName: 'Nasdaq' },  // 29 approvals (nasdaq), 44 crawled URLs
+  { source: 'workday', slug: 'stem-steminc', tenant: 'stem', wd: '12', site: 'StemInc', displayName: 'Stem' },  // 28 approvals (stem-solutions), 7 crawled URLs
+  { source: 'workday', slug: 'adient-external', tenant: 'adient', wd: '3', site: 'External', displayName: 'Adient' },  // 27 approvals (adient-us), 59 crawled URLs
+  { source: 'workday', slug: 'avant-external_careers', tenant: 'avant', wd: '503', site: 'External_Careers', displayName: 'Avant' },  // 27 approvals (avant-systems), 15 crawled URLs
+  { source: 'workday', slug: 'wawa-careers', tenant: 'wawa', wd: '1', site: 'careers', displayName: 'Wawa' },  // 27 approvals (wawa), 5 crawled URLs
+  { source: 'workday', slug: 'fivebelow-fivebelowcareers', tenant: 'fivebelow', wd: '1', site: 'fivebelowcareers', displayName: 'Five Below' },  // 27 approvals (five-below), 26 crawled URLs
+  { source: 'workday', slug: 'evonik-external_careers', tenant: 'evonik', wd: '3', site: 'External_Careers', displayName: 'Evonik' },  // 26 approvals (evonik-corporation), 62 crawled URLs
+  { source: 'workday', slug: 'clarios-clarioscareers', tenant: 'clarios', wd: '5', site: 'clarioscareers', displayName: 'Clarios' },  // 26 approvals (clarios), 41 crawled URLs
+  { source: 'workday', slug: 'dickssportinggoods-dsg', tenant: 'dickssportinggoods', wd: '1', site: 'DSG', displayName: 'Dicks Sporting Goods' },  // 26 approvals (dicks-sporting-goods), 159 crawled URLs
+  { source: 'workday', slug: 'skechers-one-career-site', tenant: 'skechers', wd: '5', site: 'One-career-site', displayName: 'Skechers' },  // 24 approvals (skechers-usa), 74 crawled URLs
+  { source: 'workday', slug: 'sunbeltrentals-sbcareers', tenant: 'sunbeltrentals', wd: '1', site: 'sbcareers', displayName: 'Sunbelt Rentals' },  // 24 approvals (sunbelt-rentals), 108 crawled URLs
+  { source: 'workday', slug: 'adventisthealthcare-adventisthealthcarecareers', tenant: 'adventisthealthcare', wd: '1', site: 'AdventistHealthCareCareers', displayName: 'Adventist Healthcare' },  // 23 approvals (adventist-healthcare), 548 crawled URLs
+  { source: 'workday', slug: 'arlo-external_careers', tenant: 'arlo', wd: '12', site: 'external_careers', displayName: 'Arlo' },  // 23 approvals (arlo-technologies), 4 crawled URLs
+  { source: 'workday', slug: 'livanova-search', tenant: 'livanova', wd: '5', site: 'Search', displayName: 'Livanova' },  // 23 approvals (livanova-usa), 2 crawled URLs
+  { source: 'workday', slug: 'axis-external_career_site', tenant: 'axis', wd: '3', site: 'External_Career_Site', displayName: 'Axis' },  // 22 approvals (axis-tech), 11 crawled URLs
+  { source: 'workday', slug: 'healthcatalyst-healthcatalystcareers', tenant: 'healthcatalyst', wd: '5', site: 'healthcatalystcareers', displayName: 'Health Catalyst' },  // 22 approvals (health-catalyst), 12 crawled URLs
+  { source: 'workday', slug: 'sky-sky_careers', tenant: 'sky', wd: '3', site: 'sky_careers', displayName: 'Sky' },  // 22 approvals (sky-technologies), 39 crawled URLs
+  { source: 'workday', slug: 'baincapital-external_public', tenant: 'baincapital', wd: '1', site: 'External_Public', displayName: 'Bain Capital' },  // 22 approvals (bain-capital-lp), 113 crawled URLs
+  { source: 'workday', slug: 'alfalaval-alfa_laval_jobs', tenant: 'alfalaval', wd: '3', site: 'Alfa_Laval_jobs', displayName: 'Alfa Laval' },  // 21 approvals (alfa-laval), 40 crawled URLs
+  { source: 'workday', slug: 'primetherapeutics-primetherapeuticscareers', tenant: 'primetherapeutics', wd: '1', site: 'PrimeTherapeuticsCareers', displayName: 'Prime Therapeutics' },  // 21 approvals (prime-therapeutics), 57 crawled URLs
+  { source: 'workday', slug: 'sumitomopharma-smpa', tenant: 'sumitomopharma', wd: '5', site: 'SMPA', displayName: 'Sumitomo Pharma' },  // 21 approvals (sumitomo-pharma-america), 2 crawled URLs
+  { source: 'workday', slug: 'sprinklr-careers', tenant: 'sprinklr', wd: '1', site: 'careers', displayName: 'Sprinklr' },  // 21 approvals (sprinklr), 158 crawled URLs
+  { source: 'workday', slug: 'inmar-inmarcareers', tenant: 'inmar', wd: '1', site: 'inmarcareers', displayName: 'Inmar' },  // 21 approvals (inmar), 13 crawled URLs
+  { source: 'workday', slug: 'wellsky-wellskycareers', tenant: 'wellsky', wd: '1', site: 'WellSkyCareers', displayName: 'Wellsky' },  // 20 approvals (wellsky-corporation), 19 crawled URLs
+  { source: 'workday', slug: 'stark-stark-germany', tenant: 'stark', wd: '3', site: 'STARK-Germany', displayName: 'Stark' },  // 20 approvals (stark-america), 19 crawled URLs
+  { source: 'workday', slug: 'carrier-jobs', tenant: 'carrier', wd: '5', site: 'jobs', displayName: 'Carrier' },  // 19 approvals (carrier-corporation), 65 crawled URLs
+  { source: 'workday', slug: 'corelogic-global', tenant: 'corelogic', wd: '5', site: 'Global', displayName: 'Corelogic' },  // 19 approvals (corelogic-solutions), 2 crawled URLs
+  { source: 'workday', slug: 'qvc-qrg', tenant: 'qvc', wd: '5', site: 'QRG', displayName: 'Qvc' },  // 19 approvals (qvc), 27 crawled URLs
+  { source: 'workday', slug: 'horizonmedia-careeropportunities', tenant: 'horizonmedia', wd: '1', site: 'CareerOpportunities', displayName: 'Horizon Media' },  // 19 approvals (horizon-media), 6 crawled URLs
+  { source: 'workday', slug: 'uhaul-uhauljobs', tenant: 'uhaul', wd: '1', site: 'UhaulJobs', displayName: 'Uhaul' },  // 19 approvals (uhaul-international), 45 crawled URLs
+  { source: 'workday', slug: 'axcelis-axcelis', tenant: 'axcelis', wd: '1', site: 'Axcelis', displayName: 'Axcelis' },  // 19 approvals (axcelis-technologies), 12 crawled URLs
+  { source: 'workday', slug: 'gatesfoundation-gates', tenant: 'gatesfoundation', wd: '1', site: 'Gates', displayName: 'Gates Foundation' },  // 19 approvals (gates-foundation), 132 crawled URLs
+  { source: 'workday', slug: 'pra-pra_careers', tenant: 'pra', wd: '1', site: 'PRA_Careers', displayName: 'Pra' },  // 19 approvals (pra-group), 1 crawled URLs
+  { source: 'workday', slug: 'collaborative-allopenings', tenant: 'collaborative', wd: '1', site: 'AllOpenings', displayName: 'Collaborative' },  // 19 approvals (collaborative-solutions), 6 crawled URLs
+  { source: 'workday', slug: 'progyny-progyny', tenant: 'progyny', wd: '5', site: 'progyny', displayName: 'Progyny' },  // 18 approvals (progyny), 74 crawled URLs
+  { source: 'workday', slug: 'thoughtspot-careers', tenant: 'thoughtspot', wd: '5', site: 'careers', displayName: 'Thoughtspot' },  // 18 approvals (thoughtspot), 14 crawled URLs
+  { source: 'workday', slug: 'toryburch-toryburchcareers', tenant: 'toryburch', wd: '1', site: 'toryburchcareers', displayName: 'Tory Burch' },  // 18 approvals (tory-burch), 12 crawled URLs
+  { source: 'workday', slug: 'centific-centific_global', tenant: 'centific', wd: '1', site: 'Centific_Global', displayName: 'Centific' },  // 18 approvals (centific-technologies), 3 crawled URLs
+  { source: 'workday', slug: 'astreya-life-at-astreya-opportunities', tenant: 'astreya', wd: '5', site: 'life-at-astreya-opportunities', displayName: 'Astreya' },  // 17 approvals (astreya-partners), 173 crawled URLs
+  { source: 'workday', slug: 'rocket-rocket_careers', tenant: 'rocket', wd: '5', site: 'rocket_careers', displayName: 'Rocket' },  // 17 approvals (rocket-software), 27 crawled URLs
+  { source: 'workday', slug: 'azenta-azentajobs', tenant: 'azenta', wd: '1', site: 'AzentaJobs', displayName: 'Azenta' },  // 17 approvals (azenta), 2 crawled URLs
+  { source: 'workday', slug: 'rakuten-rakuteninc', tenant: 'rakuten', wd: '1', site: 'RakutenInc', displayName: 'Rakuten' },  // 17 approvals (rakuten-usa), 91 crawled URLs
+  { source: 'workday', slug: 'schreiberfoods-schreiber_careers', tenant: 'schreiberfoods', wd: '115', site: 'Schreiber_Careers', displayName: 'Schreiber Foods' },  // 17 approvals (schreiber-foods), 15 crawled URLs
+  { source: 'workday', slug: 'cambiahealth-external', tenant: 'cambiahealth', wd: '1', site: 'External', displayName: 'Cambia Health' },  // 17 approvals (cambia-health-solutions), 6 crawled URLs
+  { source: 'workday', slug: 'insmed-external', tenant: 'insmed', wd: '504', site: 'EXTERNAL', displayName: 'Insmed' },  // 17 approvals (insmed), 3 crawled URLs
+  { source: 'workday', slug: 'evercommerce-evercommerce_careers', tenant: 'evercommerce', wd: '1', site: 'EverCommerce_Careers', displayName: 'Evercommerce' },  // 17 approvals (evercommerce-solutions), 28 crawled URLs
+  { source: 'workday', slug: 'vibrant-veh_external_career_site', tenant: 'vibrant', wd: '5', site: 'VEH_EXTERNAL_CAREER_SITE', displayName: 'Vibrant' },  // 16 approvals (vibrant-america), 12 crawled URLs
+  { source: 'workday', slug: 'chathamfinancial-chathamfinancial', tenant: 'chathamfinancial', wd: '501', site: 'ChathamFinancial', displayName: 'Chatham Financial' },  // 16 approvals (chatham-financial-corporation), 30 crawled URLs
+  { source: 'workday', slug: 'datarobot-datarobot_external_careers', tenant: 'datarobot', wd: '1', site: 'DataRobot_External_Careers', displayName: 'Datarobot' },  // 16 approvals (datarobot), 14 crawled URLs
+  { source: 'workday', slug: 'brambles-brambles_careers', tenant: 'brambles', wd: '5', site: 'Brambles_Careers', displayName: 'Brambles' },  // 15 approvals (brambles-usa), 7 crawled URLs
+  { source: 'workday', slug: 'msiexpress-msi_express_external_careers', tenant: 'msiexpress', wd: '5', site: 'MSI_Express_External_Careers', displayName: 'Msi Express' },  // 15 approvals (msi-express), 1 crawled URLs
+  { source: 'workday', slug: 'velera-veleracareers', tenant: 'velera', wd: '5', site: 'VeleraCareers', displayName: 'Velera' },  // 15 approvals (velera-solutions), 33 crawled URLs
+  { source: 'workday', slug: 'trinityhealth-jobs', tenant: 'trinityhealth', wd: '1', site: 'Jobs', displayName: 'Trinity Health' },  // 15 approvals (trinity-health), 15 crawled URLs
+  { source: 'workday', slug: 'collectorsuniverse-collectors', tenant: 'collectorsuniverse', wd: '1', site: 'collectors', displayName: 'Collectors Universe' },  // 15 approvals (collectors-universe), 36 crawled URLs
+  { source: 'workday', slug: 'bostondynamics-boston_dynamics', tenant: 'bostondynamics', wd: '1', site: 'Boston_Dynamics', displayName: 'Boston Dynamics' },  // 15 approvals (boston-dynamics), 52 crawled URLs
+  { source: 'workday', slug: 'flsmidth-fls_global', tenant: 'flsmidth', wd: '3', site: 'FLS_Global', displayName: 'Flsmidth' },  // 14 approvals (flsmidth), 18 crawled URLs
+  { source: 'workday', slug: 'heidelbergmaterials-global_hm_career_site', tenant: 'heidelbergmaterials', wd: '3', site: 'global_hm_career_site', displayName: 'Heidelberg Materials' },  // 14 approvals (heidelberg-materials-us), 27 crawled URLs
+  { source: 'workday', slug: 'bakerhughes-bakerhughes', tenant: 'bakerhughes', wd: '5', site: 'BakerHughes', displayName: 'Baker Hughes' },  // 14 approvals (baker-hughes-company), 62 crawled URLs
+  { source: 'workday', slug: 'shelterinsurance-careers', tenant: 'shelterinsurance', wd: '5', site: 'careers', displayName: 'Shelter Insurance' },  // 14 approvals (shelter-insurance-company), 4 crawled URLs
+  { source: 'workday', slug: 'williams-external', tenant: 'williams', wd: '5', site: 'External', displayName: 'Williams' },  // 14 approvals (williams-international), 11 crawled URLs
+  { source: 'workday', slug: 'sterling-sterling', tenant: 'sterling', wd: '5', site: 'Sterling', displayName: 'Sterling' },  // 14 approvals (sterling), 5 crawled URLs
+  { source: 'workday', slug: 'shift4payments-shift4_external_careersite', tenant: 'shift4payments', wd: '108', site: 'shift4_external_careersite', displayName: 'Shift4 Payments' },  // 13 approvals (shift4-payments), 1 crawled URLs
+  { source: 'workday', slug: 'sleepnumber-sleepnumber', tenant: 'sleepnumber', wd: '5', site: 'sleepnumber', displayName: 'Sleep Number' },  // 13 approvals (sleep-number-corporation), 3 crawled URLs
+  { source: 'workday', slug: 'vst-vistra_careers', tenant: 'vst', wd: '5', site: 'vistra_careers', displayName: 'Vst' },  // 13 approvals (vst-consulting), 13 crawled URLs
+  { source: 'workday', slug: 'pattersoncompanies-pdco', tenant: 'pattersoncompanies', wd: '501', site: 'PDCO', displayName: 'Patterson Companies' },  // 13 approvals (patterson-companies), 29 crawled URLs
+  { source: 'workday', slug: 'dynata-careers', tenant: 'dynata', wd: '108', site: 'careers', displayName: 'Dynata' },  // 13 approvals (dynata), 7 crawled URLs
+  { source: 'workday', slug: 'galileo-emlyonfac_career_site', tenant: 'galileo', wd: '3', site: 'emlyonfac_career_site', displayName: 'Galileo' },  // 13 approvals (galileo-technologies), 8 crawled URLs
+  { source: 'workday', slug: 'coxhealth-coxhealth_external', tenant: 'coxhealth', wd: '5', site: 'CoxHealth_External', displayName: 'Coxhealth' },  // 13 approvals (coxhealth), 7 crawled URLs
+  { source: 'workday', slug: 'zayo-zayo_careers', tenant: 'zayo', wd: '1', site: 'zayo_careers', displayName: 'Zayo' },  // 13 approvals (zayo-group), 24 crawled URLs
+  { source: 'workday', slug: 'texascapitalbank-careers', tenant: 'texascapitalbank', wd: '12', site: 'Careers', displayName: 'Texas Capital Bank' },  // 12 approvals (texas-capital-bank), 4 crawled URLs
+  { source: 'workday', slug: 'elekta-elekta_careers', tenant: 'elekta', wd: '3', site: 'Elekta_Careers', displayName: 'Elekta' },  // 12 approvals (elekta), 7 crawled URLs
+  { source: 'workday', slug: 'stord-stord_external_career', tenant: 'stord', wd: '503', site: 'Stord_External_Career', displayName: 'Stord' },  // 12 approvals (stord), 449 crawled URLs
+  { source: 'workday', slug: 'covetrus-covetruscareers', tenant: 'covetrus', wd: '5', site: 'CovetrusCareers', displayName: 'Covetrus' },  // 12 approvals (covetrus), 13 crawled URLs
+  { source: 'workday', slug: 'chenmed-chenmed', tenant: 'chenmed', wd: '1', site: 'ChenMed', displayName: 'Chenmed' },  // 12 approvals (chenmed), 3 crawled URLs
+  { source: 'workday', slug: 'leerink-leerinkpartners', tenant: 'leerink', wd: '5', site: 'leerinkpartners', displayName: 'Leerink' },  // 12 approvals (leerink-partners), 8 crawled URLs
+  { source: 'workday', slug: 'lilly-lly', tenant: 'lilly', wd: '115', site: 'LLY', displayName: 'Lilly' },  // 11 approvals (lilly-usa), 31 crawled URLs
+  { source: 'workday', slug: 'valmet-external', tenant: 'valmet', wd: '3', site: 'External', displayName: 'Valmet' },  // 11 approvals (valmet), 30 crawled URLs
+  { source: 'workday', slug: 'henryschein-external_careers', tenant: 'henryschein', wd: '1', site: 'External_Careers', displayName: 'Henry Schein' },  // 11 approvals (henry-schein), 46 crawled URLs
+  { source: 'workday', slug: 'pressganey-careers', tenant: 'pressganey', wd: '1', site: 'Careers', displayName: 'Press Ganey' },  // 11 approvals (press-ganey-associates), 3 crawled URLs
+  { source: 'workday', slug: 'wonder-grubhub_careers', tenant: 'wonder', wd: '1', site: 'Grubhub_Careers', displayName: 'Wonder' },  // 11 approvals (wonder-group), 10 crawled URLs
+  { source: 'workday', slug: 'scholastic-external', tenant: 'scholastic', wd: '5', site: 'External', displayName: 'Scholastic' },  // 11 approvals (scholastic), 24 crawled URLs
+  { source: 'workday', slug: 'simcorp-simcorp_jobs', tenant: 'simcorp', wd: '3', site: 'SimCorp_Jobs', displayName: 'Simcorp' },  // 11 approvals (simcorp-usa), 9 crawled URLs
+  { source: 'workday', slug: 'situsamc-situsamc', tenant: 'situsamc', wd: '1', site: 'SitusAMC', displayName: 'Situsamc' },  // 11 approvals (situsamc-holdings-corporation), 4 crawled URLs
+  { source: 'workday', slug: 'copeland-copeland_external_careers_page', tenant: 'copeland', wd: '5', site: 'copeland_external_careers_page', displayName: 'Copeland' },  // 10 approvals (copeland-lp), 12 crawled URLs
+  { source: 'workday', slug: 'organon-searchjobs', tenant: 'organon', wd: '5', site: 'SearchJobs', displayName: 'Organon' },  // 10 approvals (organon), 1 crawled URLs
+  { source: 'workday', slug: 'smucker-us_external_careers', tenant: 'smucker', wd: '5', site: 'US_External_Careers', displayName: 'Smucker' },  // 10 approvals (smucker-company), 50 crawled URLs
+  { source: 'workday', slug: 'merit-merit', tenant: 'merit', wd: '503', site: 'Merit', displayName: 'Merit' },  // 10 approvals (merit-consulting-group), 4 crawled URLs
+  { source: 'workday', slug: 'wit-wit', tenant: 'wit', wd: '1', site: 'WIT', displayName: 'Wit' },  // 10 approvals (wit), 6 crawled URLs
+  { source: 'workday', slug: 'honorhealth-honorhealth_careers', tenant: 'honorhealth', wd: '12', site: 'HonorHealth_careers', displayName: 'Honorhealth' },  // 10 approvals (honorhealth), 5 crawled URLs
+  { source: 'workday', slug: 'outsystems-outsystems', tenant: 'outsystems', wd: '503', site: 'OutSystems', displayName: 'Outsystems' },  // 10 approvals (outsystems), 31 crawled URLs
+  { source: 'workday', slug: 'semtech-semtechcareers', tenant: 'semtech', wd: '1', site: 'SemtechCareers', displayName: 'Semtech' },  // 10 approvals (semtech-corporation), 60 crawled URLs
+  { source: 'workday', slug: 'solenis-solenis', tenant: 'solenis', wd: '1', site: 'Solenis', displayName: 'Solenis' },  // 10 approvals (solenis), 53 crawled URLs
+  { source: 'workday', slug: 'spartannash-spartannash_careers', tenant: 'spartannash', wd: '1', site: 'SpartanNash_Careers', displayName: 'Spartannash' },  // 10 approvals (spartannash-associates), 128 crawled URLs
+  { source: 'workday', slug: 'gentex-gentex', tenant: 'gentex', wd: '5', site: 'Gentex', displayName: 'Gentex' },  // 10 approvals (gentex-corporation), 9 crawled URLs
+  { source: 'workday', slug: 'lyten-lyten_external_career_site', tenant: 'lyten', wd: '503', site: 'Lyten_External_Career_Site', displayName: 'Lyten' },  // 10 approvals (lyten), 3 crawled URLs
+  { source: 'workday', slug: 'datasite-datasite', tenant: 'datasite', wd: '1', site: 'datasite', displayName: 'Datasite' },  // 10 approvals (datasite), 2 crawled URLs
+  { source: 'workday', slug: 'envista-envistacareers', tenant: 'envista', wd: '1', site: 'envistacareers', displayName: 'Envista' },  // 10 approvals (envista), 4 crawled URLs
+  { source: 'workday', slug: 'waystar-waystar', tenant: 'waystar', wd: '1', site: 'Waystar', displayName: 'Waystar' },  // 10 approvals (waystar), 10 crawled URLs
+  { source: 'workday', slug: 'repligen-repligen_careers', tenant: 'repligen', wd: '108', site: 'Repligen_Careers', displayName: 'Repligen' },  // 9 approvals (repligen-corporation), 7 crawled URLs
+  { source: 'workday', slug: 'bigcommerce-commerce', tenant: 'bigcommerce', wd: '12', site: 'Commerce', displayName: 'Bigcommerce' },  // 9 approvals (bigcommerce), 47 crawled URLs
+  { source: 'workday', slug: 'mercari-mercari_external', tenant: 'mercari', wd: '3', site: 'mercari_external', displayName: 'Mercari' },  // 9 approvals (mercari), 1 crawled URLs
+  { source: 'workday', slug: 'belkin-belkin_careers', tenant: 'belkin', wd: '5', site: 'Belkin_Careers', displayName: 'Belkin' },  // 9 approvals (belkin-international), 1 crawled URLs
+  { source: 'workday', slug: 'bridgestone-external', tenant: 'bridgestone', wd: '5', site: 'External', displayName: 'Bridgestone' },  // 9 approvals (bridgestone-americas), 1626 crawled URLs
+  { source: 'workday', slug: 'goto-gotocareers', tenant: 'goto', wd: '5', site: 'gotocareers', displayName: 'Goto' },  // 9 approvals (goto-technologies-usa), 47 crawled URLs
+  { source: 'workday', slug: 'ingredion-ingredioncareers', tenant: 'ingredion', wd: '1', site: 'IngredionCareers', displayName: 'Ingredion' },  // 9 approvals (ingredion), 28 crawled URLs
+  { source: 'workday', slug: 'lifefitness-searchlfn', tenant: 'lifefitness', wd: '1', site: 'searchLFN', displayName: 'Life Fitness' },  // 9 approvals (life-fitness), 1 crawled URLs
+  { source: 'workday', slug: 'hhs-hhs1jobs', tenant: 'hhs', wd: '12', site: 'HHS1Jobs', displayName: 'Hhs' },  // 9 approvals (hhs-technology-group), 2 crawled URLs
+  { source: 'workday', slug: 'verdantas-verdantas', tenant: 'verdantas', wd: '108', site: 'Verdantas', displayName: 'Verdantas' },  // 9 approvals (verdantas), 3 crawled URLs
+  { source: 'workday', slug: 'argenx-external_careers', tenant: 'argenx', wd: '3', site: 'External_Careers', displayName: 'Argenx' },  // 9 approvals (argenx-us), 10 crawled URLs
+  { source: 'workday', slug: 'entrust-entrustcareers', tenant: 'entrust', wd: '1', site: 'EntrustCareers', displayName: 'Entrust' },  // 9 approvals (entrust-corporation), 19 crawled URLs
+  { source: 'workday', slug: 'fabletics-fabletics', tenant: 'fabletics', wd: '1', site: 'fabletics', displayName: 'Fabletics' },  // 9 approvals (fabletics), 1 crawled URLs
+  { source: 'workday', slug: 'tbc-lyriccareers', tenant: 'tbc', wd: '12', site: 'lyriccareers', displayName: 'Tbc' },  // 8 approvals (tbc-corporation), 4 crawled URLs
+  { source: 'workday', slug: 'kantar-kantar', tenant: 'kantar', wd: '3', site: 'KANTAR', displayName: 'Kantar' },  // 8 approvals (kantar), 57 crawled URLs
+  { source: 'workday', slug: 'kering-kering', tenant: 'kering', wd: '3', site: 'Kering', displayName: 'Kering' },  // 8 approvals (kering-americas), 12 crawled URLs
+  { source: 'workday', slug: 'alcoa-careers', tenant: 'alcoa', wd: '5', site: 'careers', displayName: 'Alcoa' },  // 8 approvals (alcoa-corporation), 288 crawled URLs
+  { source: 'workday', slug: 'blackbaud-externalcareers', tenant: 'blackbaud', wd: '1', site: 'ExternalCareers', displayName: 'Blackbaud' },  // 8 approvals (blackbaud), 44 crawled URLs
+  { source: 'workday', slug: 'novanta-novanta-careers', tenant: 'novanta', wd: '5', site: 'Novanta-Careers', displayName: 'Novanta' },  // 8 approvals (novanta-corporation), 24 crawled URLs
+  { source: 'workday', slug: 'taylor-external', tenant: 'taylor', wd: '1', site: 'External', displayName: 'Taylor' },  // 8 approvals (taylor-corporation), 4 crawled URLs
+  { source: 'workday', slug: 'tricentis-tricentis_careers', tenant: 'tricentis', wd: '1', site: 'Tricentis_Careers', displayName: 'Tricentis' },  // 8 approvals (tricentis-americas), 36 crawled URLs
+  { source: 'workday', slug: 'ibotta-ibotta', tenant: 'ibotta', wd: '1', site: 'Ibotta', displayName: 'Ibotta' },  // 8 approvals (ibotta), 12 crawled URLs
+  { source: 'workday', slug: 'eng-externalcareers', tenant: 'eng', wd: '3', site: 'ExternalCareers', displayName: 'Eng' },  // 8 approvals (eng-usa), 8 crawled URLs
+  { source: 'workday', slug: 'horizon-horizon', tenant: 'horizon', wd: '1', site: 'Horizon', displayName: 'Horizon' },  // 8 approvals (horizon-systems), 2 crawled URLs
+  { source: 'workday', slug: 'saks-careers_at_saks', tenant: 'saks', wd: '1', site: 'careers_at_saks', displayName: 'Saks' },  // 8 approvals (saks-company), 2 crawled URLs
+  { source: 'workday', slug: 'acehardware-arg_external', tenant: 'acehardware', wd: '1', site: 'ARG_External', displayName: 'Ace Hardware' },  // 7 approvals (ace-hardware-corporation), 185 crawled URLs
+  { source: 'workday', slug: 'askbio-askbio', tenant: 'askbio', wd: '12', site: 'AskBio', displayName: 'Askbio' },  // 7 approvals (askbio), 2 crawled URLs
+  { source: 'workday', slug: 'christies-christies_careers', tenant: 'christies', wd: '3', site: 'Christies_Careers', displayName: 'Christies' },  // 7 approvals (christies), 26 crawled URLs
+  { source: 'workday', slug: 'covestro-cov_external', tenant: 'covestro', wd: '3', site: 'cov_external', displayName: 'Covestro' },  // 7 approvals (covestro), 30 crawled URLs
+  { source: 'workday', slug: 'haemonetics-hae', tenant: 'haemonetics', wd: '5', site: 'HAE', displayName: 'Haemonetics' },  // 7 approvals (haemonetics-corporation), 80 crawled URLs
+  { source: 'workday', slug: 'bitsight-bitsight', tenant: 'bitsight', wd: '1', site: 'Bitsight', displayName: 'Bitsight' },  // 7 approvals (bitsight-technologies), 15 crawled URLs
+  { source: 'workday', slug: 'nationalindemnity-bhhc', tenant: 'nationalindemnity', wd: '5', site: 'BHHC', displayName: 'National Indemnity' },  // 7 approvals (national-indemnity-company), 12 crawled URLs
+  { source: 'workday', slug: 'progleasing-progleasingcareers', tenant: 'progleasing', wd: '5', site: 'ProgLeasingCareers', displayName: 'Prog Leasing' },  // 7 approvals (prog-leasing), 10 crawled URLs
+  { source: 'workday', slug: 'modivcare-careers', tenant: 'modivcare', wd: '1', site: 'careers', displayName: 'Modivcare' },  // 7 approvals (modivcare-solutions), 17 crawled URLs
+  { source: 'workday', slug: 'phreesia-phreesia', tenant: 'phreesia', wd: '1', site: 'Phreesia', displayName: 'Phreesia' },  // 7 approvals (phreesia), 16 crawled URLs
+  { source: 'workday', slug: 'youthvillages-youthvillagescareers', tenant: 'youthvillages', wd: '1', site: 'youthvillagescareers', displayName: 'Youth Villages' },  // 7 approvals (youth-villages), 1 crawled URLs
+  { source: 'workday', slug: 'whitecap-careers', tenant: 'whitecap', wd: '1', site: 'careers', displayName: 'White Cap' },  // 7 approvals (white-cap), 34 crawled URLs
+  { source: 'workday', slug: 'donaldson-donaldsoncareers', tenant: 'donaldson', wd: '5', site: 'DonaldsonCareers', displayName: 'Donaldson' },  // 7 approvals (donaldson-company), 6 crawled URLs
+  { source: 'workday', slug: 'albemarle-external', tenant: 'albemarle', wd: '5', site: 'External', displayName: 'Albemarle' },  // 7 approvals (albemarle-corporation), 44 crawled URLs
+  { source: 'workday', slug: 'lexmark-lexmark', tenant: 'lexmark', wd: '1', site: 'Lexmark', displayName: 'Lexmark' },  // 7 approvals (lexmark-international), 7 crawled URLs
+  { source: 'workday', slug: 'scanhealthplan-scancareers', tenant: 'scanhealthplan', wd: '108', site: 'scancareers', displayName: 'Scan Health Plan' },  // 6 approvals (scan-health-plan), 1 crawled URLs
+  { source: 'workday', slug: 'spscommerce-sps', tenant: 'spscommerce', wd: '108', site: 'SPS', displayName: 'Sps Commerce' },  // 6 approvals (sps-commerce), 5 crawled URLs
+  { source: 'workday', slug: 'vitalant-careers', tenant: 'vitalant', wd: '12', site: 'Careers', displayName: 'Vitalant' },  // 6 approvals (vitalant), 6 crawled URLs
+  { source: 'workday', slug: 'alliance-nissanjobs', tenant: 'alliance', wd: '3', site: 'nissanjobs', displayName: 'Alliance' },  // 6 approvals (alliance), 181 crawled URLs
+  { source: 'workday', slug: 'bullish-coindesk', tenant: 'bullish', wd: '3', site: 'CoinDesk', displayName: 'Bullish' },  // 6 approvals (bullish-us), 6 crawled URLs
+  { source: 'workday', slug: 'fastretailing-headquarters_eu_uniqlo', tenant: 'fastretailing', wd: '3', site: 'headquarters_eu_Uniqlo', displayName: 'Fast Retailing' },  // 6 approvals (fast-retailing-usa), 11 crawled URLs
+  { source: 'workday', slug: 'kone-careers', tenant: 'kone', wd: '3', site: 'Careers', displayName: 'Kone' },  // 6 approvals (kone), 262 crawled URLs
+  { source: 'workday', slug: 'omya-omya', tenant: 'omya', wd: '3', site: 'Omya', displayName: 'Omya' },  // 6 approvals (omya), 21 crawled URLs
+  { source: 'workday', slug: 'quadient-external_career_site', tenant: 'quadient', wd: '3', site: 'External_Career_Site', displayName: 'Quadient' },  // 6 approvals (quadient), 13 crawled URLs
+  { source: 'workday', slug: 'ace-careers', tenant: 'ace', wd: '5', site: 'careers', displayName: 'Ace' },  // 6 approvals (ace-technologies), 20 crawled URLs
+  { source: 'workday', slug: 'plugpower-plug_power_inc', tenant: 'plugpower', wd: '5', site: 'Plug_Power_Inc', displayName: 'Plug Power' },  // 6 approvals (plug-power), 8 crawled URLs
+  { source: 'workday', slug: 'marathonhealth-marathon-health-careers', tenant: 'marathonhealth', wd: '501', site: 'Marathon-Health-Careers', displayName: 'Marathon Health' },  // 6 approvals (marathon-health), 128 crawled URLs
+  { source: 'workday', slug: 'jacksonlewis-jacksonlewisbusinessandlegalprofessionalscareers', tenant: 'jacksonlewis', wd: '1', site: 'JacksonLewisBusinessandLegalProfessionalsCareers', displayName: 'Jackson Lewis' },  // 6 approvals (jackson-lewis), 5 crawled URLs
+  { source: 'workday', slug: 'millerknoll-millerknoll', tenant: 'millerknoll', wd: '1', site: 'MillerKnoll', displayName: 'Millerknoll' },  // 6 approvals (millerknoll), 18 crawled URLs
+  { source: 'workday', slug: 'usfoods-usfoodscareersexternal', tenant: 'usfoods', wd: '1', site: 'usfoodscareersExternal', displayName: 'Us Foods' },  // 6 approvals (us-foods), 47 crawled URLs
+  { source: 'workday', slug: 'dover-dover', tenant: 'dover', wd: '103', site: 'Dover', displayName: 'Dover' },  // 6 approvals (dover-corporation), 801 crawled URLs
+  { source: 'workday', slug: 'experity-experity_careers', tenant: 'experity', wd: '108', site: 'Experity_Careers', displayName: 'Experity' },  // 6 approvals (experity), 1 crawled URLs
+  { source: 'workday', slug: 'standardbiotools-external', tenant: 'standardbiotools', wd: '5', site: 'External', displayName: 'Standard Biotools' },  // 6 approvals (standard-biotools), 3 crawled URLs
+  { source: 'workday', slug: 'shutterstock-shutterstockcareers', tenant: 'shutterstock', wd: '1', site: 'ShutterstockCareers', displayName: 'Shutterstock' },  // 6 approvals (shutterstock), 2 crawled URLs
+  { source: 'workday', slug: 'sysco-syscocareers', tenant: 'sysco', wd: '5', site: 'syscocareers', displayName: 'Sysco' },  // 6 approvals (sysco-corporation), 8 crawled URLs
+  { source: 'workday', slug: 'dukeenergy-search', tenant: 'dukeenergy', wd: '1', site: 'search', displayName: 'Duke Energy' },  // 6 approvals (duke-energy-business-services), 23 crawled URLs
+  { source: 'workday', slug: 'gia-gia', tenant: 'gia', wd: '1', site: 'GIA', displayName: 'Gia' },  // 6 approvals (gia-technologies), 6 crawled URLs
+  { source: 'workday', slug: 'littelfuse-littelfuse-careers', tenant: 'littelfuse', wd: '1', site: 'Littelfuse-Careers', displayName: 'Littelfuse' },  // 6 approvals (littelfuse), 17 crawled URLs
+  { source: 'workday', slug: 'darktrace-darktaceexternal', tenant: 'darktrace', wd: '3', site: 'darktaceexternal', displayName: 'Darktrace' },  // 5 approvals (darktrace), 125 crawled URLs
+  { source: 'workday', slug: 'finastra-finc', tenant: 'finastra', wd: '3', site: 'FINC', displayName: 'Finastra' },  // 5 approvals (finastra-technology), 24 crawled URLs
+  { source: 'workday', slug: 'mars-external', tenant: 'mars', wd: '3', site: 'External', displayName: 'Mars' },  // 5 approvals (mars-tech-solutions), 299 crawled URLs
+  { source: 'workday', slug: 'pernodricard-pernod-ricard', tenant: 'pernodricard', wd: '3', site: 'pernod-ricard', displayName: 'Pernod Ricard' },  // 5 approvals (pernod-ricard-usa), 57 crawled URLs
+  { source: 'workday', slug: 'deckers-deckers', tenant: 'deckers', wd: '5', site: 'Deckers', displayName: 'Deckers' },  // 5 approvals (deckers-america), 52 crawled URLs
+  { source: 'workday', slug: 'avisbudget-abg_careers', tenant: 'avisbudget', wd: '1', site: 'ABG_Careers', displayName: 'Avis Budget' },  // 5 approvals (avis-budget-group), 73 crawled URLs
+  { source: 'workday', slug: 'otis-rec_ext_gateway', tenant: 'otis', wd: '5', site: 'REC_Ext_Gateway', displayName: 'Otis' },  // 5 approvals (otis-technology), 7 crawled URLs
+  { source: 'workday', slug: 'oumedicine-ouhealthcareers', tenant: 'oumedicine', wd: '5', site: 'OUHealthCareers', displayName: 'Ou Medicine' },  // 5 approvals (ou-medicine), 22 crawled URLs
+  { source: 'workday', slug: 'yeticoolers-yeti', tenant: 'yeticoolers', wd: '5', site: 'YETI', displayName: 'Yeti Coolers' },  // 5 approvals (yeti-coolers), 22 crawled URLs
+  { source: 'workday', slug: 'digitalturbine-digital_turbine_external_careers', tenant: 'digitalturbine', wd: '501', site: 'Digital_Turbine_External_Careers', displayName: 'Digital Turbine' },  // 5 approvals (digital-turbine), 7 crawled URLs
+  { source: 'workday', slug: 'qiagen-qiagen', tenant: 'qiagen', wd: '502', site: 'QIAGEN', displayName: 'Qiagen' },  // 5 approvals (qiagen), 8 crawled URLs
+  { source: 'workday', slug: 'workiva-careers', tenant: 'workiva', wd: '503', site: 'careers', displayName: 'Workiva' },  // 5 approvals (workiva), 65 crawled URLs
+  { source: 'workday', slug: 'healthcare-search', tenant: 'healthcare', wd: '1', site: 'Search', displayName: 'Healthcare' },  // 5 approvals (healthcare), 104 crawled URLs
+  { source: 'workday', slug: 'oneoncology-echo', tenant: 'oneoncology', wd: '1', site: 'ECHO', displayName: 'Oneoncology' },  // 5 approvals (oneoncology), 9 crawled URLs
+  { source: 'workday', slug: 'tti-milwaukee', tenant: 'tti', wd: '1', site: 'Milwaukee', displayName: 'Tti' },  // 5 approvals (tti), 2 crawled URLs
+  { source: 'workday', slug: 'dealertire-4710', tenant: 'dealertire', wd: '5', site: '4710', displayName: 'Dealer Tire' },  // 5 approvals (dealer-tire), 42 crawled URLs
+  { source: 'workday', slug: 'pvh-pvh_careers', tenant: 'pvh', wd: '1', site: 'PVH_Careers', displayName: 'Pvh' },  // 5 approvals (pvh), 3 crawled URLs
+  { source: 'workday', slug: 'resilience-resilience_careers', tenant: 'resilience', wd: '1', site: 'Resilience_Careers', displayName: 'Resilience' },  // 5 approvals (resilience-solutions), 12 crawled URLs
+  { source: 'workday', slug: 'openlane-openlane_careers', tenant: 'openlane', wd: '115', site: 'OPENLANE_Careers', displayName: 'Openlane' },  // 5 approvals (openlane), 16 crawled URLs
+  { source: 'workday', slug: 'aia-external', tenant: 'aia', wd: '3', site: 'External', displayName: 'Aia' },  // 5 approvals (aia-solutions), 137 crawled URLs
+  { source: 'workday', slug: 'graco-graco_careers', tenant: 'graco', wd: '501', site: 'Graco_Careers', displayName: 'Graco' },  // 5 approvals (graco), 2 crawled URLs
+  { source: 'workday', slug: 'essentiahealth-essentia_health', tenant: 'essentiahealth', wd: '1', site: 'Essentia_Health', displayName: 'Essentia Health' },  // 5 approvals (essentia-health), 58 crawled URLs
+  { source: 'workday', slug: 'dedalus-external', tenant: 'dedalus', wd: '3', site: 'External', displayName: 'Dedalus' },  // 4 approvals (dedalus-labs), 27 crawled URLs
+  { source: 'workday', slug: 'trumpf-trumpf_graduates_and_professionals', tenant: 'trumpf', wd: '3', site: 'TRUMPF_Graduates_and_Professionals', displayName: 'Trumpf' },  // 4 approvals (trumpf), 68 crawled URLs
+  { source: 'workday', slug: 'gainsight-gainsight_external_careers', tenant: 'gainsight', wd: '5', site: 'Gainsight_External_Careers', displayName: 'Gainsight' },  // 4 approvals (gainsight), 8 crawled URLs
+  { source: 'workday', slug: 'harbourvest-hvp', tenant: 'harbourvest', wd: '5', site: 'HVP', displayName: 'Harbourvest' },  // 4 approvals (harbourvest-partners), 5 crawled URLs
+  { source: 'workday', slug: 'orionsteel-externalcareers', tenant: 'orionsteel', wd: '5', site: 'externalcareers', displayName: 'Orion Steel' },  // 4 approvals (orion-steel-group), 70 crawled URLs
+  { source: 'workday', slug: 'penncolor-penn-environmental-remediation', tenant: 'penncolor', wd: '5', site: 'Penn-Environmental-Remediation', displayName: 'Penn Color' },  // 4 approvals (penn-color), 1 crawled URLs
+  { source: 'workday', slug: 'pnc-external', tenant: 'pnc', wd: '5', site: 'External', displayName: 'Pnc' },  // 4 approvals (pnc), 232 crawled URLs
+  { source: 'workday', slug: 'russell-russellinvestments', tenant: 'russell', wd: '5', site: 'russellinvestments', displayName: 'Russell' },  // 4 approvals (russell-company), 47 crawled URLs
+  { source: 'workday', slug: 'ulse-ulricareers', tenant: 'ulse', wd: '5', site: 'ulricareers', displayName: 'Ulse' },  // 4 approvals (ulse), 9 crawled URLs
+  { source: 'workday', slug: 'wilsonart-wilsonart_careers', tenant: 'wilsonart', wd: '5', site: 'Wilsonart_Careers', displayName: 'Wilsonart' },  // 4 approvals (wilsonart), 1 crawled URLs
+  { source: 'workday', slug: 'woodward-woodward', tenant: 'woodward', wd: '5', site: 'woodward', displayName: 'Woodward' },  // 4 approvals (woodward), 9 crawled URLs
+  { source: 'workday', slug: 'osborn-oec', tenant: 'osborn', wd: '504', site: 'OEC', displayName: 'Osborn' },  // 4 approvals (osborn-consulting), 1 crawled URLs
+  { source: 'workday', slug: 'huntsman-huntsman', tenant: 'huntsman', wd: '1', site: 'Huntsman', displayName: 'Huntsman' },  // 4 approvals (huntsman-international), 38 crawled URLs
+  { source: 'workday', slug: 'path-external', tenant: 'path', wd: '1', site: 'External', displayName: 'Path' },  // 4 approvals (path), 130 crawled URLs
+  { source: 'workday', slug: 'wpengine-wp_engine', tenant: 'wpengine', wd: '1', site: 'WP_Engine', displayName: 'Wpengine' },  // 4 approvals (wpengine), 7 crawled URLs
+  { source: 'workday', slug: 'prodege-prodege_careers', tenant: 'prodege', wd: '108', site: 'Prodege_Careers', displayName: 'Prodege' },  // 4 approvals (prodege), 3 crawled URLs
+  { source: 'workday', slug: 'nexperia-careers', tenant: 'nexperia', wd: '3', site: 'careers', displayName: 'Nexperia' },  // 4 approvals (nexperia-usa), 16 crawled URLs
+  { source: 'workday', slug: 'spinmaster-spinmaster_careers', tenant: 'spinmaster', wd: '3', site: 'SpinMaster_Careers', displayName: 'Spin Master' },  // 4 approvals (spin-master), 2 crawled URLs
+  { source: 'workday', slug: 'canadiansolar-canadiansolar', tenant: 'canadiansolar', wd: '5', site: 'CanadianSolar', displayName: 'Canadian Solar' },  // 4 approvals (canadian-solar-usa), 7 crawled URLs
+  { source: 'workday', slug: 'composecure-composecure-careers', tenant: 'composecure', wd: '504', site: 'CompoSecure-Careers', displayName: 'Composecure' },  // 4 approvals (composecure), 1 crawled URLs
+  { source: 'workday', slug: 'sagility-sagilityusa', tenant: 'sagility', wd: '1', site: 'SagilityUSA', displayName: 'Sagility' },  // 4 approvals (sagility), 17 crawled URLs
+  { source: 'workday', slug: 'srsdistribution-srs', tenant: 'srsdistribution', wd: '1', site: 'SRS', displayName: 'Srs Distribution' },  // 4 approvals (srs-distribution), 8 crawled URLs
+  { source: 'workday', slug: 'ameresco-ameresco', tenant: 'ameresco', wd: '5', site: 'Ameresco', displayName: 'Ameresco' },  // 4 approvals (ameresco), 7 crawled URLs
+  { source: 'workday', slug: 'marywashingtonhealthcare-externalcareers', tenant: 'marywashingtonhealthcare', wd: '5', site: 'Externalcareers', displayName: 'Mary Washington Healthcare' },  // 4 approvals (mary-washington-healthcare), 47 crawled URLs
+  { source: 'workday', slug: 'laticrete-laticreteinternational', tenant: 'laticrete', wd: '1', site: 'laticreteinternational', displayName: 'Laticrete' },  // 4 approvals (laticrete-international), 8 crawled URLs
+  { source: 'workday', slug: 'mattressfirm-mattressfirmcareers', tenant: 'mattressfirm', wd: '1', site: 'MattressFirmCareers', displayName: 'Mattress Firm' },  // 4 approvals (mattress-firm), 6 crawled URLs
+  { source: 'workday', slug: 'abcsupply-tcicareers', tenant: 'abcsupply', wd: '1', site: 'TCIcareers', displayName: 'Abc Supply' },  // 3 approvals (abc-supply), 4 crawled URLs
+  { source: 'workday', slug: 'logicalis-logicaliscareers', tenant: 'logicalis', wd: '3', site: 'LogicalisCareers', displayName: 'Logicalis' },  // 3 approvals (logicalis), 1 crawled URLs
+  { source: 'workday', slug: 'borgwarner-borgwarner_careers', tenant: 'borgwarner', wd: '5', site: 'BorgWarner_Careers', displayName: 'Borgwarner' },  // 3 approvals (borgwarner), 20 crawled URLs
+  { source: 'workday', slug: 'ccc-ccc_external', tenant: 'ccc', wd: '5', site: 'ccc_External', displayName: 'Ccc' },  // 3 approvals (ccc-group), 3 crawled URLs
+  { source: 'workday', slug: 'evrazna-evraz', tenant: 'evrazna', wd: '5', site: 'EVRAZ', displayName: 'Evraz Na' },  // 3 approvals (evraz-na), 6 crawled URLs
+  { source: 'workday', slug: 'awe-art_and_wellness', tenant: 'awe', wd: '1', site: 'Art_and_Wellness', displayName: 'Awe' },  // 3 approvals (awe-technologies), 61 crawled URLs
+  { source: 'workday', slug: 'marmon-marmon_careers', tenant: 'marmon', wd: '5', site: 'Marmon_Careers', displayName: 'Marmon' },  // 3 approvals (marmon-group), 85 crawled URLs
+  { source: 'workday', slug: 'xylem-xylem-careers', tenant: 'xylem', wd: '5', site: 'xylem-careers', displayName: 'Xylem' },  // 3 approvals (xylem), 6 crawled URLs
+  { source: 'workday', slug: 'lambweston-external_vacancies', tenant: 'lambweston', wd: '1', site: 'External_Vacancies', displayName: 'Lamb Weston' },  // 3 approvals (lamb-weston), 25 crawled URLs
+  { source: 'workday', slug: 'georgfischer-georgfischer_careers', tenant: 'georgfischer', wd: '103', site: 'GeorgFischer_Careers', displayName: 'Georg Fischer' },  // 3 approvals (georg-fischer), 19 crawled URLs
+  { source: 'workday', slug: 'lego-lego_external', tenant: 'lego', wd: '103', site: 'LEGO_External', displayName: 'Lego' },  // 3 approvals (lego-systems), 22 crawled URLs
+  { source: 'workday', slug: 'revvity-external', tenant: 'revvity', wd: '103', site: 'External', displayName: 'Revvity' },  // 3 approvals (revvity), 8 crawled URLs
+  { source: 'workday', slug: 'acrisure-acrisure', tenant: 'acrisure', wd: '1', site: 'Acrisure', displayName: 'Acrisure' },  // 3 approvals (acrisure-technology-group), 149 crawled URLs
+  { source: 'workday', slug: 'werner-werner_careers', tenant: 'werner', wd: '1', site: 'Werner_Careers', displayName: 'Werner' },  // 3 approvals (werner), 1 crawled URLs
+  { source: 'workday', slug: 'aaon-aaon', tenant: 'aaon', wd: '108', site: 'AAON', displayName: 'Aaon' },  // 3 approvals (aaon), 2 crawled URLs
+  { source: 'workday', slug: 'xpel-xpel_careers', tenant: 'xpel', wd: '5', site: 'XPEL_Careers', displayName: 'Xpel' },  // 3 approvals (xpel), 1 crawled URLs
+  { source: 'workday', slug: 'clearesult-clearesult_external_careers', tenant: 'clearesult', wd: '1', site: 'clearesult_external_careers', displayName: 'Clearesult' },  // 3 approvals (clearesult-consulting), 23 crawled URLs
+  { source: 'workday', slug: 'fedex-fxe-eu_external', tenant: 'fedex', wd: '1', site: 'FXE-EU_External', displayName: 'Fedex' },  // 3 approvals (fedex-corporation), 42 crawled URLs
+  { source: 'workday', slug: 'sphera-careers', tenant: 'sphera', wd: '1', site: 'Careers', displayName: 'Sphera' },  // 3 approvals (sphera-solutions), 11 crawled URLs
+  { source: 'workday', slug: 'thedacare-thedacare_career_site1', tenant: 'thedacare', wd: '5', site: 'ThedaCare_Career_Site1', displayName: 'Thedacare' },  // 3 approvals (thedacare), 11 crawled URLs
+  { source: 'workday', slug: 'masco-cabinetworksgroup', tenant: 'masco', wd: '1', site: 'CabinetworksGroup', displayName: 'Masco' },  // 3 approvals (masco-corporation), 1 crawled URLs
+  { source: 'workday', slug: 'material-material_external_career_site', tenant: 'material', wd: '1', site: 'Material_External_Career_Site', displayName: 'Material' },  // 3 approvals (material-holdings), 3 crawled URLs
+  { source: 'workday', slug: 'owensborohealth-owensborohealth', tenant: 'owensborohealth', wd: '1', site: 'OwensboroHealth', displayName: 'Owensboro Health' },  // 3 approvals (owensboro-health), 1 crawled URLs
+
+# CHECK: tenant matches only the first word(s) of the sponsor name
+  { source: 'workday', slug: 'barclays-external_career_site_barclays', tenant: 'barclays', wd: '3', site: 'External_Career_Site_Barclays', displayName: 'Barclays Services' },  // 1107 approvals (barclays-services), 58 crawled URLs
+  { source: 'workday', slug: 'lowes-lws_external_cs', tenant: 'lowes', wd: '5', site: 'lws_external_cs', displayName: 'Lowes Companies' },  // 584 approvals (lowes-companies), 10 crawled URLs
+  { source: 'workday', slug: 'gilead-gileadcareers', tenant: 'gilead', wd: '1', site: 'gileadcareers', displayName: 'Gilead Sciences' },  // 356 approvals (gilead-sciences), 287 crawled URLs
+  { source: 'workday', slug: 'nordstrom-nordstrom_careers', tenant: 'nordstrom', wd: '5', site: 'nordstrom_careers', displayName: 'Nordstrom Nordstrom' },  // 330 approvals (nordstrom-nordstrom), 376 crawled URLs
+  { source: 'workday', slug: 'medline-medline', tenant: 'medline', wd: '5', site: 'Medline', displayName: 'Medline Industries' },  // 316 approvals (medline-industries-lp), 23 crawled URLs
+  { source: 'workday', slug: 'regeneron-careers', tenant: 'regeneron', wd: '1', site: 'Careers', displayName: 'Regeneron Pharmaceuticals' },  // 273 approvals (regeneron-pharmaceuticals), 626 crawled URLs
+  { source: 'workday', slug: 'georgia-tgc', tenant: 'georgia', wd: '5', site: 'TGC', displayName: 'Georgia Institute' },  // 210 approvals (georgia-institute-technology), 376 crawled URLs
+  { source: 'workday', slug: 'takeda-external', tenant: 'takeda', wd: '502', site: 'External', displayName: 'Takeda Development Center' },  // 209 approvals (takeda-development-center-americas), 32 crawled URLs
+  { source: 'workday', slug: 'uchicago-external', tenant: 'uchicago', wd: '5', site: 'External', displayName: 'Uchicago Argonne' },  // 207 approvals (uchicago-argonne), 286 crawled URLs
+  { source: 'workday', slug: 'centene-centene_external', tenant: 'centene', wd: '5', site: 'Centene_External', displayName: 'Centene Management' },  // 206 approvals (centene-management-company), 221 crawled URLs
+  { source: 'workday', slug: 'huntington-hnbcareers', tenant: 'huntington', wd: '12', site: 'HNBcareers', displayName: 'Huntington National Bank' },  // 194 approvals (huntington-national-bank), 124 crawled URLs
+  { source: 'workday', slug: 'liberty-lu_job_board_staff', tenant: 'liberty', wd: '5', site: 'lu_job_board_staff', displayName: 'Liberty Mutual' },  // 160 approvals (liberty-mutual-technology-group), 20 crawled URLs
+  { source: 'workday', slug: 'usacs-usacscareers', tenant: 'usacs', wd: '1', site: 'usacscareers', displayName: 'Usacs Medical' },  // 143 approvals (usacs-medical-group), 5 crawled URLs
+  { source: 'workday', slug: 'sanofi-sanoficareers', tenant: 'sanofi', wd: '3', site: 'SanofiCareers', displayName: 'Sanofi Us Services' },  // 131 approvals (sanofi-us-services), 872 crawled URLs
+  { source: 'workday', slug: 'guardianlife-guardian-life-careers', tenant: 'guardianlife', wd: '5', site: 'Guardian-Life-Careers', displayName: 'Guardian Life Insurance' },  // 112 approvals (guardian-life-insurance-company-america), 36 crawled URLs
+  { source: 'workday', slug: 'edwards-edwardscareers', tenant: 'edwards', wd: '5', site: 'edwardscareers', displayName: 'Edwards Lifesciences' },  // 107 approvals (edwards-lifesciences), 50 crawled URLs
+  { source: 'workday', slug: 'activision-blizzard_external_careers', tenant: 'activision', wd: '1', site: 'Blizzard_External_Careers', displayName: 'Activision Publishing' },  // 106 approvals (activision-publishing), 3 crawled URLs
+  { source: 'workday', slug: 'ryder-rydercareers', tenant: 'ryder', wd: '5', site: 'RyderCareers', displayName: 'Ryder System' },  // 105 approvals (ryder-system), 26 crawled URLs
+  { source: 'workday', slug: 'alcon-careers_alcon', tenant: 'alcon', wd: '5', site: 'careers_alcon', displayName: 'Alcon Research' },  // 103 approvals (alcon-research), 632 crawled URLs
+  { source: 'workday', slug: 'ancestry-careers', tenant: 'ancestry', wd: '501', site: 'Careers', displayName: 'Ancestry Com Operations' },  // 95 approvals (ancestry-com-operations), 1 crawled URLs
+  { source: 'workday', slug: 'harman-harman', tenant: 'harman', wd: '3', site: 'HARMAN', displayName: 'Harman Becker Automotive' },  // 91 approvals (harman-becker-automotive-systems), 10 crawled URLs
+  { source: 'workday', slug: 'mizuho-mizuhoamericas', tenant: 'mizuho', wd: '1', site: 'mizuhoamericas', displayName: 'Mizuho Americas Services' },  // 86 approvals (mizuho-americas-services), 117 crawled URLs
+  { source: 'workday', slug: 'corteva-ctp', tenant: 'corteva', wd: '5', site: 'ctp', displayName: 'Corteva Agriscience' },  // 86 approvals (corteva-agriscience), 3 crawled URLs
+  { source: 'workday', slug: 'scripps-scripps_careers', tenant: 'scripps', wd: '115', site: 'Scripps_Careers', displayName: 'Scripps Research Institute' },  // 81 approvals (scripps-research-institute), 42 crawled URLs
+  { source: 'workday', slug: 'jackson-jackson_careers', tenant: 'jackson', wd: '1', site: 'Jackson_Careers', displayName: 'Jackson Laboratory' },  // 77 approvals (jackson-laboratory), 53 crawled URLs
+  { source: 'workday', slug: 'abercrombie-anf', tenant: 'abercrombie', wd: '108', site: 'anf', displayName: 'Abercrombie Fitch Management' },  // 70 approvals (abercrombie-fitch-management), 498 crawled URLs
+  { source: 'workday', slug: 'standard-search', tenant: 'standard', wd: '1', site: 'Search', displayName: 'Standard Chartered Bank' },  // 69 approvals (standard-chartered-bank), 30 crawled URLs
+  { source: 'workday', slug: 'christianacare-cchs', tenant: 'christianacare', wd: '5', site: 'CCHS', displayName: 'Christiana Care Health Services' },  // 67 approvals (christiana-care-health-services), 9 crawled URLs
+  { source: 'workday', slug: 'regions-regions_careers', tenant: 'regions', wd: '5', site: 'Regions_Careers', displayName: 'Regions Bank' },  // 65 approvals (regions-bank), 7 crawled URLs
+  { source: 'workday', slug: 'michaels-external', tenant: 'michaels', wd: '5', site: 'External', displayName: 'Michaels Stores' },  // 63 approvals (michaels-stores), 11 crawled URLs
+  { source: 'workday', slug: 'factset-factsetcareers', tenant: 'factset', wd: '1', site: 'FactSetCareers', displayName: 'Factset Research' },  // 61 approvals (factset-research-systems), 6 crawled URLs
+  { source: 'workday', slug: 'sabre-sabrejobs', tenant: 'sabre', wd: '1', site: 'SabreJobs', displayName: 'Sabre Glbl' },  // 60 approvals (sabre-glbl), 18 crawled URLs
+  { source: 'workday', slug: 'sentara-scs', tenant: 'sentara', wd: '1', site: 'scs', displayName: 'Sentara Health' },  // 58 approvals (sentara-health), 21 crawled URLs
+  { source: 'workday', slug: 'livenation-lnexternalsite', tenant: 'livenation', wd: '503', site: 'LNExternalSite', displayName: 'Live Nation Worldwide' },  // 57 approvals (live-nation-worldwide), 163 crawled URLs
+  { source: 'workday', slug: 'envestnet-env', tenant: 'envestnet', wd: '5', site: 'ENV', displayName: 'Envestnet Financial' },  // 54 approvals (envestnet-financial-technologies), 1 crawled URLs
+  { source: 'workday', slug: 'global-globalpartnerscareers', tenant: 'global', wd: '1', site: 'globalpartnerscareers', displayName: 'Global Infotech' },  // 53 approvals (global-infotech), 177 crawled URLs
+  { source: 'workday', slug: 'flagstar-flagstar', tenant: 'flagstar', wd: '5', site: 'flagstar', displayName: 'Flagstar Bank Na' },  // 51 approvals (flagstar-bank-na), 11 crawled URLs
+  { source: 'workday', slug: 'suffolk-external', tenant: 'suffolk', wd: '1', site: 'External', displayName: 'Suffolk Construction' },  // 51 approvals (suffolk-construction-company), 3 crawled URLs
+  { source: 'workday', slug: 'recar-slatecareers', tenant: 'recar', wd: '108', site: 'SLATEcareers', displayName: 'Re Car Dba Slate' },  // 50 approvals (re-car-dba-slate), 2 crawled URLs
+  { source: 'workday', slug: 'generac-external', tenant: 'generac', wd: '5', site: 'External', displayName: 'Generac Power' },  // 50 approvals (generac-power-systems), 43 crawled URLs
+  { source: 'workday', slug: 'empower-empower', tenant: 'empower', wd: '12', site: 'empower', displayName: 'Empower Retirement' },  // 50 approvals (empower-retirement), 8 crawled URLs
+  { source: 'workday', slug: 'pinnacle-pinnacle', tenant: 'pinnacle', wd: '1', site: 'Pinnacle', displayName: 'Pinnacle Technical Resources' },  // 49 approvals (pinnacle-technical-resources), 1 crawled URLs
+  { source: 'workday', slug: 'mgmresorts-mgmcareers', tenant: 'mgmresorts', wd: '5', site: 'MGMCareers', displayName: 'Mgm Resorts Satellite' },  // 49 approvals (mgm-resorts-satellite), 12 crawled URLs
+  { source: 'workday', slug: 'amadeus-jobs', tenant: 'amadeus', wd: '3', site: 'jobs', displayName: 'Amadeus North' },  // 47 approvals (amadeus-north-america), 10 crawled URLs
+  { source: 'workday', slug: 'thales-careers', tenant: 'thales', wd: '3', site: 'careers', displayName: 'Thales Avionics' },  // 47 approvals (thales-avionics), 110 crawled URLs
+  { source: 'workday', slug: 'parsons-search', tenant: 'parsons', wd: '5', site: 'Search', displayName: 'Parsons Transportation' },  // 46 approvals (parsons-transportation-group), 1125 crawled URLs
+  { source: 'workday', slug: 'genesys-genesys', tenant: 'genesys', wd: '1', site: 'Genesys', displayName: 'Genesys Cloud Services' },  // 46 approvals (genesys-cloud-services), 40 crawled URLs
+  { source: 'workday', slug: 'athene-apollo_careers', tenant: 'athene', wd: '5', site: 'Apollo_Careers', displayName: 'Athene Annuity Life' },  // 45 approvals (athene-annuity-life-company), 147 crawled URLs
+  { source: 'workday', slug: 'rockymountain-rmi', tenant: 'rockymountain', wd: '1', site: 'RMI', displayName: 'Rocky Mountain Institute' },  // 44 approvals (rocky-mountain-institute), 18 crawled URLs
+  { source: 'workday', slug: 'brookfield-brookfield', tenant: 'brookfield', wd: '5', site: 'brookfield', displayName: 'Brookfield Asset Management' },  // 43 approvals (brookfield-asset-management), 379 crawled URLs
+  { source: 'workday', slug: 'brown-staff-careers-brown', tenant: 'brown', wd: '5', site: 'staff-careers-brown', displayName: 'Brown Brothers Harriman' },  // 43 approvals (brown-brothers-harriman), 89 crawled URLs
+  { source: 'workday', slug: 'wintrust-search', tenant: 'wintrust', wd: '1', site: 'Search', displayName: 'Wintrust Financial' },  // 43 approvals (wintrust-financial-corporation), 11 crawled URLs
+  { source: 'workday', slug: 'geisinger-geisingerexternal', tenant: 'geisinger', wd: '5', site: 'geisingerexternal', displayName: 'Geisinger System Services' },  // 41 approvals (geisinger-system-services), 28 crawled URLs
+  { source: 'workday', slug: 'transamerica-auk_jobsite', tenant: 'transamerica', wd: '5', site: 'AUK_JobSite', displayName: 'Transamerica Life Insurance' },  // 41 approvals (transamerica-life-insurance-company), 5 crawled URLs
+  { source: 'workday', slug: 'lonza-lonza_careers', tenant: 'lonza', wd: '3', site: 'Lonza_Careers', displayName: 'Lonza Houston' },  // 40 approvals (lonza-houston), 81 crawled URLs
+  { source: 'workday', slug: 'avera-avera-careers', tenant: 'avera', wd: '5', site: 'avera-careers', displayName: 'Avera Mckennan' },  // 39 approvals (avera-mckennan), 105 crawled URLs
+  { source: 'workday', slug: 'urban-urban-careers', tenant: 'urban', wd: '1', site: 'Urban-Careers', displayName: 'Urban Outfitters' },  // 39 approvals (urban-outfitters), 14 crawled URLs
+  { source: 'workday', slug: 'premera-premera', tenant: 'premera', wd: '5', site: 'premera', displayName: 'Premera Blue Cross' },  // 39 approvals (premera-blue-cross), 9 crawled URLs
+  { source: 'workday', slug: 'idexx-idexx', tenant: 'idexx', wd: '1', site: 'IDEXX', displayName: 'Idexx Laboratories' },  // 34 approvals (idexx-laboratories), 11 crawled URLs
+  { source: 'workday', slug: 'sunlife-experienced-jobs', tenant: 'sunlife', wd: '3', site: 'Experienced-Jobs', displayName: 'Sun Life Financial Services' },  // 34 approvals (sun-life-financial-services-company), 59 crawled URLs
+  { source: 'workday', slug: 'eversource-externalsite', tenant: 'eversource', wd: '1', site: 'ExternalSite', displayName: 'Eversource Energy Service' },  // 34 approvals (eversource-energy-service-company), 3 crawled URLs
+  { source: 'workday', slug: 'leidos-external', tenant: 'leidos', wd: '5', site: 'External', displayName: 'Leidos Engineering' },  // 32 approvals (leidos-engineering), 127 crawled URLs
+  { source: 'workday', slug: 'uniphore-uniphore', tenant: 'uniphore', wd: '503', site: 'Uniphore', displayName: 'Uniphore Technologies North' },  // 31 approvals (uniphore-technologies-north-america), 17 crawled URLs
+  { source: 'workday', slug: 'carmax-external', tenant: 'carmax', wd: '1', site: 'External', displayName: 'Carmax Enterprise Services' },  // 30 approvals (carmax-enterprise-services), 444 crawled URLs
+  { source: 'workday', slug: 'vanderlande-careers', tenant: 'vanderlande', wd: '3', site: 'careers', displayName: 'Vanderlande Industries' },  // 29 approvals (vanderlande-industries), 463 crawled URLs
+  { source: 'workday', slug: 'republic-republic', tenant: 'republic', wd: '5', site: 'Republic', displayName: 'Republic Services' },  // 29 approvals (republic-services), 4 crawled URLs
+  { source: 'workday', slug: 'sarepta-sarepta_external', tenant: 'sarepta', wd: '5', site: 'sarepta_external', displayName: 'Sarepta Therapeutics' },  // 29 approvals (sarepta-therapeutics), 17 crawled URLs
+  { source: 'workday', slug: 'priceline-priceline', tenant: 'priceline', wd: '1', site: 'Priceline', displayName: 'Priceline Com' },  // 29 approvals (priceline-com), 37 crawled URLs
+  { source: 'workday', slug: 'roswellpark-externalcareers', tenant: 'roswellpark', wd: '5', site: 'externalcareers', displayName: 'Roswell Park Cancer Institute' },  // 29 approvals (roswell-park-cancer-institute), 2 crawled URLs
+  { source: 'workday', slug: 'nature-externalcareers', tenant: 'nature', wd: '108', site: 'ExternalCareers', displayName: 'Nature Conservancy' },  // 26 approvals (nature-conservancy), 118 crawled URLs
+  { source: 'workday', slug: 'sartorius-sartoriuscareers', tenant: 'sartorius', wd: '3', site: 'sartoriuscareers', displayName: 'Sartorius Stedim North' },  // 26 approvals (sartorius-stedim-north-america), 9 crawled URLs
+  { source: 'workday', slug: 'goosehead-careers', tenant: 'goosehead', wd: '503', site: 'Careers', displayName: 'Goosehead Insurance Agency' },  // 25 approvals (goosehead-insurance-agency), 1 crawled URLs
+  { source: 'workday', slug: 'blueowl-blueowl', tenant: 'blueowl', wd: '1', site: 'blueowl', displayName: 'Blue Owl Capital' },  // 24 approvals (blue-owl-capital-holdings), 10 crawled URLs
+  { source: 'workday', slug: 'hysteryale-hyster-yalecareers', tenant: 'hysteryale', wd: '1', site: 'Hyster-YaleCareers', displayName: 'Hyster Yale Materials Handling' },  // 23 approvals (hyster-yale-materials-handling), 6 crawled URLs
+  { source: 'workday', slug: 'maersk-maersk_careers', tenant: 'maersk', wd: '3', site: 'Maersk_Careers', displayName: 'Maersk Logistics Services' },  // 21 approvals (maersk-logistics-services-usa), 222 crawled URLs
+  { source: 'workday', slug: 'richemont-richemont', tenant: 'richemont', wd: '3', site: 'richemont', displayName: 'Richemont North' },  // 21 approvals (richemont-north-america), 16 crawled URLs
+  { source: 'workday', slug: 'wholefoods-wholefoods', tenant: 'wholefoods', wd: '5', site: 'wholefoods', displayName: 'Whole Foods Market Services' },  // 21 approvals (whole-foods-market-services), 204 crawled URLs
+  { source: 'workday', slug: 'zelis-zeliscareers', tenant: 'zelis', wd: '1', site: 'ZelisCareers', displayName: 'Zelis Healthcare' },  // 21 approvals (zelis-healthcare), 6 crawled URLs
+  { source: 'workday', slug: 'dupont-jobs', tenant: 'dupont', wd: '5', site: 'Jobs', displayName: 'Dupont Specialty Products' },  // 21 approvals (dupont-specialty-products-usa), 2 crawled URLs
+  { source: 'workday', slug: 'evolent-external', tenant: 'evolent', wd: '1', site: 'External', displayName: 'Evolent Health' },  // 21 approvals (evolent-health), 12 crawled URLs
+  { source: 'workday', slug: 'airproducts-ap0001', tenant: 'airproducts', wd: '5', site: 'AP0001', displayName: 'Air Products Chemicals' },  // 20 approvals (air-products-chemicals), 267 crawled URLs
+  { source: 'workday', slug: 'cengage-cengagenorthamericacareers', tenant: 'cengage', wd: '5', site: 'CengageNorthAmericaCareers', displayName: 'Cengage Learning' },  // 20 approvals (cengage-learning), 44 crawled URLs
+  { source: 'workday', slug: 'transperfect-transperfect', tenant: 'transperfect', wd: '5', site: 'transperfect', displayName: 'Transperfect Translations' },  // 20 approvals (transperfect-translations-international), 18 crawled URLs
+  { source: 'workday', slug: 'greystar-external', tenant: 'greystar', wd: '1', site: 'External', displayName: 'Greystar Management Services' },  // 20 approvals (greystar-management-services), 14 crawled URLs
+  { source: 'workday', slug: 'interface-interface', tenant: 'interface', wd: '1', site: 'interface', displayName: 'Interface Rehab' },  // 20 approvals (interface-rehab), 4 crawled URLs
+  { source: 'workday', slug: 'baldwin-baldwin', tenant: 'baldwin', wd: '1', site: 'baldwin', displayName: 'Baldwin Group Colleague' },  // 19 approvals (baldwin-group-colleague), 6 crawled URLs
+  { source: 'workday', slug: 'oregon-sor_external_career_site', tenant: 'oregon', wd: '5', site: 'SOR_External_Career_Site', displayName: 'Oregon Institute' },  // 19 approvals (oregon-institute-technology), 268 crawled URLs
+  { source: 'workday', slug: 'encore-externalnew', tenant: 'encore', wd: '1', site: 'externalnew', displayName: 'Encore Consulting Services' },  // 19 approvals (encore-consulting-services), 5 crawled URLs
+  { source: 'workday', slug: 'amplify-amplify_careers', tenant: 'amplify', wd: '1', site: 'Amplify_Careers', displayName: 'Amplify Education' },  // 18 approvals (amplify-education), 13 crawled URLs
+  { source: 'workday', slug: 'championx-championx_external', tenant: 'championx', wd: '1', site: 'ChampionX_External', displayName: 'Championx Resources' },  // 18 approvals (championx-resources), 15 crawled URLs
+  { source: 'workday', slug: 'siemensgamesa-sgre', tenant: 'siemensgamesa', wd: '3', site: 'SGRE', displayName: 'Siemens Gamesa Renewable Energy' },  // 18 approvals (siemens-gamesa-renewable-energy), 19 crawled URLs
+  { source: 'workday', slug: 'forrester-careers', tenant: 'forrester', wd: '501', site: 'careers', displayName: 'Forrester Research' },  // 17 approvals (forrester-research), 10 crawled URLs
+  { source: 'workday', slug: 'granite-careers', tenant: 'granite', wd: '1', site: 'careers', displayName: 'Granite Telecommunications' },  // 17 approvals (granite-telecommunications), 17 crawled URLs
+  { source: 'workday', slug: 'primerica-pri', tenant: 'primerica', wd: '1', site: 'PRI', displayName: 'Primerica Life Insurance' },  // 17 approvals (primerica-life-insurance-company), 3 crawled URLs
+  { source: 'workday', slug: 'veritiv-veritivcareers', tenant: 'veritiv', wd: '5', site: 'VeritivCareers', displayName: 'Veritiv Operating' },  // 17 approvals (veritiv-operating-company), 2 crawled URLs
+  { source: 'workday', slug: 'franklintempleton-primary-external-1', tenant: 'franklintempleton', wd: '5', site: 'Primary-External-1', displayName: 'Franklin Templeton Companies' },  // 16 approvals (franklin-templeton-companies), 42 crawled URLs
+  { source: 'workday', slug: 'thrivent-external', tenant: 'thrivent', wd: '5', site: 'External', displayName: 'Thrivent Financial Lutherans' },  // 16 approvals (thrivent-financial-lutherans), 38 crawled URLs
+  { source: 'workday', slug: 'nidec-nidec', tenant: 'nidec', wd: '1', site: 'Nidec', displayName: 'Nidec Motor' },  // 16 approvals (nidec-motor-corporation), 9 crawled URLs
+  { source: 'workday', slug: 'chatham-chathamuniversity', tenant: 'chatham', wd: '12', site: 'ChathamUniversity', displayName: 'Chatham Financial' },  // 16 approvals (chatham-financial-corporation), 3 crawled URLs
+  { source: 'workday', slug: 'montage-montage_international', tenant: 'montage', wd: '1', site: 'Montage_International', displayName: 'Montage Semiconductor' },  // 16 approvals (montage-semiconductor), 5 crawled URLs
+  { source: 'workday', slug: 'clarivate-clarivate_careers', tenant: 'clarivate', wd: '3', site: 'Clarivate_Careers', displayName: 'Clarivate Analytics' },  // 15 approvals (clarivate-analytics-us), 69 crawled URLs
+  { source: 'workday', slug: 'greif-greif', tenant: 'greif', wd: '5', site: 'Greif', displayName: 'Greif Packaging' },  // 15 approvals (greif-packaging), 13 crawled URLs
+  { source: 'workday', slug: 'simmons-simmons-careers', tenant: 'simmons', wd: '504', site: 'Simmons-Careers', displayName: 'Simmons Prepared Foods' },  // 15 approvals (simmons-prepared-foods), 9 crawled URLs
+  { source: 'workday', slug: 'guggenheim-guggenheim_careers_campus', tenant: 'guggenheim', wd: '1', site: 'Guggenheim_Careers_Campus', displayName: 'Guggenheim Securities' },  // 15 approvals (guggenheim-securities), 13 crawled URLs
+  { source: 'workday', slug: 'richmond-student', tenant: 'richmond', wd: '5', site: 'student', displayName: 'Richmond Green' },  // 14 approvals (richmond-green), 5 crawled URLs
+  { source: 'workday', slug: 'heidelberg-careersheidelberg', tenant: 'heidelberg', wd: '502', site: 'careersHEIDELBERG', displayName: 'Heidelberg Materials' },  // 14 approvals (heidelberg-materials-us), 6 crawled URLs
+  { source: 'workday', slug: 'arbella-arbella', tenant: 'arbella', wd: '5', site: 'Arbella', displayName: 'Arbella Insurance' },  // 14 approvals (arbella-insurance-group), 1 crawled URLs
+  { source: 'workday', slug: 'enbridge-enbridge_careers', tenant: 'enbridge', wd: '3', site: 'enbridge_careers', displayName: 'Enbridge Employee Services' },  // 13 approvals (enbridge-employee-services), 78 crawled URLs
+  { source: 'workday', slug: 'oneok-oneok', tenant: 'oneok', wd: '1', site: 'ONEOK', displayName: 'Oneok Services' },  // 12 approvals (oneok-services-company), 114 crawled URLs
+  { source: 'workday', slug: 'peets-peets', tenant: 'peets', wd: '12', site: 'Peets', displayName: 'Peets Coffee' },  // 12 approvals (peets-coffee), 2 crawled URLs
+  { source: 'workday', slug: 'swinerton-swinerton_external_career', tenant: 'swinerton', wd: '1', site: 'Swinerton_External_Career', displayName: 'Swinerton Builders' },  // 12 approvals (swinerton-builders), 7 crawled URLs
+  { source: 'workday', slug: 'colliers-colliers-external-career-site', tenant: 'colliers', wd: '3', site: 'colliers-external-career-site', displayName: 'Colliers Engineering Design' },  // 11 approvals (colliers-engineering-design), 3 crawled URLs
+  { source: 'workday', slug: 'unilever-unilever_experienced_professionals', tenant: 'unilever', wd: '3', site: 'Unilever_Experienced_Professionals', displayName: 'Unilever United States' },  // 11 approvals (unilever-united-states), 113 crawled URLs
+  { source: 'workday', slug: 'prologis-prologis_external_careers', tenant: 'prologis', wd: '5', site: 'Prologis_External_Careers', displayName: 'Prologis Management' },  // 11 approvals (prologis-management), 10 crawled URLs
+  { source: 'workday', slug: 'spectrumhealth-corewellhealthcareers', tenant: 'spectrumhealth', wd: '5', site: 'CorewellHealthCareers', displayName: 'Spectrum Health Primary Care' },  // 11 approvals (spectrum-health-primary-care-partners), 99 crawled URLs
+  { source: 'workday', slug: 'topgolf-topgolfcareers', tenant: 'topgolf', wd: '501', site: 'TopgolfCareers', displayName: 'Topgolf Callaway Brands' },  // 11 approvals (topgolf-callaway-brands), 40 crawled URLs
+  { source: 'workday', slug: 'audubon-audubon', tenant: 'audubon', wd: '503', site: 'Audubon', displayName: 'Audubon Companies' },  // 11 approvals (audubon-companies), 115 crawled URLs
+  { source: 'workday', slug: 'netflix-netflix', tenant: 'netflix', wd: '1', site: 'Netflix', displayName: 'Netflix Global' },  // 11 approvals (netflix-global), 20 crawled URLs
+  { source: 'workday', slug: 'owens-occ', tenant: 'owens', wd: '1', site: 'OCC', displayName: 'Owens Minor Distribution' },  // 11 approvals (owens-minor-distribution), 37 crawled URLs
+  { source: 'workday', slug: 'cableone-cable_one_external_careers', tenant: 'cableone', wd: '1', site: 'Cable_One_External_Careers', displayName: 'Cable One Dba Sparklight' },  // 11 approvals (cable-one-dba-sparklight), 18 crawled URLs
+  { source: 'workday', slug: 'revantage-revantage', tenant: 'revantage', wd: '1', site: 'Revantage', displayName: 'Revantage Corporate Services' },  // 11 approvals (revantage-corporate-services), 83 crawled URLs
+  { source: 'workday', slug: 'altamed-careers', tenant: 'altamed', wd: '1', site: 'Careers', displayName: 'Altamed Health Services' },  // 11 approvals (altamed-health-services-corporation), 15 crawled URLs
+  { source: 'workday', slug: 'ameren-external', tenant: 'ameren', wd: '1', site: 'External', displayName: 'Ameren Services' },  // 11 approvals (ameren-services-company), 110 crawled URLs
+  { source: 'workday', slug: 'owensminor-omcareers', tenant: 'owensminor', wd: '1', site: 'OMCareers', displayName: 'Owens Minor Distribution' },  // 11 approvals (owens-minor-distribution), 19 crawled URLs
+  { source: 'workday', slug: 'sandvik-sandvik-jobs', tenant: 'sandvik', wd: '3', site: 'sandvik-jobs', displayName: 'Sandvik Mining Construction' },  // 10 approvals (sandvik-mining-construction-usa), 77 crawled URLs
+  { source: 'workday', slug: 'amcor-amcor_external_career_site', tenant: 'amcor', wd: '5', site: 'Amcor_External_Career_Site', displayName: 'Amcor Rigid Packaging' },  // 10 approvals (amcor-rigid-packaging-usa), 292 crawled URLs
+  { source: 'workday', slug: 'hummingbird-hummingbird', tenant: 'hummingbird', wd: '1', site: 'hummingbird', displayName: 'Hummingbird Teksystems' },  // 10 approvals (hummingbird-teksystems), 2 crawled URLs
+  { source: 'workday', slug: 'pennmutual-_penn-careers', tenant: 'pennmutual', wd: '1', site: '_penn-careers', displayName: 'Penn Mutual Life Insurance' },  // 10 approvals (penn-mutual-life-insurance-company), 19 crawled URLs
+  { source: 'workday', slug: 'martinmarietta-martin_marietta_careers', tenant: 'martinmarietta', wd: '5', site: 'Martin_Marietta_Careers', displayName: 'Martin Marietta Materials' },  // 10 approvals (martin-marietta-materials), 1 crawled URLs
+  { source: 'workday', slug: 'worldwide-external', tenant: 'worldwide', wd: '1', site: 'External', displayName: 'World Wide Professional' },  // 10 approvals (world-wide-professional-solutions), 19 crawled URLs
+  { source: 'workday', slug: 'kapsch-onestepahead_nam', tenant: 'kapsch', wd: '3', site: 'onestepahead_NAM', displayName: 'Kapsch Trafficcom' },  // 9 approvals (kapsch-trafficcom-usa), 19 crawled URLs
+  { source: 'workday', slug: 'barrywehmiller-bwcareers', tenant: 'barrywehmiller', wd: '1', site: 'BWCareers', displayName: 'Barry Wehmiller Companies' },  // 9 approvals (barry-wehmiller-companies), 74 crawled URLs
+  { source: 'workday', slug: 'northwest-northwest_careers', tenant: 'northwest', wd: '1', site: 'Northwest_Careers', displayName: 'Northwest Bank' },  // 9 approvals (northwest-bank), 2 crawled URLs
+  { source: 'workday', slug: 'novozymes-novonesis_careers', tenant: 'novozymes', wd: '103', site: 'Novonesis_Careers', displayName: 'Novozymes North' },  // 9 approvals (novozymes-north-america), 3 crawled URLs
+  { source: 'workday', slug: 'ferguson-ferguson_experienced', tenant: 'ferguson', wd: '1', site: 'Ferguson_Experienced', displayName: 'Ferguson Enterprises' },  // 9 approvals (ferguson-enterprises), 63 crawled URLs
+  { source: 'workday', slug: 'kansascity-jobs', tenant: 'kansascity', wd: '1', site: 'Jobs', displayName: 'Kansas City Southern Railway' },  // 9 approvals (kansas-city-southern-railway-company), 10 crawled URLs
+  { source: 'workday', slug: 'nvent-nvent', tenant: 'nvent', wd: '5', site: 'nVent', displayName: 'Nvent Management' },  // 8 approvals (nvent-management-company), 40 crawled URLs
+  { source: 'workday', slug: 'specialized-specialized_external_career_site', tenant: 'specialized', wd: '5', site: 'Specialized_External_Career_Site', displayName: 'Specialized Bicycle Components' },  // 8 approvals (specialized-bicycle-components), 6 crawled URLs
+  { source: 'workday', slug: 'xcelenergy-external', tenant: 'xcelenergy', wd: '1', site: 'External', displayName: 'Xcel Energy Services' },  // 8 approvals (xcel-energy-services), 153 crawled URLs
+  { source: 'workday', slug: 'chrobinson-chrobinson', tenant: 'chrobinson', wd: '5', site: 'CHRobinson', displayName: 'Ch Robinson Worldwide' },  // 8 approvals (ch-robinson-worldwide), 68 crawled URLs
+  { source: 'workday', slug: 'evergreen-evergreen_careers', tenant: 'evergreen', wd: '501', site: 'Evergreen_Careers', displayName: 'Evergreen Employee Management' },  // 8 approvals (evergreen-employee-management), 1 crawled URLs
+  { source: 'workday', slug: 'fujifilm-flb_cs', tenant: 'fujifilm', wd: '3', site: 'FLB_CS', displayName: 'Fujifilm Sonosite' },  // 8 approvals (fujifilm-sonosite), 3 crawled URLs
+  { source: 'workday', slug: 'carbon-carboncareers', tenant: 'carbon', wd: '504', site: 'carboncareers', displayName: 'Carbon Reduction Capital' },  // 8 approvals (carbon-reduction-capital), 2 crawled URLs
+  { source: 'workday', slug: 'lhoist-careers', tenant: 'lhoist', wd: '3', site: 'Careers', displayName: 'Lhoist North' },  // 7 approvals (lhoist-north-america), 72 crawled URLs
+  { source: 'workday', slug: 'benchmark-pgh_careers', tenant: 'benchmark', wd: '1', site: 'PGH_Careers', displayName: 'Benchmark Education' },  // 7 approvals (benchmark-education-company), 64 crawled URLs
+  { source: 'workday', slug: 'meredith-ext', tenant: 'meredith', wd: '5', site: 'EXT', displayName: 'Meredith Operations' },  // 7 approvals (meredith-operations-corporation), 51 crawled URLs
+  { source: 'workday', slug: 'ncino-ncinocareers', tenant: 'ncino', wd: '5', site: 'nCinoCareers', displayName: 'Ncino Opco' },  // 7 approvals (ncino-opco), 11 crawled URLs
+  { source: 'workday', slug: 'clark-clarkexternal', tenant: 'clark', wd: '503', site: 'clarkexternal', displayName: 'Clark Construction' },  // 7 approvals (clark-construction-group), 8 crawled URLs
+  { source: 'workday', slug: 'lazboy-lzbcareers', tenant: 'lazboy', wd: '1', site: 'LZBCareers', displayName: 'Lazboy Incorporated' },  // 7 approvals (lazboy-incorporated), 8 crawled URLs
+  { source: 'workday', slug: 'fugro-careers', tenant: 'fugro', wd: '3', site: 'Careers', displayName: 'Fugro Usa Marine' },  // 7 approvals (fugro-usa-marine), 78 crawled URLs
+  { source: 'workday', slug: 'firstadvantage-firstadvantage', tenant: 'firstadvantage', wd: '5', site: 'FirstAdvantage', displayName: 'First Advantage Background Services' },  // 7 approvals (first-advantage-background-services), 1 crawled URLs
+  { source: 'workday', slug: 'sonoco-corporatecareers', tenant: 'sonoco', wd: '1', site: 'CorporateCareers', displayName: 'Sonoco Products' },  // 7 approvals (sonoco-products), 6 crawled URLs
+  { source: 'workday', slug: 'americanfidelity-external', tenant: 'americanfidelity', wd: '5', site: 'External', displayName: 'American Fidelity Assurance' },  // 7 approvals (american-fidelity-assurance-company), 1 crawled URLs
+  { source: 'workday', slug: 'seminolehardrock-seminolehardrockcareers', tenant: 'seminolehardrock', wd: '503', site: 'seminolehardrockcareers', displayName: 'Seminole Hard Rock Digital' },  // 7 approvals (seminole-hard-rock-digital), 11 crawled URLs
+  { source: 'workday', slug: 'strada-careers', tenant: 'strada', wd: '12', site: 'Careers', displayName: 'Strada Professional Services' },  // 6 approvals (strada-professional-services), 2 crawled URLs
+  { source: 'workday', slug: 'trafigura-puma_energy_careers', tenant: 'trafigura', wd: '3', site: 'Puma_Energy_Careers', displayName: 'Trafigura Trading' },  // 6 approvals (trafigura-trading), 201 crawled URLs
+  { source: 'workday', slug: 'globelife-globe-life-careers', tenant: 'globelife', wd: '5', site: 'Globe-Life-Careers', displayName: 'Globe Life Accident Insurance' },  // 6 approvals (globe-life-accident-insurance-company), 4 crawled URLs
+  { source: 'workday', slug: 'arcticwolf-external', tenant: 'arcticwolf', wd: '1', site: 'External', displayName: 'Arctic Wolf Networks' },  // 6 approvals (arctic-wolf-networks), 95 crawled URLs
+  { source: 'workday', slug: 'topbuild-cci_external', tenant: 'topbuild', wd: '5', site: 'CCI_External', displayName: 'Topbuild Support Services' },  // 6 approvals (topbuild-support-services), 1 crawled URLs
+  { source: 'workday', slug: 'sulzer-sulzerjobs', tenant: 'sulzer', wd: '502', site: 'SulzerJobs', displayName: 'Sulzer Chemtech' },  // 6 approvals (sulzer-chemtech-usa), 14 crawled URLs
+  { source: 'workday', slug: 'ipsen-ipsen_careers', tenant: 'ipsen', wd: '103', site: 'Ipsen_Careers', displayName: 'Ipsen Biopharmaceuticals' },  // 6 approvals (ipsen-biopharmaceuticals), 13 crawled URLs
+  { source: 'workday', slug: 'wegmans-wegmans', tenant: 'wegmans', wd: '1', site: 'Wegmans', displayName: 'Wegmans Food Markets' },  // 6 approvals (wegmans-food-markets), 2 crawled URLs
+  { source: 'workday', slug: 'masterbrand-careers', tenant: 'masterbrand', wd: '12', site: 'Careers', displayName: 'Masterbrand Cabinets' },  // 6 approvals (masterbrand-cabinets), 10 crawled URLs
+  { source: 'workday', slug: 'cerence-cerence', tenant: 'cerence', wd: '5', site: 'Cerence', displayName: 'Cerence Operating' },  // 6 approvals (cerence-operating-company), 20 crawled URLs
+  { source: 'workday', slug: 'chghealthcare-external', tenant: 'chghealthcare', wd: '1', site: 'External', displayName: 'Chg Healthcare Services' },  // 6 approvals (chg-healthcare-services), 10 crawled URLs
+  { source: 'workday', slug: 'reputation-external', tenant: 'reputation', wd: '1', site: 'External', displayName: 'Reputation Com' },  // 6 approvals (reputation-com), 5 crawled URLs
+  { source: 'workday', slug: 'sharecare-sharecare_careers', tenant: 'sharecare', wd: '1', site: 'Sharecare_Careers', displayName: 'Sharecare Operating' },  // 6 approvals (sharecare-operating-company), 33 crawled URLs
+  { source: 'workday', slug: 'denver-ccd-denver-denvergov-csc_jobs-civil_service_jobs-police_jobs-fire_jobs', tenant: 'denver', wd: '1', site: 'CCD-denver-denvergov-CSC_Jobs-Civil_service_jobs-Police_Jobs-Fire_Jobs', displayName: 'Denver Technologies Warp' },  // 6 approvals (denver-technologies-warp), 39 crawled URLs
+  { source: 'workday', slug: 'ceritypartners-ceritypartnerscareers', tenant: 'ceritypartners', wd: '12', site: 'ceritypartnerscareers', displayName: 'Cerity Partners Management' },  // 5 approvals (cerity-partners-management), 9 crawled URLs
+  { source: 'workday', slug: 'essity-job_opportunities', tenant: 'essity', wd: '3', site: 'Job_opportunities', displayName: 'Essity North' },  // 5 approvals (essity-north-america), 51 crawled URLs
+  { source: 'workday', slug: 'interdigital-interdigital_career', tenant: 'interdigital', wd: '5', site: 'InterDigital_Career', displayName: 'Interdigital Communications' },  // 5 approvals (interdigital-communications), 1 crawled URLs
+  { source: 'workday', slug: 'whataburger-wab_careers', tenant: 'whataburger', wd: '5', site: 'WAB_CAREERS', displayName: 'Whataburger Restaurants' },  // 5 approvals (whataburger-restaurants), 4 crawled URLs
+  { source: 'workday', slug: 'ineos-ineoscareers', tenant: 'ineos', wd: '503', site: 'INEOScareers', displayName: 'Ineos Styrolution' },  // 5 approvals (ineos-styrolution-america), 13 crawled URLs
+  { source: 'workday', slug: 'nelnet-mynelnet', tenant: 'nelnet', wd: '1', site: 'MyNelnet', displayName: 'Nelnet Business' },  // 5 approvals (nelnet-business-solutions), 56 crawled URLs
+  { source: 'workday', slug: 'uoflhealth-uoflhealthcareers', tenant: 'uoflhealth', wd: '1', site: 'UofLHealthCareers', displayName: 'Uofl Health Louisville' },  // 5 approvals (uofl-health-louisville), 3 crawled URLs
+  { source: 'workday', slug: 'shell-shellcareers', tenant: 'shell', wd: '3', site: 'ShellCareers', displayName: 'Shell Exploration Production' },  // 5 approvals (shell-exploration-production-company), 206 crawled URLs
+  { source: 'workday', slug: 'solera-global_career_site', tenant: 'solera', wd: '5', site: 'Global_Career_Site', displayName: 'Solera Health' },  // 5 approvals (solera-health), 27 crawled URLs
+  { source: 'workday', slug: 'connect-ztsystemscareers', tenant: 'connect', wd: '1', site: 'ztsystemscareers', displayName: 'Connect Media Networks' },  // 5 approvals (connect-media-networks), 2 crawled URLs
+  { source: 'workday', slug: 'amherst-amherst_jobs', tenant: 'amherst', wd: '5', site: 'Amherst_Jobs', displayName: 'Amherst Wilder Foundation' },  // 5 approvals (amherst-wilder-foundation), 55 crawled URLs
+  { source: 'workday', slug: 'academy-careers', tenant: 'academy', wd: '1', site: 'Careers', displayName: 'Academy Excellence' },  // 4 approvals (academy-excellence), 164 crawled URLs
+  { source: 'workday', slug: 'dickinson-jobs', tenant: 'dickinson', wd: '108', site: 'Jobs', displayName: 'Dickinson Wright Pllc' },  // 4 approvals (dickinson-wright-pllc), 5 crawled URLs
+  { source: 'workday', slug: 'selfhelp-self_help_careers', tenant: 'selfhelp', wd: '108', site: 'SELF_HELP_CAREERS', displayName: 'Selfhelp Community Services' },  // 4 approvals (selfhelp-community-services), 5 crawled URLs
+  { source: 'workday', slug: 'saintfrancis-external', tenant: 'saintfrancis', wd: '115', site: 'External', displayName: 'Saint Francis Medical' },  // 4 approvals (saint-francis-medical-partners), 73 crawled URLs
+  { source: 'workday', slug: 'sunriseseniorliving-sunrise_ext_careers', tenant: 'sunriseseniorliving', wd: '12', site: 'sunrise_ext_careers', displayName: 'Sunrise Senior Living Management' },  // 4 approvals (sunrise-senior-living-management), 8 crawled URLs
+  { source: 'workday', slug: 'tomtom-tt_external_careers', tenant: 'tomtom', wd: '3', site: 'TT_External_Careers', displayName: 'Tomtom North' },  // 4 approvals (tomtom-north-america), 1 crawled URLs
+  { source: 'workday', slug: 'hagerty-hagerty', tenant: 'hagerty', wd: '5', site: 'hagerty', displayName: 'Hagerty Management' },  // 4 approvals (hagerty-management), 13 crawled URLs
+  { source: 'workday', slug: 'aviva-external', tenant: 'aviva', wd: '1', site: 'External', displayName: 'Aviva Natural Supplements' },  // 4 approvals (aviva-natural-supplements), 43 crawled URLs
+  { source: 'workday', slug: 'mimecast-mimecast-careers', tenant: 'mimecast', wd: '5', site: 'Mimecast-Careers', displayName: 'Mimecast North' },  // 4 approvals (mimecast-north-america), 1 crawled URLs
+  { source: 'workday', slug: 'nexstar-nexstar', tenant: 'nexstar', wd: '5', site: 'nexstar', displayName: 'Nexstar Media' },  // 4 approvals (nexstar-media), 44 crawled URLs
+  { source: 'workday', slug: 'oceanspray-oceansprayjobs', tenant: 'oceanspray', wd: '5', site: 'OceanSprayJobs', displayName: 'Ocean Spray Cranberries' },  // 4 approvals (ocean-spray-cranberries), 3 crawled URLs
+  { source: 'workday', slug: 'patagonia-pwcareers', tenant: 'patagonia', wd: '503', site: 'PWCareers', displayName: 'Patagonia Health' },  // 4 approvals (patagonia-health), 31 crawled URLs
+  { source: 'workday', slug: 'graybar-careers', tenant: 'graybar', wd: '1', site: 'Careers', displayName: 'Graybar Electric' },  // 4 approvals (graybar-electric-company), 15 crawled URLs
+  { source: 'workday', slug: 'optioncare-navenhealth', tenant: 'optioncare', wd: '1', site: 'NavenHealth', displayName: 'Option Care Enterprises' },  // 4 approvals (option-care-enterprises), 17 crawled URLs
+  { source: 'workday', slug: 'chagee-external', tenant: 'chagee', wd: '102', site: 'External', displayName: 'Chagee Ca' },  // 4 approvals (chagee-ca), 1 crawled URLs
+  { source: 'workday', slug: 'endurance-sompointernational', tenant: 'endurance', wd: '103', site: 'sompointernational', displayName: 'Endurance Services' },  // 4 approvals (endurance-services-limited), 2 crawled URLs
+  { source: 'workday', slug: 'cenovus-careers', tenant: 'cenovus', wd: '3', site: 'careers', displayName: 'Cenovus Services' },  // 4 approvals (cenovus-services), 47 crawled URLs
+  { source: 'workday', slug: 'stewart-external', tenant: 'stewart', wd: '1', site: 'External', displayName: 'Stewart Stevenson' },  // 4 approvals (stewart-stevenson), 9 crawled URLs
+  { source: 'workday', slug: 'rentschler-rentschler_career', tenant: 'rentschler', wd: '3', site: 'Rentschler_Career', displayName: 'Rentschler Biopharma' },  // 4 approvals (rentschler-biopharma), 27 crawled URLs
+  { source: 'workday', slug: 'essex-essexcareers', tenant: 'essex', wd: '5', site: 'essexcareers', displayName: 'Essex Lake' },  // 4 approvals (essex-lake-group), 1 crawled URLs
+  { source: 'workday', slug: 'cyrusone-cyrusonecareerportal', tenant: 'cyrusone', wd: '1', site: 'CyrusOneCareerPortal', displayName: 'Cyrusone Management Services' },  // 4 approvals (cyrusone-management-services), 11 crawled URLs
+  { source: 'workday', slug: 'terex-terexcareers', tenant: 'terex', wd: '1', site: 'terexcareers', displayName: 'Terex South Dakota' },  // 4 approvals (terex-south-dakota), 1 crawled URLs
+  { source: 'workday', slug: 'adams-asu', tenant: 'adams', wd: '1', site: 'ASU', displayName: 'Adams Street' },  // 3 approvals (adams-street-partners), 4 crawled URLs
+  { source: 'workday', slug: 'fticonsulting-fticonsultingcareers', tenant: 'fticonsulting', wd: '108', site: 'FTIConsultingCareers', displayName: 'Fti Consulting Sc' },  // 3 approvals (fti-consulting-sc), 36 crawled URLs
+  { source: 'workday', slug: 'valleyhealth-valley_health_system_careers_', tenant: 'valleyhealth', wd: '12', site: 'valley_health_system_careers_', displayName: 'Valley Health Team' },  // 3 approvals (valley-health-team), 30 crawled URLs
+  { source: 'workday', slug: 'diageo-diageo_careers', tenant: 'diageo', wd: '3', site: 'Diageo_Careers', displayName: 'Diageo Americas Supply' },  // 3 approvals (diageo-americas-supply), 209 crawled URLs
+  { source: 'workday', slug: 'elringklinger-external', tenant: 'elringklinger', wd: '3', site: 'External', displayName: 'Elringklinger Automotive Manufacturing' },  // 3 approvals (elringklinger-automotive-manufacturing), 2 crawled URLs
+  { source: 'workday', slug: 'lombardodier-lombard_odier_careers', tenant: 'lombardodier', wd: '3', site: 'Lombard_Odier_Careers', displayName: 'Lombard Odier Asset Management' },  // 3 approvals (lombard-odier-asset-management-usa), 34 crawled URLs
+  { source: 'workday', slug: 'brinks-brinkscareersus', tenant: 'brinks', wd: '5', site: 'BrinksCareersUS', displayName: 'Brinks Incorporated' },  // 3 approvals (brinks-incorporated), 175 crawled URLs
+  { source: 'workday', slug: 'firstquality-firstquality', tenant: 'firstquality', wd: '5', site: 'FIRSTQUALITY', displayName: 'First Quality Enterprises' },  // 3 approvals (first-quality-enterprises), 5 crawled URLs
+  { source: 'workday', slug: 'learfield-learfield', tenant: 'learfield', wd: '5', site: 'Learfield', displayName: 'Learfield Communications' },  // 3 approvals (learfield-communications), 7 crawled URLs
+  { source: 'workday', slug: 'monarch-monarch', tenant: 'monarch', wd: '5', site: 'Monarch', displayName: 'Monarch Air' },  // 3 approvals (monarch-air-group), 4 crawled URLs
+  { source: 'workday', slug: 'oxford-lillypulitzer', tenant: 'oxford', wd: '5', site: 'LillyPulitzer', displayName: 'Oxford Economics' },  // 3 approvals (oxford-economics-usa), 24 crawled URLs
+  { source: 'workday', slug: 'porch-careers', tenant: 'porch', wd: '1', site: 'careers', displayName: 'Porch Com' },  // 3 approvals (porch-com), 12 crawled URLs
+  { source: 'workday', slug: 'chemours-chemours', tenant: 'chemours', wd: '103', site: 'Chemours', displayName: 'Chemours Company Fc' },  // 3 approvals (chemours-company-fc), 12 crawled URLs
+  { source: 'workday', slug: 'wabtec-wabtec_careers', tenant: 'wabtec', wd: '1', site: 'wabtec_careers', displayName: 'Wabtec Railway Electronics' },  // 3 approvals (wabtec-railway-electronics), 36 crawled URLs
+  { source: 'workday', slug: 'starz-starz', tenant: 'starz', wd: '5', site: 'Starz', displayName: 'Starz Entertainment' },  // 3 approvals (starz-entertainment), 13 crawled URLs
+  { source: 'workday', slug: 'bethany-bethanycareers', tenant: 'bethany', wd: '10', site: 'bethanycareers', displayName: 'Bethany Christian Services' },  // 3 approvals (bethany-christian-services), 1 crawled URLs
+  { source: 'workday', slug: 'pentair-pentair_careers', tenant: 'pentair', wd: '5', site: 'pentair_careers', displayName: 'Pentair Management' },  // 3 approvals (pentair-management-company), 9 crawled URLs
+  { source: 'workday', slug: 'saputo-saputo_external_careers', tenant: 'saputo', wd: '5', site: 'Saputo_External_Careers', displayName: 'Saputo Cheese' },  // 3 approvals (saputo-cheese-usa), 39 crawled URLs
+  { source: 'workday', slug: 'ensign-snpcareersite', tenant: 'ensign', wd: '1', site: 'SNPCareerSite', displayName: 'Ensign Services' },  // 3 approvals (ensign-services), 3 crawled URLs
+  { source: 'workday', slug: 'maricopa-mc_external', tenant: 'maricopa', wd: '1', site: 'MC_External', displayName: 'Maricopa Association Governments' },  // 3 approvals (maricopa-association-governments), 8 crawled URLs
+  { source: 'workday', slug: 'ultradent-careers', tenant: 'ultradent', wd: '1', site: 'careers', displayName: 'Ultradent Products' },  // 3 approvals (ultradent-products), 1 crawled URLs

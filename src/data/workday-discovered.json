@@ -1,0 +1,129 @@
+{
+ "generatedAt": "2026-11-24T22:38:26.501Z",
+ "crawls": [
+  "CC-MAIN-2026-47",
+  "CC-MAIN-2026-43",
+  "CC-MAIN-2026-39"
+ ],
+ "companies": [
+  {
+   "tenant": "7eleven",
+   "wd": "3",
+   "site": "7eleven",
+   "displayName": "7eleven",
+   "sponsor": "7eleven",
+   "approvals": 177,
+   "softwareHits": 0,
+   "usOnFirstPage": 0
+  },
+  {
+   "tenant": "asml",
+   "wd": "3",
+   "site": "asmlext1",
+   "displayName": "Asml Us Lp Us20",
+   "legalName": "ASML US, LP. (US20)",
+   "sponsor": "asml-us-lp",
+   "approvals": 509,
+   "softwareHits": 238,
+   "usOnFirstPage": 12
+  },
+  {
+   "tenant": "bdo",
+   "wd": "3",
+   "site": "BDO",
+   "displayName": "Bdo Canada",
+   "legalName": "BDO Canada LLP",
+   "sponsor": "bdo-usa",
+   "approvals": 141,
+   "softwareHits": 16,
+   "usOnFirstPage": 0
+  },
+  {
+   "tenant": "cohesity",
+   "wd": "5",
+   "site": "cohesity_careers",
+   "displayName": "Cohesity India Private",
+   "legalName": "Cohesity India Private Limited",
+   "sponsor": "cohesity",
+   "approvals": 225,
+   "softwareHits": 40,
+   "usOnFirstPage": 5
+  },
+  {
+   "tenant": "equifax",
+   "wd": "5",
+   "site": "External",
+   "displayName": "0020 Equifax",
+   "legalName": "0020 Equifax, Inc",
+   "sponsor": "equifax",
+   "approvals": 394,
+   "softwareHits": 65,
+   "usOnFirstPage": 10
+  },
+  {
+   "tenant": "equinix",
+   "wd": "1",
+   "site": "External",
+   "displayName": "00454 Equinix India Professional Services Private",
+   "legalName": "00454 Equinix India Professional Services Private Limited",
+   "sponsor": "equinix",
+   "approvals": 219,
+   "softwareHits": 82,
+   "usOnFirstPage": 4
+  },
+  {
+   "tenant": "fca",
+   "wd": "3",
+   "site": "FCA_earlycareers",
+   "displayName": "Fca",
+   "sponsor": "fca-us",
+   "approvals": 457,
+   "softwareHits": 0,
+   "usOnFirstPage": 0
+  },
+  {
+   "tenant": "iqvia",
+   "wd": "1",
+   "site": "IQVIA",
+   "displayName": "Iqvia Analytics Services Private Limited In03",
+   "legalName": "IQVIA Analytics Services Private Limited (IN03)",
+   "sponsor": "iqvia",
+   "approvals": 251,
+   "softwareHits": 153,
+   "usOnFirstPage": 3
+  },
+  {
+   "tenant": "nike",
+   "wd": "1",
+   "site": "nke",
+   "displayName": "Nike India Technology Center Private",
+   "legalName": "NIKE India Technology Center Private Limited",
+   "sponsor": "nike",
+   "approvals": 481,
+   "softwareHits": 81,
+   "usOnFirstPage": 5
+  },
+  {
+   "tenant": "ohiohealth",
+   "wd": "5",
+   "site": "OhioHealthJobs",
+   "displayName": "010 Ohiohealth",
+   "legalName": "010 OhioHealth Corporation",
+   "sponsor": "ohiohealth",
+   "approvals": 199,
+   "softwareHits": 12,
+   "usOnFirstPage": 3
+  },
+  {
+   "tenant": "tmobile",
+   "wd": "1",
+   "site": "External",
+   "displayName": "T Mobile",
+   "legalName": "T-Mobile USA, Inc.",
+   "sponsor": "tmobile-usa",
+   "approvals": 875,
+   "softwareHits": 119,
+   "usOnFirstPage": 11
+  }
+ ]
+}
