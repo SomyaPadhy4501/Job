@@ -13,7 +13,7 @@ use axum::Json;
 use axum::body::Body;
 use axum::extract::multipart::MultipartRejection;
 use axum::extract::{Multipart, Path, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -22,7 +22,7 @@ use uuid::Uuid;
 use accounts::crypto::Field;
 use accounts::parser::{PARSER_VERSION, ParsedResume, extract_text, parse_resume};
 use accounts::tags::{SUGGESTED_TAGS, normalize_tags, normalize_title, split_tag_field};
-use accounts::token::sha256;
+use accounts::token::{hex, sha256};
 use accounts::upload::{
     FileKind, MAX_FILE_BYTES, UploadError, check_file, default_title, sanitize_file_name,
 };
@@ -34,6 +34,20 @@ use crate::housekeeping::delete_objects;
 use crate::http::{JsonBody, attachment, parse_id, this_month, today};
 
 const PARSE_TIMEOUT: Duration = Duration::from_secs(10);
+/// LaTeX source for one resume. Real resumes are 5-20 KB.
+pub const MAX_SOURCE_BYTES: usize = 100 * 1024;
+
+fn check_source(source: &str) -> ApiResult<()> {
+    if source.len() > MAX_SOURCE_BYTES {
+        return Err(ApiError::TooLarge(
+            "The LaTeX source can be at most 100 KB.".into(),
+        ));
+    }
+    if source.trim().is_empty() {
+        return Err(ApiError::bad("The LaTeX source is empty."));
+    }
+    Ok(())
+}
 
 /// "the file is empty" → "The file is empty."
 pub fn sentence(e: impl std::fmt::Display) -> String {
@@ -153,8 +167,8 @@ pub async fn upload(
     let mut mp = multipart
         .map_err(|_| ApiError::Unsupported("Upload the file as multipart/form-data.".into()))?;
 
-    let (mut file, mut file_name, mut title, mut tags_raw) =
-        (None::<Vec<u8>>, String::new(), None, None);
+    let (mut file, mut file_name, mut title, mut tags_raw, mut source) =
+        (None::<Vec<u8>>, String::new(), None, None, None::<String>);
     while let Some(field) = mp.next_field().await.map_err(multipart_error)? {
         match field.name() {
             Some("file") => {
@@ -167,8 +181,12 @@ pub async fn upload(
             }
             Some("title") => title = Some(field.text().await.map_err(multipart_error)?),
             Some("tags") => tags_raw = Some(field.text().await.map_err(multipart_error)?),
+            Some("source") => source = Some(field.text().await.map_err(multipart_error)?),
             _ => {}
         }
+    }
+    if let Some(src) = &source {
+        check_source(src)?;
     }
     let bytes = file.ok_or_else(|| ApiError::bad("Choose a file to upload."))?;
     let kind = check_file(&bytes).map_err(upload_error)?;
@@ -255,6 +273,13 @@ pub async fn upload(
     }
     db::mark_resume_stored(pool, user_id, id).await?;
     db::audit(pool, Some(user_id), "resume_upload").await?;
+    // Made in the LaTeX editor: keep the source with the PDF it compiled to.
+    if let Some(src) = &source {
+        let enc = state
+            .keyring()?
+            .encrypt(Field::ResumeSource, &user_id, src.as_bytes());
+        db::put_source(pool, id, &enc, Some(&hex(&sha))).await?;
+    }
 
     let (_, parsed) = parse_and_store(&state, user_id, id, kind, bytes).await?;
     // The first readable resume fills an empty profile straight away.
@@ -403,6 +428,217 @@ pub async fn reparse(
         .await?
         .ok_or(ApiError::NotFound)?;
     Ok(Json(json!({ "resume": resume, "parsed": parsed })))
+}
+
+/// `PUT /api/me/resumes/{id}/latex`: a save from the LaTeX editor. Replaces
+/// the resume's PDF (title, tags and default stay) and stores the source it
+/// was compiled from, in one request so they can't drift apart.
+///
+/// Multipart: `file` (the PDF) and `source`. Optional `If-Match: <fileSha256>`
+/// refuses the save if the resume changed since the editor loaded it.
+pub async fn save_latex(
+    State(state): State<AppState>,
+    signed: Signed,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    multipart: Result<Multipart, MultipartRejection>,
+) -> ApiResult<Json<Value>> {
+    let id = parse_id(&id)?;
+    let pool = state.pool()?;
+    let keys = state.keyring()?;
+    if !state.storage.is_enabled() {
+        return Err(ApiError::Unavailable(
+            "Resume uploads aren't available on this server yet.".into(),
+        ));
+    }
+    let mut mp = multipart
+        .map_err(|_| ApiError::Unsupported("Send the PDF as multipart/form-data.".into()))?;
+    let (mut file, mut source) = (None::<Vec<u8>>, None::<String>);
+    while let Some(field) = mp.next_field().await.map_err(multipart_error)? {
+        match field.name() {
+            Some("file") => {
+                let bytes = field.bytes().await.map_err(multipart_error)?;
+                if bytes.len() > MAX_FILE_BYTES {
+                    return Err(ApiError::TooLarge("Files can be at most 4 MB.".into()));
+                }
+                file = Some(bytes.to_vec());
+            }
+            Some("source") => source = Some(field.text().await.map_err(multipart_error)?),
+            _ => {}
+        }
+    }
+    let bytes = file.ok_or_else(|| ApiError::bad("The compiled PDF is missing."))?;
+    let source = source.ok_or_else(|| ApiError::bad("The LaTeX source is missing."))?;
+    check_source(&source)?;
+    let kind = check_file(&bytes).map_err(upload_error)?;
+    if kind != FileKind::Pdf {
+        return Err(ApiError::Unsupported("Save the compiled PDF.".into()));
+    }
+    let if_match = headers
+        .get(header::IF_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.trim().trim_matches('"').to_ascii_lowercase());
+    let user_id = signed.user.id;
+    let sha = sha256(&bytes);
+    let sha_hex = hex(&sha);
+    let size = bytes.len() as i64;
+    let encrypted = keys.encrypt(Field::ResumeSource, &user_id, source.as_bytes());
+    let c = &state.config;
+
+    // Checks and quota, under locks on the user and the resume.
+    let mut tx = pool.begin().await.map_err(db::DbError::from)?;
+    db::lock_user(&mut tx, user_id).await?;
+    let resume = db::lock_resume(&mut tx, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    if if_match.as_deref().is_some_and(|m| m != resume.file_sha256) {
+        return Err(ApiError::Conflict(
+            "This resume changed since you opened it. Reload to get the latest version.".into(),
+        ));
+    }
+    if sha_hex == resume.file_sha256 {
+        // Same PDF: only the source may have changed. No quota used.
+        db::put_source(&mut *tx, id, &encrypted, Some(&sha_hex)).await?;
+        tx.commit().await.map_err(db::DbError::from)?;
+        let resume = db::get_resume(pool, user_id, id)
+            .await?
+            .ok_or(ApiError::NotFound)?;
+        return Ok(Json(json!({ "resume": resume, "unchanged": true })));
+    }
+    if db::resume_by_sha(&mut *tx, user_id, &sha)
+        .await?
+        .is_some_and(|other| other != id)
+    {
+        return Err(ApiError::Conflict(
+            "Another of your resumes already has exactly this PDF.".into(),
+        ));
+    }
+    let usage = db::resume_usage(&mut *tx, user_id).await?;
+    if usage.bytes - i64::from(resume.size_bytes) + size > c.max_user_bytes {
+        return Err(ApiError::Forbidden(
+            "Your resume storage is full. Delete a resume first.".into(),
+        ));
+    }
+    let subject = format!("user:{user_id}");
+    if db::get_counter(&mut *tx, &subject, "replace", &today()).await? >= c.replaces_per_day {
+        return Err(ApiError::TooMany(format!(
+            "You can save {} times a day. Try again tomorrow.",
+            c.replaces_per_day
+        )));
+    }
+    if db::total_resume_bytes(&mut *tx).await? - i64::from(resume.size_bytes) + size
+        > c.max_storage_bytes
+    {
+        return Err(ApiError::Unavailable(
+            "Saving is paused for now. Try again later.".into(),
+        ));
+    }
+    db::bump_counter(&mut *tx, &subject, "replace", &today(), 1).await?;
+    let new_key = format!("resumes/{user_id}/{}", Uuid::new_v4());
+    // If anything below fails, the daily cleanup deletes the new object.
+    db::reserve_object(&mut *tx, &new_key).await?;
+    tx.commit().await.map_err(db::DbError::from)?;
+
+    state
+        .storage
+        .put(&new_key, bytes.clone(), kind.mime())
+        .await?;
+
+    let file_name = sanitize_file_name(&resume.file_name, kind);
+    let mut tx = pool.begin().await.map_err(db::DbError::from)?;
+    let switched = db::replace_resume_file(
+        &mut *tx,
+        user_id,
+        id,
+        &resume.object_key,
+        &db::ReplacedFile {
+            file_name: &file_name,
+            mime_type: kind.mime(),
+            size_bytes: size as i32,
+            sha256: &sha,
+            object_key: &new_key,
+        },
+    )
+    .await
+    .map_err(|e| match e {
+        db::DbError::Conflict(_) => {
+            ApiError::Conflict("Another of your resumes already has exactly this PDF.".into())
+        }
+        other => other.into(),
+    })?;
+    if !switched {
+        return Err(ApiError::Conflict(
+            "This resume changed while saving. Reload and try again.".into(),
+        ));
+    }
+    db::put_source(&mut *tx, id, &encrypted, Some(&sha_hex)).await?;
+    db::deletion_done(&mut *tx, &new_key).await?;
+    tx.commit().await.map_err(db::DbError::from)?;
+
+    // The trigger queued the old file; delete it now (the cleanup retries).
+    delete_objects(&state, std::slice::from_ref(&resume.object_key)).await;
+    db::audit(pool, Some(user_id), "resume_replace").await?;
+    let (_, parsed) = parse_and_store(&state, user_id, id, kind, bytes).await?;
+    let resume = db::get_resume(pool, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(json!({ "resume": resume, "parsed": parsed })))
+}
+
+/// `GET /api/me/resumes/{id}/source`: the LaTeX source, decrypted.
+pub async fn get_source(
+    State(state): State<AppState>,
+    signed: Signed,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let id = parse_id(&id)?;
+    let user_id = signed.user.id;
+    let row = db::get_source(state.pool()?, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let source = state
+        .keyring()?
+        .decrypt(Field::ResumeSource, &user_id, &row.source)?;
+    let source = String::from_utf8(source).map_err(|_| ApiError::Internal)?;
+    let updated_at = row
+        .updated_at
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_default();
+    Ok(Json(json!({
+        "source": source,
+        "compiledSha256": row.compiled_sha256,
+        "updatedAt": updated_at,
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct SourceBody {
+    source: String,
+}
+
+/// `PUT /api/me/resumes/{id}/source`: saves the source alone ("compile
+/// later"). The resume's PDF is then marked out of date.
+pub async fn put_source(
+    State(state): State<AppState>,
+    signed: Signed,
+    Path(id): Path<String>,
+    JsonBody(body): JsonBody<SourceBody>,
+) -> ApiResult<Json<Value>> {
+    let id = parse_id(&id)?;
+    check_source(&body.source)?;
+    let pool = state.pool()?;
+    let user_id = signed.user.id;
+    db::get_resume(pool, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let enc = state
+        .keyring()?
+        .encrypt(Field::ResumeSource, &user_id, body.source.as_bytes());
+    db::put_source(pool, id, &enc, None).await?;
+    let resume = db::get_resume(pool, user_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(json!({ "resume": resume })))
 }
 
 #[cfg(test)]

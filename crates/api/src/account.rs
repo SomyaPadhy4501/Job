@@ -90,9 +90,22 @@ pub async fn export(State(state): State<AppState>, signed: Signed) -> ApiResult<
     let mut resumes = Vec::new();
     for r in db::list_resumes(pool, user_id).await? {
         let parsed = parsed_of(&state, user_id, &r)?;
+        // LaTeX source, for resumes made in the editor (at most 100 KB each).
+        let latex = match db::get_source(pool, user_id, r.id).await? {
+            Some(row) => Some(
+                String::from_utf8(state.keyring()?.decrypt(
+                    accounts::crypto::Field::ResumeSource,
+                    &user_id,
+                    &row.source,
+                )?)
+                .map_err(|_| ApiError::Internal)?,
+            ),
+            None => None,
+        };
         resumes.push(json!({
             "resume": r,
             "parsed": parsed,
+            "latexSource": latex,
             "download": format!("/api/me/resumes/{}/file", r.id),
         }));
     }

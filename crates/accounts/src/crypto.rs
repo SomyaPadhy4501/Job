@@ -45,6 +45,7 @@ pub enum Field {
     ProfileData,
     ResumeParsed,
     AnswerEntry,
+    ResumeSource,
 }
 
 impl Field {
@@ -53,6 +54,7 @@ impl Field {
             Field::ProfileData => "profiles.data",
             Field::ResumeParsed => "resumes.parsed",
             Field::AnswerEntry => "answers.entry",
+            Field::ResumeSource => "resume_sources.source",
         }
     }
 }

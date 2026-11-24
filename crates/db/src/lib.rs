@@ -383,11 +383,21 @@ pub struct Resume {
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
     pub updated_at: OffsetDateTime,
+    /// SHA-256 of the file, hex. The LaTeX editor sends it back as `If-Match`.
+    pub file_sha256: String,
+    /// Made in the LaTeX editor: the source can be opened again.
+    pub has_source: bool,
+    /// The source changed after the PDF was last compiled from it.
+    pub source_stale: bool,
 }
 
 const RESUME_COLUMNS: &str =
     "id, title, tags, is_default, file_name, mime_type, size_bytes, object_key, status,
-     parse_status, parse_version, parsed, created_at, updated_at";
+     parse_status, parse_version, parsed, created_at, updated_at,
+     encode(sha256, 'hex') AS file_sha256,
+     EXISTS (SELECT 1 FROM resume_sources s WHERE s.resume_id = resumes.id) AS has_source,
+     COALESCE((SELECT s.compiled_sha256 IS DISTINCT FROM encode(resumes.sha256, 'hex')
+               FROM resume_sources s WHERE s.resume_id = resumes.id), FALSE) AS source_stale";
 
 /// Stored resumes, default first, then newest.
 pub async fn list_resumes(db: impl PgExecutor<'_>, user_id: Uuid) -> Result<Vec<Resume>> {
@@ -595,6 +605,101 @@ pub async fn delete_resume(tx: &mut Tx<'_>, user_id: Uuid, id: Uuid) -> Result<O
     Ok(Some(key))
 }
 
+/// The resume row, locked for the rest of the transaction.
+pub async fn lock_resume(tx: &mut Tx<'_>, user_id: Uuid, id: Uuid) -> Result<Option<Resume>> {
+    Ok(sqlx::query_as(&format!(
+        "SELECT {RESUME_COLUMNS} FROM resumes WHERE id = $1 AND user_id = $2 AND status = 'stored' FOR UPDATE"
+    ))
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await?)
+}
+
+pub struct ReplacedFile<'a> {
+    pub file_name: &'a str,
+    pub mime_type: &'a str,
+    pub size_bytes: i32,
+    pub sha256: &'a [u8; 32],
+    pub object_key: &'a str,
+}
+
+/// Points the resume at a new file and clears the old parse. Only if it
+/// still points at `old_key` (another save may have won). The trigger queues
+/// the old object for deletion.
+pub async fn replace_resume_file(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    id: Uuid,
+    old_key: &str,
+    f: &ReplacedFile<'_>,
+) -> Result<bool> {
+    Ok(sqlx::query(
+        "UPDATE resumes SET file_name = $4, mime_type = $5, size_bytes = $6, sha256 = $7, object_key = $8,
+                parse_status = 'pending', parse_version = 0, parsed = NULL, updated_at = now()
+         WHERE id = $1 AND user_id = $2 AND object_key = $3 AND status = 'stored'",
+    )
+    .bind(id)
+    .bind(user_id)
+    .bind(old_key)
+    .bind(f.file_name)
+    .bind(f.mime_type)
+    .bind(f.size_bytes)
+    .bind(&f.sha256[..])
+    .bind(f.object_key)
+    .execute(db)
+    .await?
+    .rows_affected()
+        == 1)
+}
+
+// ---------------------------------------------------------------------------
+// LaTeX sources
+
+#[derive(Debug, Clone, FromRow)]
+pub struct SourceRow {
+    pub source: Vec<u8>,
+    pub compiled_sha256: Option<String>,
+    pub updated_at: OffsetDateTime,
+}
+
+pub async fn get_source(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    resume_id: Uuid,
+) -> Result<Option<SourceRow>> {
+    Ok(sqlx::query_as(
+        "SELECT s.source, s.compiled_sha256, s.updated_at FROM resume_sources s
+         JOIN resumes r ON r.id = s.resume_id
+         WHERE s.resume_id = $1 AND r.user_id = $2 AND r.status = 'stored'",
+    )
+    .bind(resume_id)
+    .bind(user_id)
+    .fetch_optional(db)
+    .await?)
+}
+
+/// Saves the (encrypted) source. `compiled_sha256` is the hex SHA-256 of the
+/// PDF compiled from it, or `None` when only the source was saved.
+pub async fn put_source(
+    db: impl PgExecutor<'_>,
+    resume_id: Uuid,
+    source: &[u8],
+    compiled_sha256: Option<&str>,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO resume_sources (resume_id, source, compiled_sha256) VALUES ($1, $2, $3)
+         ON CONFLICT (resume_id) DO UPDATE SET source = EXCLUDED.source,
+           compiled_sha256 = EXCLUDED.compiled_sha256, updated_at = now()",
+    )
+    .bind(resume_id)
+    .bind(source)
+    .bind(compiled_sha256)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
 /// Deletes a row that never finished uploading (the object put failed).
 pub async fn discard_upload(db: impl PgExecutor<'_>, user_id: Uuid, id: Uuid) -> Result<()> {
     sqlx::query("DELETE FROM resumes WHERE id = $1 AND user_id = $2 AND status = 'uploading'")
@@ -795,21 +900,37 @@ pub async fn pending_deletions(
 ) -> Result<Vec<String>> {
     Ok(match keys {
         Some(keys) => {
-            sqlx::query_scalar("SELECT object_key FROM object_deletions WHERE object_key = ANY ($1) LIMIT $2")
-                .bind(keys)
-                .bind(limit)
-                .fetch_all(db)
-                .await?
+            sqlx::query_scalar(
+                "SELECT object_key FROM object_deletions WHERE object_key = ANY ($1) LIMIT $2",
+            )
+            .bind(keys)
+            .bind(limit)
+            .fetch_all(db)
+            .await?
         }
         None => {
             sqlx::query_scalar(
-                "SELECT object_key FROM object_deletions WHERE attempts < 20 ORDER BY queued_at LIMIT $1",
+                // An hour's grace: a save reserves its new key here before
+                // storing the file, and drops the reservation once the row
+                // points at it.
+                "SELECT object_key FROM object_deletions WHERE attempts < 20
+                   AND queued_at < now() - interval '1 hour' ORDER BY queued_at LIMIT $1",
             )
             .bind(limit)
             .fetch_all(db)
             .await?
         }
     })
+}
+
+/// Marks a key about to be written, so a failed save leaves nothing behind:
+/// the daily cleanup deletes it unless the save drops the reservation.
+pub async fn reserve_object(db: impl PgExecutor<'_>, key: &str) -> Result<()> {
+    sqlx::query("INSERT INTO object_deletions (object_key) VALUES ($1) ON CONFLICT DO NOTHING")
+        .bind(key)
+        .execute(db)
+        .await?;
+    Ok(())
 }
 
 pub async fn deletion_done(db: impl PgExecutor<'_>, key: &str) -> Result<()> {
@@ -906,7 +1027,8 @@ pub async fn usage(db: impl PgExecutor<'_>) -> Result<Usage> {
            (SELECT COUNT(*) FROM object_deletions) AS pending_deletions,
            (SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0)::BIGINT FROM pg_class c
               WHERE c.relname IN ('users','sessions','api_tokens','resumes','profiles','answers',
-                                  'usage_counters','audit_events','object_deletions')) AS accounts_table_bytes",
+                                  'usage_counters','audit_events','object_deletions',
+                                  'resume_sources')) AS accounts_table_bytes",
     )
     .fetch_one(db)
     .await?)

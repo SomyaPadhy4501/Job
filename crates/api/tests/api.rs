@@ -10,7 +10,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use accounts::crypto::Keyring;
 use accounts::storage::{FsStore, Storage};
 use accounts::testing::{
-    TEST_CLIENT_ID, TEST_DATA_KEY, TEST_KID, docx_resume, sign_google_token, test_verifier,
+    TEST_CLIENT_ID, TEST_DATA_KEY, TEST_KID, docx_resume, pdf_resume, sign_google_token,
+    test_verifier,
 };
 use api::{AppState, Config, router};
 use axum::Router;
@@ -140,11 +141,25 @@ impl<'a> Browser<'a> {
         content_type: Option<&str>,
         body: Vec<u8>,
     ) -> Res {
+        self.send_with(method, path, content_type, body, &[]).await
+    }
+
+    async fn send_with(
+        &mut self,
+        method: Method,
+        path: &str,
+        content_type: Option<&str>,
+        body: Vec<u8>,
+        extra: &[(&str, &str)],
+    ) -> Res {
         let mut req = Request::builder()
             .method(method.clone())
             .uri(path)
             .header(header::HOST, "localhost")
             .header("x-forwarded-for", self.ip.as_str());
+        for (k, v) in extra {
+            req = req.header(*k, *v);
+        }
         if self.csrf && method != Method::GET {
             req = req
                 .header("x-requested-with", "fetch")
@@ -1095,4 +1110,255 @@ async fn form_schema_needs_a_token_and_skips_unknown_pages() {
     let res = ext.get(path).await;
     assert_eq!(res.status, StatusCode::OK);
     assert_eq!(res.json(), json!({ "fields": [] }));
+}
+
+/// Multipart body with text parts and an optional PDF `file` part.
+fn multipart(parts: &[(&str, &str)], pdf: Option<&[u8]>) -> (String, Vec<u8>) {
+    let boundary = "XlatexX";
+    let mut body = Vec::new();
+    for (name, value) in parts {
+        body.extend(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+            )
+            .bytes(),
+        );
+    }
+    if let Some(bytes) = pdf {
+        body.extend(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"resume.pdf\"\r\nContent-Type: application/pdf\r\n\r\n"
+            )
+            .bytes(),
+        );
+        body.extend_from_slice(bytes);
+        body.extend(b"\r\n");
+    }
+    body.extend(format!("--{boundary}--\r\n").bytes());
+    (format!("multipart/form-data; boundary={boundary}"), body)
+}
+
+const SOURCE_V1: &str = r"\documentclass{article}\begin{document}Jane Doe v1\end{document}";
+const SOURCE_V2: &str = r"\documentclass{article}\begin{document}Jane Doe v2\end{document}";
+
+fn pdf_v(version: &str) -> Vec<u8> {
+    let mut lines: Vec<&str> = RESUME.to_vec();
+    lines.push(version);
+    pdf_resume(&lines)
+}
+
+async fn new_latex_resume(b: &mut Browser<'_>) -> (String, String) {
+    let (ct, body) = multipart(
+        &[
+            ("title", "LaTeX resume"),
+            ("tags", ""),
+            ("source", SOURCE_V1),
+        ],
+        Some(&pdf_v("v1")),
+    );
+    let res = b
+        .send(Method::POST, "/api/me/resumes", Some(&ct), body)
+        .await;
+    assert_eq!(
+        res.status,
+        StatusCode::CREATED,
+        "{}",
+        String::from_utf8_lossy(&res.body)
+    );
+    let r = &res.json()["resume"];
+    assert_eq!(r["hasSource"], true);
+    assert_eq!(r["sourceStale"], false);
+    assert_eq!(
+        r["parseStatus"], "parsed",
+        "the pdfTeX-style PDF is readable"
+    );
+    (
+        r["id"].as_str().unwrap().to_owned(),
+        r["fileSha256"].as_str().unwrap().to_owned(),
+    )
+}
+
+#[tokio::test]
+async fn latex_save_replaces_the_pdf_and_keeps_the_source() {
+    let Some(app) = app() else { return };
+    let mut b = Browser::new(&app);
+    b.sign_in().await;
+    let (id, sha1) = new_latex_resume(&mut b).await;
+    let old_key: String = sqlx::query_scalar("SELECT object_key FROM resumes WHERE id = $1::uuid")
+        .bind(&id)
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+
+    let src = b.get(&format!("/api/me/resumes/{id}/source")).await;
+    assert_eq!(src.status, StatusCode::OK);
+    assert_eq!(src.json()["source"], SOURCE_V1);
+    assert_eq!(src.json()["compiledSha256"], sha1.as_str());
+
+    // Replace with a new PDF and source.
+    let path = format!("/api/me/resumes/{id}/latex");
+    let (ct, body) = multipart(&[("source", SOURCE_V2)], Some(&pdf_v("v2")));
+    let res = b.send(Method::PUT, &path, Some(&ct), body).await;
+    assert_eq!(
+        res.status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&res.body)
+    );
+    let r = &res.json()["resume"];
+    assert_eq!(r["id"], id.as_str(), "same resume, not a new one");
+    assert_eq!(r["title"], "LaTeX resume");
+    assert_eq!(r["parseStatus"], "parsed");
+    assert_ne!(r["fileSha256"], sha1.as_str());
+    let sha2 = r["fileSha256"].as_str().unwrap().to_owned();
+    assert_eq!(
+        b.get(&format!("/api/me/resumes/{id}/file")).await.body,
+        pdf_v("v2")
+    );
+    assert_eq!(
+        b.get(&format!("/api/me/resumes/{id}/source")).await.json()["source"],
+        SOURCE_V2
+    );
+    // The old object was queued by the trigger and deleted straight away.
+    let queued: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM object_deletions WHERE object_key = $1")
+            .bind(&old_key)
+            .fetch_one(&app.pool)
+            .await
+            .unwrap();
+    assert_eq!(queued, 0, "old file deleted");
+    let list = b.get("/api/me/resumes").await.json();
+    assert_eq!(list["resumes"].as_array().unwrap().len(), 1);
+    assert_eq!(list["limits"]["uploadsToday"], 1, "a save isn't an upload");
+
+    // Stale If-Match: refused.
+    let (ct, body) = multipart(&[("source", SOURCE_V1)], Some(&pdf_v("v3")));
+    let stale = b
+        .send_with(Method::PUT, &path, Some(&ct), body, &[("if-match", &sha1)])
+        .await;
+    assert_eq!(stale.status, StatusCode::CONFLICT);
+
+    // Same PDF again: only the source is saved, no quota.
+    let (ct, body) = multipart(&[("source", SOURCE_V1)], Some(&pdf_v("v2")));
+    let same = b
+        .send_with(Method::PUT, &path, Some(&ct), body, &[("if-match", &sha2)])
+        .await;
+    assert_eq!(same.status, StatusCode::OK);
+    assert_eq!(same.json()["unchanged"], true);
+    assert_eq!(
+        b.get(&format!("/api/me/resumes/{id}/source")).await.json()["source"],
+        SOURCE_V1
+    );
+
+    // Source only: the PDF is now out of date.
+    let res = b
+        .json(
+            Method::PUT,
+            &format!("/api/me/resumes/{id}/source"),
+            json!({ "source": SOURCE_V2 }),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(res.json()["resume"]["sourceStale"], true);
+
+    // The export carries the source.
+    let export = b.get("/api/me/export").await.json();
+    assert_eq!(export["resumes"][0]["latexSource"], SOURCE_V2);
+}
+
+#[tokio::test]
+async fn latex_save_refuses_big_sources_quota_and_other_users() {
+    let Some(app) = app_with(|c| c.replaces_per_day = 1) else {
+        return;
+    };
+    let mut b = Browser::new(&app);
+    b.sign_in().await;
+    let (id, _) = new_latex_resume(&mut b).await;
+    assert_eq!(
+        b.upload("other.docx", &docx_resume(RESUME), "", "")
+            .await
+            .status,
+        StatusCode::CREATED
+    );
+    let list = b.get("/api/me/resumes").await.json();
+    let other_id = list["resumes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] != id.as_str())
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let path = format!("/api/me/resumes/{id}/latex");
+
+    let big = "x".repeat(101 * 1024);
+    let (ct, body) = multipart(&[("source", &big)], Some(&pdf_v("big")));
+    assert_eq!(
+        b.send(Method::PUT, &path, Some(&ct), body).await.status,
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    let (ct, body) = multipart(&[("source", SOURCE_V2)], None);
+    assert_eq!(
+        b.send(Method::PUT, &path, Some(&ct), body).await.status,
+        StatusCode::BAD_REQUEST,
+        "no PDF"
+    );
+
+    // One save a day here: the second is refused.
+    let (ct, body) = multipart(&[("source", SOURCE_V2)], Some(&pdf_v("v2")));
+    assert_eq!(
+        b.send(Method::PUT, &path, Some(&ct), body).await.status,
+        StatusCode::OK
+    );
+    let (ct, body) = multipart(&[("source", SOURCE_V2)], Some(&pdf_v("v3")));
+    assert_eq!(
+        b.send(Method::PUT, &path, Some(&ct), body).await.status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+
+    // Another user can neither read nor replace it.
+    let mut eve = Browser::new(&app);
+    eve.sign_in().await;
+    assert_eq!(
+        eve.get(&format!("/api/me/resumes/{id}/source"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    let (ct, body) = multipart(&[("source", SOURCE_V2)], Some(&pdf_v("eve")));
+    assert_eq!(
+        eve.send(Method::PUT, &path, Some(&ct), body).await.status,
+        StatusCode::NOT_FOUND
+    );
+    // A resume that wasn't made in the editor has no source.
+    assert_eq!(
+        b.get(&format!("/api/me/resumes/{other_id}/source"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn latex_save_refuses_a_pdf_another_resume_has() {
+    let Some(app) = app() else { return };
+    let mut b = Browser::new(&app);
+    b.sign_in().await;
+    let (id, _) = new_latex_resume(&mut b).await;
+    let taken = pdf_v("taken");
+    assert_eq!(
+        b.upload("taken.pdf", &taken, "", "").await.status,
+        StatusCode::CREATED
+    );
+    let (ct, body) = multipart(&[("source", SOURCE_V2)], Some(&taken));
+    let res = b
+        .send(
+            Method::PUT,
+            &format!("/api/me/resumes/{id}/latex"),
+            Some(&ct),
+            body,
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::CONFLICT);
 }

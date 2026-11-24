@@ -47,6 +47,48 @@ pub fn docx_resume(lines: &[&str]) -> Vec<u8> {
     buf.into_inner()
 }
 
+/// A minimal but real one-page PDF whose text lines are `lines`, laid out
+/// the way pdfTeX writes them: one text object, Type 1 font, each line
+/// placed with `Td` and no space characters between lines.
+pub fn pdf_resume(lines: &[&str]) -> Vec<u8> {
+    let escape = |s: &str| {
+        s.replace('\\', "\\\\")
+            .replace('(', "\\(")
+            .replace(')', "\\)")
+    };
+    let mut content = String::from("BT /F1 11 Tf 72 720 Td 14 TL\n");
+    for line in lines {
+        content.push_str(&format!("({}) Tj T*\n", escape(line)));
+    }
+    content.push_str("ET");
+    let objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_owned(),
+        format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_owned(),
+    ];
+    let mut pdf = b"%PDF-1.5\n".to_vec();
+    let mut offsets = Vec::new();
+    for (i, body) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.extend(format!("{} 0 obj\n{body}\nendobj\n", i + 1).bytes());
+    }
+    let xref = pdf.len();
+    pdf.extend(format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).bytes());
+    for off in offsets {
+        pdf.extend(format!("{off:010} 00000 n \n").bytes());
+    }
+    pdf.extend(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .bytes(),
+    );
+    pdf
+}
+
 pub fn sign_google_token(claims: &serde_json::Value, kid: &str) -> String {
     let mut header = Header::new(Algorithm::RS256);
     header.kid = Some(kid.to_owned());

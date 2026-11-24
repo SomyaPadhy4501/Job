@@ -31,7 +31,7 @@ use accounts::google::GoogleVerifier;
 use accounts::storage::Storage;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderValue, StatusCode, Uri, header};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -66,6 +66,8 @@ pub struct Config {
     pub max_resumes: i64,
     pub max_user_bytes: i64,
     pub uploads_per_day: i64,
+    /// Saves from the LaTeX editor that replace a resume's file, per user per day.
+    pub replaces_per_day: i64,
     pub uploads_per_month_global: i64,
     /// Total resume bytes across all users before uploads are refused.
     pub max_storage_bytes: i64,
@@ -94,6 +96,7 @@ impl Default for Config {
             max_resumes: 10,
             max_user_bytes: 12 * 1024 * 1024,
             uploads_per_day: 5,
+            replaces_per_day: 50,
             uploads_per_month_global: 3000,
             max_storage_bytes: 9 * 1024 * 1024 * 1024,
             max_tokens: 5,
@@ -146,6 +149,7 @@ impl Config {
             max_resumes: env_int("MAX_RESUMES", d.max_resumes),
             max_user_bytes: env_int("MAX_USER_BYTES", d.max_user_bytes),
             uploads_per_day: env_int("UPLOADS_PER_DAY", d.uploads_per_day),
+            replaces_per_day: env_int("REPLACES_PER_DAY", d.replaces_per_day),
             uploads_per_month_global: env_int("UPLOADS_PER_MONTH", d.uploads_per_month_global),
             max_storage_bytes: env_int("R2_MAX_BYTES", d.max_storage_bytes),
             max_tokens: d.max_tokens,
@@ -279,6 +283,14 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/me/resumes/{id}/file", get(resumes::file))
         .route("/api/me/resumes/{id}/reparse", post(resumes::reparse))
+        .route(
+            "/api/me/resumes/{id}/latex",
+            put(resumes::save_latex).layer(DefaultBodyLimit::max(MAX_UPLOAD_BODY)),
+        )
+        .route(
+            "/api/me/resumes/{id}/source",
+            get(resumes::get_source).put(resumes::put_source),
+        )
         .route("/api/me/profile", get(profile::show).put(profile::save))
         .route("/api/me/profile/import/{resume_id}", post(profile::import))
         .route("/api/me/answers", get(answers::list).put(answers::save))
