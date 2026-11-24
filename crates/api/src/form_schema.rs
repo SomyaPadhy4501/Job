@@ -43,7 +43,8 @@ impl Target {
 fn slug(s: &str) -> Option<String> {
     let ok = !s.is_empty()
         && s.len() <= 100
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         && s != "."
         && s != "..";
     ok.then(|| s.to_owned())
@@ -54,7 +55,8 @@ fn digits(s: &str) -> Option<String> {
 }
 
 fn uuid_like(s: &str) -> Option<String> {
-    (s.len() == 36 && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-')).then(|| s.to_ascii_lowercase())
+    (s.len() == 36 && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
+        .then(|| s.to_ascii_lowercase())
 }
 
 /// Which posting an application page belongs to, if it's one we can look up.
@@ -105,7 +107,8 @@ pub fn greenhouse_fields(body: &Value) -> Vec<Value> {
             let label = q["label"].as_str().unwrap_or("").trim();
             let required = q["required"].as_bool().unwrap_or(false);
             for f in q["fields"].as_array().into_iter().flatten() {
-                let (Some(name), kind) = (f["name"].as_str(), f["type"].as_str().unwrap_or("")) else {
+                let (Some(name), kind) = (f["name"].as_str(), f["type"].as_str().unwrap_or(""))
+                else {
                     continue;
                 };
                 if kind == "input_hidden" || label.is_empty() {
@@ -132,7 +135,11 @@ pub fn ashby_fields(body: &Value) -> Vec<Value> {
             if title.trim().is_empty() || f["isDeactivated"].as_bool() == Some(true) {
                 continue;
             }
-            out.push(field(path, title.trim(), e["isRequired"].as_bool().unwrap_or(false)));
+            out.push(field(
+                path,
+                title.trim(),
+                e["isRequired"].as_bool().unwrap_or(false),
+            ));
         }
     }
     out.truncate(MAX_FIELDS);
@@ -143,18 +150,16 @@ const ASHBY_QUERY: &str = "query ApiJobPosting($organizationHostedJobsPageName: 
 
 async fn fetch(state: &AppState, target: &Target) -> Result<Vec<Value>, ApiError> {
     let unavailable = || ApiError::Unavailable("The application form couldn't be read.".into());
-    let res = match target {
-        Target::Greenhouse { board, job } => {
-            state
+    let res =
+        match target {
+            Target::Greenhouse { board, job } => state
                 .http
                 .get(format!(
                     "https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{job}?questions=true"
                 ))
                 .send()
-                .await
-        }
-        Target::Ashby { org, posting } => {
-            state
+                .await,
+            Target::Ashby { org, posting } => state
                 .http
                 .post("https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobPosting")
                 .json(&json!({
@@ -163,10 +168,9 @@ async fn fetch(state: &AppState, target: &Target) -> Result<Vec<Value>, ApiError
                     "query": ASHBY_QUERY,
                 }))
                 .send()
-                .await
+                .await,
         }
-    }
-    .map_err(|_| unavailable())?;
+        .map_err(|_| unavailable())?;
     if res.status() == reqwest::StatusCode::NOT_FOUND {
         return Err(ApiError::NotFound);
     }
@@ -201,10 +205,13 @@ pub async fn form_schema(
         return Ok(Json(json!({ "fields": [] })));
     };
     let key = target.key();
-    if let Some((at, fields)) = cache().lock().ok().and_then(|c| c.get(&key).cloned()) {
-        if at.elapsed() < TTL {
-            return Ok(Json(json!({ "fields": fields })));
-        }
+    if let Some((_, fields)) = cache()
+        .lock()
+        .ok()
+        .and_then(|c| c.get(&key).cloned())
+        .filter(|(at, _)| at.elapsed() < TTL)
+    {
+        return Ok(Json(json!({ "fields": fields })));
     }
     let fields = fetch(&state, &target).await?;
     if let Ok(mut c) = cache().lock() {
@@ -227,11 +234,17 @@ mod tests {
     fn reads_only_known_application_pages() {
         assert_eq!(
             parse_target("https://job-boards.greenhouse.io/figma/jobs/6233043004?gh_src=x"),
-            Some(Target::Greenhouse { board: "figma".into(), job: "6233043004".into() })
+            Some(Target::Greenhouse {
+                board: "figma".into(),
+                job: "6233043004".into()
+            })
         );
         assert_eq!(
             parse_target("https://job-boards.greenhouse.io/embed/job_app?for=stripe&token=7210000"),
-            Some(Target::Greenhouse { board: "stripe".into(), job: "7210000".into() })
+            Some(Target::Greenhouse {
+                board: "stripe".into(),
+                job: "7210000".into()
+            })
         );
         assert_eq!(
             parse_target(
