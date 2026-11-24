@@ -3,10 +3,17 @@
 const { CONFIG } = require('./config');
 const log = require('./logger');
 
-// POST a batch of raw jobs to the main API's /admin/ingest endpoint.
+// POST a batch of raw jobs to the main API's /admin/ingest endpoint, or, with
+// DATABASE_URL set (the GitHub workflow), write them to the database directly
+// through the same steps, as the collect workflow does: then a COLLECT_TOKEN
+// that differs between GitHub and Vercel can't stop a scrape.
 // Returns { ok, received, inserted, updated, rejected } or throws on hard failure.
 async function ingest(source, jobs) {
   if (!jobs || !jobs.length) return { ok: true, received: 0, inserted: 0, updated: 0, rejected: 0 };
+  if (process.env.DATABASE_URL) {
+    // eslint-disable-next-line global-require
+    return require('../../src/services/ingest').ingestRows(source, jobs);
+  }
 
   const headers = { 'content-type': 'application/json' };
   if (CONFIG.ingestToken) headers['x-collect-token'] = CONFIG.ingestToken;

@@ -58,24 +58,27 @@ jobs:
         working-directory: scraper
         run: npx playwright install --with-deps chromium
 
+      # The scraper writes to the database through the main code's ingest
+      # step (pg, normalize), so the root dependencies are needed too.
+      - name: Install root dependencies (pg)
+        if: steps.due.outputs.due != 'false'
+        run: npm ci
+
       - name: Run one-shot scrape (all targets)
         if: steps.due.outputs.due != 'false'
         working-directory: scraper
         run: npm run scrape
         env:
-          # Scraper POSTs results to the Vercel /admin/ingest endpoint.
-          # It never touches the DB directly — keeps the boundary clean.
-          INGEST_URL:    ${{ secrets.INGEST_URL }}
-          COLLECT_TOKEN: ${{ secrets.COLLECT_TOKEN }}
-          HEADLESS:      'true'
+          # Written straight to Neon, as the collect workflow does (same
+          # filters: the defaults in src/config.js). It used to POST to
+          # /admin/ingest with COLLECT_TOKEN, which failed whenever the GitHub
+          # secret and Vercel's value differed.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          HEADLESS:     'true'
 
       # Built In rows whose posting we already store from the employer (the
       # Workday rows the extension sends, Greenhouse, ...) take that row's link,
       # or go when it's already on the board. No network, a few seconds.
-      - name: Install root dependencies (pg)
-        if: steps.due.outputs.due != 'false'
-        run: npm ci
-
       - name: Give Built In rows the employer's link
         if: steps.due.outputs.due != 'false'
         run: node src/scripts/fix-builtin-links.js --apply --stored-only

@@ -9,7 +9,7 @@ this codebase. It exists so you don't have to re-derive context.
 - Workday collection and the boards' captures go through the connected account (`/api/capture/jobs`); the server forwards with COLLECT_TOKEN, which no browser holds any more. The popup's Collect token box is gone (an older install's saved token still works).
 - Rows from a Workday page must link to Workday, are stored as source `workday`, and count against `WORKDAY_SHARES_PER_USER_PER_DAY` (default 20,000), apart from the 3,000 general share cap. `OWNER_SUBS` accounts aren't counted.
 - Share uploads split at 200 rows or ~200 KB (the API takes 256 KB).
-- COLLECT_TOKEN was rotated in GitHub secrets on 2026-11-24: Vercel's value must match it, or the scrape workflow's ingest gets 401.
+- The scrape workflow writes to Neon directly (DATABASE_URL, through src/services/ingest.js, shared with /admin/ingest), like collect. GitHub's COLLECT_TOKEN secret (rotated 2026-11-24) is no longer used by any workflow, so it needn't match Vercel's; only Vercel's own value matters (Node /admin and the Rust share route read the same variable).
 
 ### Done 2026-11-24 (Built In links, Workday token message)
 - Built In links: a builtin.com link no longer overwrites an employer's link on upsert (pg + SQLite). Titles Built In cut short ("Full-stack Engineer 4" for "…, Enterprise Data Tech") match when one same-city posting fits.

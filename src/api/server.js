@@ -4,11 +4,10 @@ const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const { CONFIG } = require('../config');
-const { queryJobs, queryCompanies, queryNewestJobs, getJobById, statsSummary, upsertJob, bulkUpsert } = require('../db');
+const { queryJobs, queryCompanies, queryNewestJobs, getJobById, statsSummary, upsertJob } = require('../db');
 const { jobsCache } = require('./cache');
 const { collectAll } = require('../services/collect');
-const { normalizeJob } = require('../services/normalize');
-const { dedupeBatch } = require('../services/dedupe');
+const { ingestRows } = require('../services/ingest');
 const log = require('../logger');
 
 // Free-text filters longer than this are cut: nothing real is this long, and
@@ -204,34 +203,11 @@ function createApp() {
       return res.status(413).json({ error: 'Too many jobs in one ingest (max 10000)' });
     }
 
-    let inserted = 0, updated = 0, rejected = 0;
-    const toUpsert = [];
-    for (const raw of jobs) {
-      const n = normalizeJob(
-        { ...raw, source },
-        {
-          filterUSOnly: CONFIG.filterUSOnly,
-          filterSoftwareOnly: CONFIG.filterSoftwareOnly,
-          entryLevelMode: CONFIG.entryLevelMode,
-          // As in a collect run: a dated posting past the window isn't stored
-          // (the scraper and the extension's Workday rows now carry dates).
-          retentionDays: CONFIG.retentionDays,
-        }
-      );
-      if (!n) { rejected++; continue; }
-      toUpsert.push(n);
-    }
-
     try {
-      // The same in-batch dedupe a collect run applies: one copy per posting,
-      // and separate openings that share a title and location kept apart.
-      // Without it the upsert merged a batch's same-key rows into one.
-      const result = await bulkUpsert(dedupeBatch(toUpsert));
-      inserted = result.inserted;
-      updated = result.updated;
+      const result = await ingestRows(source, jobs);
       jobsCache.clear();
-      log.info('ingest.ok', { source, received: jobs.length, inserted, updated, rejected });
-      res.json({ ok: true, source, received: jobs.length, inserted, updated, rejected });
+      log.info('ingest.ok', { source, received: result.received, inserted: result.inserted, updated: result.updated, rejected: result.rejected });
+      res.json(result);
     } catch (err) {
       log.error('ingest.error', { source, error: err.message });
       res.status(500).json({ ok: false, error: 'Ingest failed. See the server log.' });
