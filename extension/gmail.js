@@ -15,6 +15,7 @@
   const TOKEN = 'gmailToken';
   const USED = 'gmailUsed';
   const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
+  const RECONNECT = 'Reconnect Gmail in the extension popup to fill codes.';
   let flow = null;
 
   const clientId = () => self.JOB_CONFIG?.gmailClientId || '';
@@ -64,7 +65,13 @@
     if (saved?.token && saved.until > Date.now()) return saved.token;
     const { gmailEmail } = await chrome.storage.local.get('gmailEmail');
     if (!gmailEmail) throw new Error('Connect Gmail in the extension popup to read codes automatically.');
-    return (await authorize(false, gmailEmail)).token;
+    // Silent sign-in failed (signed out, access removed): only the popup can fix
+    // that, so the page stops looking and says so.
+    try {
+      return (await authorize(false, gmailEmail)).token;
+    } catch {
+      throw new Error(RECONNECT);
+    }
   }
 
   async function gmail(path) {

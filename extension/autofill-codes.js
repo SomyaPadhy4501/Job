@@ -45,9 +45,9 @@
       const style = document.createElement('style');
       style.textContent =
         ':host{all:initial;position:fixed;left:20px;bottom:20px;z-index:2147483647}' +
-        'div{font:13px/1.45 Inter,system-ui,sans-serif;color:#1a1d26;background:#fff;border:1px solid #e6e8ee;border-radius:12px;' +
+        'div{font:13px/1.45 Inter,system-ui,sans-serif;color:#18191c;background:#fff;border:1px solid #d5d9df;border-radius:12px;' +
         'padding:10px 12px;max-width:320px;box-shadow:0 12px 32px rgba(15,23,42,.14)}' +
-        'button{font:600 12.5px Inter,system-ui,sans-serif;margin-left:8px;padding:4px 10px;border-radius:8px;border:1px solid #d4d7e0;background:#fff;cursor:pointer}';
+        'button{font:600 12.5px Inter,system-ui,sans-serif;margin-left:8px;padding:4px 10px;border-radius:8px;border:1px solid #aeb5be;background:#fff;cursor:pointer}';
       const box = document.createElement('div');
       box.setAttribute('role', 'status');
       root.append(style, box);

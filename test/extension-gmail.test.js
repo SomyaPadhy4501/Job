@@ -74,7 +74,7 @@ function load(messages, { connected = true } = {}) {
   };
   sandbox.globalThis = sandbox;
   vm.runInNewContext(source, sandbox);
-  return { G: sandbox.self.AutofillGmail, opened, queries };
+  return { G: sandbox.self.AutofillGmail, opened, queries, sandbox };
 }
 
 test('codes: only this company, recent mail, the requested shape, each email once', async () => {
@@ -116,6 +116,21 @@ test('verify links: this company only, opened by the worker', async () => {
   ]);
   assert.equal(await G.openVerifyLink('acme'), true);
   assert.deepEqual(opened, ['https://acme.wd5.myworkdayjobs.com/en-US/External/activate?token=abc&x=1']);
+});
+
+test('silent sign-in rejected: one attempt, then a reconnect message', async () => {
+  const { G, queries, sandbox } = load([{ id: 'm', from: 'Acme <acme@myworkday.com>', body: 'Your code is 482913' }]);
+  sandbox.chrome.storage.session.data.gmailToken = { token: 'old', until: Date.now() - 1000 };
+  let attempts = 0;
+  sandbox.chrome.identity.launchWebAuthFlow = async () => {
+    attempts++;
+    throw new Error('User interaction required.');
+  };
+  await assert.rejects(G.findCode('workday', 'acme', { length: 6, charset: 'digits' }), {
+    message: 'Reconnect Gmail in the extension popup to fill codes.',
+  });
+  assert.equal(attempts, 1);
+  assert.equal(queries.length, 0);
 });
 
 test('not connected: a clear message and no Gmail call', async () => {
