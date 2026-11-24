@@ -130,6 +130,21 @@ export function firstError(result) {
   return text ? { line: null, message: text } : null;
 }
 
+/** "Font tcrm1000 at 600 not found": a font only cm-super has. */
+export function missingFont(result) {
+  return /Font \S+ at \d+ not found/.test(`${result?.error || ''}\n${result?.log || ''}`);
+}
+
+/** The source with \usepackage{lmodern} after \documentclass, or null when
+ * it already loads lmodern or has no \documentclass. */
+export function withLatinModern(text) {
+  if (/\\usepackage(?:\[[^\]]*\])?\{[^}]*\blmodern\b[^}]*\}/.test(text)) return null;
+  const m = /\\documentclass(?:\[[^\]]*\])?\{[^}]*\}/.exec(text);
+  if (!m) return null;
+  const at = m.index + m[0].length;
+  return `${text.slice(0, at)}\n\\usepackage{lmodern}${text.slice(at)}`;
+}
+
 /** Phones and small devices: compiling needs ~0.5 GB of memory. */
 export function lowMemoryDevice() {
   const ios = /iP(?:hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

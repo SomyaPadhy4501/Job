@@ -5,7 +5,7 @@ import { StreamLanguage } from '@codemirror/language';
 import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { api, useAccount } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
-import { acquireCompiler, firstError, lowMemoryDevice, releaseCompiler } from '../latex/engine.js';
+import { acquireCompiler, firstError, lowMemoryDevice, missingFont, releaseCompiler, withLatinModern } from '../latex/engine.js';
 import { fromProfile, TEMPLATE } from '../latex/fromProfile.js';
 
 const PdfViewer = lazy(() => import('../components/PdfViewer.jsx'));
@@ -60,6 +60,7 @@ function Editor() {
   const [problem, setProblem] = useState(null);
   const [log, setLog] = useState('');
   const [showLog, setShowLog] = useState(false);
+  const [fontNote, setFontNote] = useState(false);
   const [save, setSave] = useState({ status: 'idle', message: '' });
   const compiling = useRef(false);
   const view = useRef(null);
@@ -109,6 +110,20 @@ function Editor() {
           if (u.docChanged) setSource(u.state.doc.toString());
         }),
         EditorView.contentAttributes.of({ 'aria-label': 'LaTeX source' }),
+        // Pasting a whole document (with \documentclass) into one that has
+        // one already replaces it, instead of nesting the two.
+        EditorView.domEventHandlers({
+          paste(event, v) {
+            const pasted = event.clipboardData?.getData('text/plain') || '';
+            const doc = v.state.doc.toString();
+            const sel = v.state.selection.main;
+            if (!/\\documentclass/.test(pasted) || !/\\documentclass/.test(doc) || (sel.from === 0 && sel.to === doc.length))
+              return false;
+            event.preventDefault();
+            v.dispatch({ changes: { from: 0, to: doc.length, insert: pasted }, selection: { anchor: 0 } });
+            return true;
+          },
+        }),
       ],
     });
     return () => {
@@ -151,7 +166,20 @@ function Editor() {
     try {
       const compiler = await acquireCompiler();
       releaseCompiler();
-      const result = await compiler.compile(text, { engine: 'pdflatex' });
+      let result = await compiler.compile(text, { engine: 'pdflatex' });
+      // The default fonts' symbols (\textbullet, ...) need cm-super, which
+      // the in-browser TeX doesn't carry. Latin Modern looks the same and is
+      // there: retry with it, without changing the user's source.
+      let usedLatinModern = false;
+      const fallback = !result.success && missingFont(result) ? withLatinModern(text) : null;
+      if (fallback) {
+        const retry = await compiler.compile(fallback, { engine: 'pdflatex' });
+        if (retry.success) {
+          result = retry;
+          usedLatinModern = true;
+        }
+      }
+      setFontNote(usedLatinModern);
       setLog(result.log || '');
       if (result.success && result.pdf) {
         setPdf(new Uint8Array(result.pdf));
@@ -319,7 +347,7 @@ function Editor() {
             )}
             <span className="muted small" role="status">
               {engine.status === 'loading' && engine.detail}
-              {engine.status === 'ready' && (upToDate ? 'Preview is up to date.' : 'Compiling after you stop typing…')}
+              {engine.status === 'ready' && (upToDate ? (fontNote ? 'Preview is up to date (compiled with Latin Modern fonts, which look the same as the default ones).' : 'Preview is up to date.') : 'Compiling after you stop typing…')}
               {save.status === 'saving' && ' Saving…'}
             </span>
           </div>
