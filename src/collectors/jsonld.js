@@ -1,6 +1,7 @@
 'use strict';
 
 const { runWithConcurrency } = require('./http');
+const { CONFIG } = require('../config');
 
 // Generic collector for career sites that publish schema.org JobPosting data.
 //
@@ -18,7 +19,7 @@ const { runWithConcurrency } = require('./http');
 // a company here**, and skip any site that gates content behind bot detection.
 //
 // Config shape:
-//   { source: 'jsonld', slug, displayName, sitemapUrl, jobPath, maxDetail }
+//   { source: 'jsonld', slug, displayName, sitemapUrl, jobPath, maxDetail, concurrency }
 
 const DEFAULT_JOB_PATH = '/job/';
 // Cap on detail fetches per company per run. Sized to cover the whole
@@ -37,20 +38,53 @@ const UA = 'job-aggregator (+https://github.com/SomyaPadhy4501/Job)';
 const SOFTWARE_URL_HINT =
   /software|developer|\bswe\b|\bsde\b|engineer|full[-_]?stack|frontend|front[-_]end|backend|back[-_]end|platform|infrastructure|site[-_]reliability|\bsre\b|machine[-_]learning|\bml\b|data[-_](?:scientist|engineer)|ai[-_]|android|ios|mobile|security|devops|cloud|architect/i;
 
-async function fetchText(url) {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,application/xml' },
-    redirect: 'follow',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.text();
+// With a timeout (a hung career site used to stall the whole run), and one
+// patient retry on 429: these are ordinary web servers, not APIs, and a short
+// pause is what they ask for.
+async function fetchText(url, { retries = 1 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,application/xml' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(CONFIG.requestTimeoutMs),
+    });
+    if (res.ok) return res.text();
+    if (res.status === 429 && attempt < retries) {
+      const wait = Math.min(30, Number(res.headers.get('retry-after')) || 10) * 1000;
+      await new Promise((r) => setTimeout(r, wait));
+      continue;
+    }
+    throw new Error(`HTTP ${res.status} for ${url}`);
+  }
+}
+
+// Job URLs from a sitemap, each with its <lastmod> when the site gives one.
+function extractSitemapEntries(xml, jobPath) {
+  const blocks = xml.match(/<url>[\s\S]*?<\/url>/g);
+  const entries = blocks
+    ? blocks.map((b) => ({
+        url: (b.match(/<loc>\s*([^<]+?)\s*<\/loc>/) || [])[1] || '',
+        lastmod: (b.match(/<lastmod>\s*([^<]+?)\s*<\/lastmod>/) || [])[1] || null,
+      }))
+    : (xml.match(/<loc>\s*([^<]+?)\s*<\/loc>/g) || []).map((l) => ({
+        url: l.replace(/<\/?loc>/g, '').trim(),
+        lastmod: null,
+      }));
+  return entries
+    .map((e) => ({ ...e, url: e.url.replace(/&amp;/g, '&') }))
+    .filter((e) => e.url.includes(jobPath));
 }
 
 function extractSitemapUrls(xml, jobPath) {
-  const locs = xml.match(/<loc>\s*([^<]+?)\s*<\/loc>/g) || [];
-  return locs
-    .map((l) => l.replace(/<\/?loc>/g, '').trim())
-    .filter((u) => u.includes(jobPath));
+  return extractSitemapEntries(xml, jobPath).map((e) => e.url);
+}
+
+// A posting not modified within the retention window can't be newer than it:
+// skip its page instead of fetching it only for normalize to drop it.
+function isFresh(lastmod, retentionDays) {
+  if (!lastmod || !retentionDays) return true;
+  const t = Date.parse(lastmod);
+  return !Number.isFinite(t) || t >= Date.now() - retentionDays * 86_400_000;
 }
 
 // Pull the first JobPosting object out of the page's JSON-LD blocks. Handles
@@ -107,15 +141,20 @@ async function fetchCompany(company) {
     sitemapUrl,
     jobPath = DEFAULT_JOB_PATH,
     maxDetail = DEFAULT_MAX_DETAIL,
+    concurrency = CONCURRENCY,
   } = company;
 
   if (!sitemapUrl) throw new Error(`jsonld company "${slug}" missing sitemapUrl`);
 
   const xml = await fetchText(sitemapUrl);
-  const all = extractSitemapUrls(xml, jobPath);
-  const candidates = all.filter((u) => SOFTWARE_URL_HINT.test(u)).slice(0, maxDetail);
+  const all = extractSitemapEntries(xml, jobPath);
+  const candidates = all
+    .filter((e) => SOFTWARE_URL_HINT.test(e.url) && isFresh(e.lastmod, CONFIG.retentionDays))
+    .map((e) => e.url)
+    .slice(0, maxDetail);
 
-  const results = await runWithConcurrency(candidates, CONCURRENCY, async (url) => {
+  let failed = 0;
+  const results = await runWithConcurrency(candidates, concurrency, async (url) => {
     try {
       const html = await fetchText(url);
       const p = extractJobPosting(html);
@@ -131,13 +170,18 @@ async function fetchCompany(company) {
         date_posted: p.datePosted || null,
       };
     } catch {
+      failed++;
       return null; // one dead posting shouldn't fail the company
     }
   });
+  // Every page refused (blocked, rate-limited): a failed company, not an empty one.
+  if (candidates.length && failed === candidates.length) {
+    throw new Error(`all ${failed} job pages failed for ${slug}`);
+  }
 
   // runWithConcurrency substitutes { __error } for a throwing worker rather than
   // rejecting, so a plain Boolean filter would let those through as fake jobs.
   return results.filter((r) => r && !r.__error);
 }
 
-module.exports = { fetchCompany, source: 'jsonld' };
+module.exports = { fetchCompany, source: 'jsonld', extractSitemapEntries, extractSitemapUrls, isFresh };

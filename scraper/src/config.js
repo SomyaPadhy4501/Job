@@ -28,7 +28,9 @@ const CONFIG = {
   // genuinely-gated sites. Set SCRAPER_TARGETS=microsoft to force it here too.
   // Apple is no longer here: src/collectors/apple.js reads its embedded page data
   // over plain HTTP, so it needs neither Playwright nor this scraper.
-  targets: (process.env.SCRAPER_TARGETS || 'meta,google,deloitte,phenom,builtin,wayfair')
+  // Wayfair left on 2026-11-24: the browser got a bot challenge and 0 rows,
+  // while its sitemap and job pages answer plain HTTP (src/collectors/jsonld.js).
+  targets: (process.env.SCRAPER_TARGETS || 'meta,google,deloitte,phenom,builtin')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),

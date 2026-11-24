@@ -669,6 +669,12 @@ const COMPANIES = [
   // instead. 1,063 H-1B approvals over the last 2 FY per the USCIS Data Hub.
   { source: 'jsonld', slug: 'intuit', displayName: 'Intuit',
     sitemapUrl: 'https://jobs.intuit.com/sitemap.xml', jobPath: '/job/' },
+  // Wayfair: no public ATS API, and the search pages challenge bots, but the
+  // careers sitemap and the job pages (JSON-LD with location and date) answer
+  // plain requests, and robots.txt doesn't disallow /careers (checked
+  // 2026-11-24). Two pages at a time; lastmod skips old postings unfetched.
+  { source: 'jsonld', slug: 'wayfair', displayName: 'Wayfair',
+    sitemapUrl: 'https://www.wayfair.com/careers/sitemapfile1.xml', jobPath: '/careers/job/', concurrency: 2 },
 
   // ── Adzuna aggregator (see src/collectors/adzuna.js) ───────────────────────
   // Discovery-only fallback for employers with no reachable public board.
@@ -682,9 +688,8 @@ const COMPANIES = [
   { source: 'adzuna', slug: 'tesla',    displayName: 'Tesla',    company: 'Tesla' },
   { source: 'adzuna', slug: 'qualcomm', displayName: 'Qualcomm', company: 'Qualcomm' },
   { source: 'adzuna', slug: 'ibm',      displayName: 'IBM',      company: 'IBM' },
-  // Wayfair and LinkedIn have no other route: wayfair.com/careers sits behind a
-  // PerimeterX challenge and LinkedIn posts only on linkedin.com (see HANDOFF).
-  { source: 'adzuna', slug: 'wayfair',  displayName: 'Wayfair',  company: 'Wayfair' },
+  // LinkedIn has no other route: it posts only on linkedin.com (see HANDOFF).
+  // Wayfair moved to the jsonld source above on 2026-11-24.
   { source: 'adzuna', slug: 'linkedin', displayName: 'LinkedIn', company: 'LinkedIn' },
 
   // ─── Oracle HCM / Candidate Experience ───────────────────────────────────
