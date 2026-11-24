@@ -300,3 +300,33 @@ test('"this country" and "the country where the job is located" read as the US; 
   ])
     assert.deepEqual(F.resolve(yesno(q), profile), [], q);
 });
+
+test('location search: the city must lead and every profile part must appear', () => {
+  const options = [
+    'San Francisco, California, United States',
+    'San Francisco Bay Area, California, United States',
+    'San Francisco de Macorís, Duarte, Dominican Republic',
+    'San Francisco, Córdoba, Argentina',
+  ];
+  assert.strictEqual(F.pickPlace(options, 'San Francisco, CA, USA'), 0);
+  assert.strictEqual(F.pickPlace(options, 'San Francisco, California, United States of America'), 0);
+  // A bare city is ambiguous here, so nothing is picked.
+  assert.strictEqual(F.pickPlace(options, 'San Francisco'), -1);
+  assert.strictEqual(F.pickPlace(['Portland, Oregon, United States', 'Portland, Maine, United States'], 'Portland, ME'), 1);
+  assert.strictEqual(F.pickPlace(['Bogotá, Colombia'], 'Bogota, Colombia'), 0);
+  assert.strictEqual(F.placeQuery('San Francisco, CA, USA'), 'San Francisco');
+  assert.strictEqual(F.placeQuery(''), '');
+});
+
+test('date pickers get US-order text; start-date questions read the profile', () => {
+  assert.strictEqual(F.usDate('2027-01-15'), '01/15/2027');
+  assert.strictEqual(F.usDate('soon'), '');
+  assert.deepStrictEqual(F.classify({ label: 'When can you start a new role?', type: 'text' }), {
+    kind: 'profile',
+    path: 'preferences.earliestStart',
+  });
+  assert.deepStrictEqual(F.classify({ label: 'Where are you currently located?', type: 'combo' }), {
+    kind: 'profile',
+    path: 'location',
+  });
+});

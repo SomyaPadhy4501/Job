@@ -69,22 +69,37 @@
       await chrome.storage.session.remove(CACHE);
       return {};
     }
-    // Answers typed into an application, held between "submit" and the next
-    // page so the save prompt survives a page change. Per tab, 30 minutes.
+    // Answers typed into an application, held between steps and "submit" and
+    // the next page, so the save prompt survives a page change and a
+    // multi-step form (Workday) offers every step's answers. Per tab, 30
+    // minutes; offered only once the application was submitted.
     if (msg.type === 'autofill:holdAnswers' || msg.type === 'autofill:takeAnswers') {
       const key = 'pendingAnswers:' + sender.tab.id;
+      const held = (await chrome.storage.session.get(key))[key];
+      const fresh = held && Date.now() - held.at < 30 * 60_000 ? held : null;
       if (msg.type === 'autofill:takeAnswers') {
-        const held = (await chrome.storage.session.get(key))[key];
+        if (!fresh?.submitted) return null;
         await chrome.storage.session.remove(key);
-        return held && Date.now() - held.at < 30 * 60_000 ? held : null;
+        return fresh;
       }
-      const answers = (Array.isArray(msg.answers) ? msg.answers : [])
-        .filter((a) => typeof a?.question === 'string' && typeof a?.answer === 'string')
-        .slice(0, 50)
-        .map((a) => ({ question: a.question.slice(0, 500), answer: a.answer.slice(0, 4000) }));
+      // Nothing is held for a browser that isn't connected to an account.
+      if (!(await credentials())?.token) return {};
+      const merged = new Map((fresh?.answers || []).map((a) => [a.question, a]));
+      for (const a of Array.isArray(msg.answers) ? msg.answers : []) {
+        if (typeof a?.question !== 'string' || typeof a?.answer !== 'string') continue;
+        const question = a.question.slice(0, 500);
+        merged.delete(question);
+        merged.set(question, { question, answer: a.answer.slice(0, 4000) });
+      }
+      const answers = [...merged.values()].slice(-50);
       if (answers.length)
         await chrome.storage.session.set({
-          [key]: { answers, company: String(msg.company || '').slice(0, 100), at: Date.now() },
+          [key]: {
+            answers,
+            company: String(msg.company || fresh?.company || '').slice(0, 100),
+            submitted: !!msg.submitted || !!fresh?.submitted,
+            at: Date.now(),
+          },
         });
       return {};
     }

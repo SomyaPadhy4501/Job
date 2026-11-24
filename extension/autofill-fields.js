@@ -44,9 +44,13 @@
   alias('address.state', 'state|province|state/province');
   alias('address.postalCode', 'postal code|zip|zip code|zip/postal code');
   alias('address.country', 'country|country of residence');
-  alias('location', 'current location|location|systemfield location');
+  alias(
+    'location',
+    'current location|location|systemfield location|where are you currently located|where are you located|where are you currently based|where are you based'
+  );
   alias('fullLocation', 'please indicate your current city, state, and country');
-  alias('address.city', 'location (city)');
+  // Greenhouse's "Location (City)" is a place search: the city alone is ambiguous.
+  alias('location', 'location (city)');
   alias('currentCompany', 'org|current company|current employer');
   alias('skillList', 'skills|list your skills');
   alias('links.linkedin', 'linkedin|linkedin url|linkedin profile|urls linkedin');
@@ -54,7 +58,10 @@
   alias('links.portfolio', 'portfolio|portfolio url|urls portfolio');
   alias('links.website', 'website|personal website|website url');
   alias('preferences.relocate', 'are you willing to relocate|willing to relocate');
-  alias('preferences.earliestStart', 'earliest start date|when can you start');
+  alias(
+    'preferences.earliestStart',
+    'earliest start date|when can you start|when can you start a new role|when could you start|what is your earliest start date|earliest available start date|available start date'
+  );
   alias('preferences.workMode', 'preferred work mode|work mode preference');
   alias('preferences.salaryExpectation', 'salary expectation|salary expectations|expected salary');
   alias('misc.over18', 'are you 18 years of age or older|are you at least 18 years old');
@@ -338,6 +345,48 @@
     const matches = options.map((label, i) => (acceptable.has(key(label)) ? i : -1)).filter((i) => i >= 0);
     return matches.length === 1 ? matches[0] : -1;
   }
+  // Location search boxes list places as "City, State, Country". The profile
+  // may say "CA" or "USA"; every part the profile gives must appear, and the
+  // city must be the first part, so "San Francisco Bay Area" never matches.
+  const usStates = {
+    al: 'alabama', ak: 'alaska', az: 'arizona', ar: 'arkansas', ca: 'california', co: 'colorado',
+    ct: 'connecticut', de: 'delaware', dc: 'district of columbia', fl: 'florida', ga: 'georgia',
+    hi: 'hawaii', id: 'idaho', il: 'illinois', in: 'indiana', ia: 'iowa', ks: 'kansas', ky: 'kentucky',
+    la: 'louisiana', me: 'maine', md: 'maryland', ma: 'massachusetts', mi: 'michigan', mn: 'minnesota',
+    ms: 'mississippi', mo: 'missouri', mt: 'montana', ne: 'nebraska', nv: 'nevada', nh: 'new hampshire',
+    nj: 'new jersey', nm: 'new mexico', ny: 'new york', nc: 'north carolina', nd: 'north dakota',
+    oh: 'ohio', ok: 'oklahoma', or: 'oregon', pa: 'pennsylvania', ri: 'rhode island',
+    sc: 'south carolina', sd: 'south dakota', tn: 'tennessee', tx: 'texas', ut: 'utah', vt: 'vermont',
+    va: 'virginia', wa: 'washington', wv: 'west virginia', wi: 'wisconsin', wy: 'wyoming',
+  };
+  const placePart = (part) => {
+    const k = key(part)
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/^united states of america$/, 'united states')
+      .replace(/^us$/, 'united states');
+    return Object.hasOwn(usStates, k) ? usStates[k] : k;
+  };
+  const placeParts = (value) => clean(value).split(',').map(placePart).filter(Boolean);
+  function placeQuery(value) {
+    return placeParts(value).length ? clean(value).split(',')[0].trim() : '';
+  }
+  function pickPlace(options, value) {
+    const want = placeParts(value);
+    if (!want.length) return -1;
+    const matches = options
+      .map((option, i) => {
+        const have = placeParts(option);
+        return have[0] === want[0] && want.slice(1).every((w) => have.slice(1).includes(w)) ? i : -1;
+      })
+      .filter((i) => i >= 0);
+    return matches.length === 1 ? matches[0] : -1;
+  }
+  // Date pickers that take typed text (react-datepicker) read US order.
+  function usDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(clean(iso));
+    return m ? `${m[2]}/${m[3]}/${m[1]}` : '';
+  }
   function rankResumes(resumes, title, page, preferred) {
     const words = (value) =>
       ' ' +
@@ -369,7 +418,7 @@
     );
   }
 
-  const api = { clean, classify, resolve, pick, savedAnswer, rankResumes };
+  const api = { clean, classify, resolve, pick, pickPlace, placeQuery, usDate, savedAnswer, rankResumes };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AutofillFields = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

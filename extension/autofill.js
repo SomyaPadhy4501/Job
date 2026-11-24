@@ -419,10 +419,11 @@
   };
   // ─── After you submit: offer to save the new answers ─────────────────────
   // Watches passively (never blocks or delays anything). When you submit an
-  // application yourself, the custom questions you answered that aren't in
-  // your answer bank yet are held for a few minutes, so the offer survives a
-  // page change, then shown as a small card. Nothing is sent until you click
-  // Save.
+  // application yourself, the custom questions you answered (on every step of
+  // a multi-step form) are held for a few minutes, so the offer survives a
+  // page change. Once the submission is confirmed, the ones not already in
+  // your answer bank are shown in a small card. Nothing is sent until you
+  // click Save.
   function companyName() {
     const parts = location.pathname.split('/').filter(Boolean);
     if (ats === 'ashby' || ats === 'lever') return parts[0] || '';
@@ -431,35 +432,62 @@
     if (ats === 'workday') return location.hostname.split('.')[0];
     return location.hostname.replace(/^(?:www|careers|jobs|apply)\./, '').split('.')[0];
   }
-  function newAnswers() {
-    if (!account) return [];
+  // Custom questions answered on this page (or step). Compared with the answer
+  // bank only when offering, so this works without the panel ever opening.
+  function typedAnswers() {
     const seen = new Set();
     return adapter
       .collect()
       .filter((d) => F.classify(d).kind === 'question' && d.label)
       .map((d) => ({ question: F.clean(d.label).slice(0, 500), answer: F.clean(adapter.answer(d) || '').slice(0, 4000) }))
-      .filter((a) => {
-        if (!a.answer || seen.has(a.question)) return false;
-        seen.add(a.question);
-        return F.savedAnswer(a.question, account.answers || []) !== a.answer;
-      });
+      .filter((a) => a.answer && !seen.has(a.question) && seen.add(a.question));
   }
-  let held = false;
-  function onSubmitLike(e) {
-    if (!e.isTrusted || busy || held) return;
-    if (e.type === 'click') {
-      const b = e.target?.closest?.('button,input[type=submit],[role=button]');
-      const words = (b?.textContent || b?.value || b?.getAttribute?.('aria-label') || '').trim();
-      if (!b || !/\b(?:submit|send)\b.*\b(?:application)?|^apply$/i.test(words)) return;
-    }
-    const answers = newAnswers();
-    if (!answers.length) return;
-    held = true;
+  function hold(submitted) {
+    const answers = typedAnswers();
+    if (!answers.length && !submitted) return;
     chrome.runtime
-      .sendMessage({ type: 'autofill:holdAnswers', answers, company: companyName() })
+      .sendMessage({ type: 'autofill:holdAnswers', answers, company: companyName(), submitted })
       .catch(() => {});
-    // Single-page forms (Ashby) stay on this document: offer here shortly.
-    setTimeout(offerHeld, 2500);
+  }
+  // Final submission, on any ATS's wording: "Submit application", "Send",
+  // "Apply", "Finish", "Complete application". A step button ("Next", "Save
+  // and continue") only holds that step's answers for later.
+  const finalWords = /^(?:submit|send|apply|finish|complete)\b|\bsubmit\b|\b(?:send|complete|finish) (?:my |your )?application\b/i;
+  const stepWords = /^(?:next|continue|save and continue|save & continue|review)\b/i;
+  const confirmation =
+    /thank you for (?:applying|your application|your interest)|application (?:has been |was )?(?:submitted|received)|(?:we(?:'ve| have)|we) received your application|successfully (?:submitted|applied)/i;
+  let watching = 0;
+  // Single-page forms (Ashby, Workday) stay on this document: offer once the
+  // page confirms the submission, never while the form is still being edited.
+  function watchForConfirmation() {
+    const mine = ++watching;
+    const pageText = () => document.body?.innerText || '';
+    // Text already on the page (a job description's "thank you for your
+    // interest") isn't a confirmation.
+    const already = confirmation.test(pageText());
+    let tries = 0;
+    const check = () => {
+      if (mine !== watching || offered) return;
+      const formGone = !adapter.collect().some((d) => ['text', 'textarea', 'email', 'combo', 'select', 'yesno', 'radio'].includes(d.type));
+      if ((!already && confirmation.test(pageText())) || formGone) return void offerHeld();
+      if (++tries < 20) setTimeout(check, 1000);
+    };
+    setTimeout(check, 1500);
+  }
+  function onSubmitLike(e) {
+    if (!e.isTrusted || busy) return;
+    const b =
+      e.type === 'click' ? e.target?.closest?.('button,input[type=submit],[role=button]') : e.submitter;
+    const words = F.clean(b?.textContent || b?.value || b?.getAttribute?.('aria-label') || '');
+    // A form submitted by its "Next" button is a step, not the application.
+    if (e.type === 'submit' && stepWords.test(words)) return;
+    if (e.type === 'click') {
+      if (!b || !words) return;
+      if (stepWords.test(words)) return hold(false);
+      if (!finalWords.test(words)) return;
+    }
+    hold(true);
+    watchForConfirmation();
   }
   window.addEventListener('submit', onSubmitLike, true);
   document.addEventListener('click', onSubmitLike, true);
@@ -474,6 +502,14 @@
       return;
     }
     if (!pending?.answers?.length) return;
+    let bank;
+    try {
+      bank = account || (await api('getProfile'));
+    } catch {
+      return;
+    }
+    pending.answers = pending.answers.filter((a) => F.savedAnswer(a.question, bank.answers || []) !== a.answer);
+    if (!pending.answers.length || offered) return;
     offered = true;
     const card = element('div');
     card.className = 'card';
@@ -520,7 +556,7 @@
       keep.disabled = skip.disabled = true;
       try {
         // A fresh page (after submit) hasn't loaded the account yet.
-        const binding = (account || (await api('getProfile'))).binding;
+        const binding = bank.binding;
         const { saved } = await api('saveAnswers', { answers: chosen, binding });
         card.replaceChildren(element('h2', 'Saved ' + saved + (saved === 1 ? ' answer' : ' answers')));
         card.querySelector('h2').className = 'ok';

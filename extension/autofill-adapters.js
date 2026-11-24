@@ -130,6 +130,19 @@
     }
     el[property] = value;
   }
+  // Location search boxes: the ATS needs a place picked from its suggestions,
+  // so a typed value alone doesn't count.
+  const placePaths = ['location', 'fullLocation', 'address.city'];
+  function placeSearch(d) {
+    return (
+      d.el.localName === 'input' &&
+      d.el.matches('[aria-autocomplete="list"],.location-input') &&
+      placePaths.includes(F.classify(d).path)
+    );
+  }
+  // react-datepicker inputs take typed MM/DD/YYYY text.
+  const datePicker = (el) =>
+    el.matches('.ashby-application-form-input-date,.react-datepicker__input-container input');
   function changed(el) {
     for (const event of ['input', 'change', 'blur'])
       el.dispatchEvent(new el.ownerDocument.defaultView.Event(event, { bubbles: true }));
@@ -381,6 +394,8 @@
         );
       }
       if (!d.el.isConnected) return false;
+      if (placeSearch(d)) return F.pickPlace([read(d)], values[0]) === 0;
+      if (datePicker(d.el)) return !!values[0] && read(d) === F.usDate(values[0]);
       const value = read(d);
       if (d.members || d.type === 'combo') return F.pick([value], values) === 0;
       return value === values[0];
@@ -455,6 +470,48 @@
         }
       }
     }
+    async function search(d, values, active) {
+      const el = d.el,
+        win = doc.defaultView,
+        value = values[0],
+        query = F.placeQuery(value);
+      if (!query || !available(d)) return false;
+      const type = (v) => {
+        nativeSet(el, 'value', v);
+        el.dispatchEvent(new win.Event('input', { bubbles: true }));
+      };
+      // react-select (Greenhouse) only opens its menu from a mouse press.
+      if (el.matches('.select__input')) {
+        for (const kind of ['mousedown', 'mouseup', 'click'])
+          el.dispatchEvent(new win.MouseEvent(kind, { button: 0, bubbles: true, cancelable: true, view: win }));
+      }
+      el.focus();
+      type(query);
+      let picked = false;
+      try {
+        // Suggestions come from the ATS's server: allow ~3 s, and let a list
+        // left over from an earlier query be replaced before giving up.
+        for (let n = 0; n < 60; n++) {
+          await pause(50);
+          if (!active() || !el.isConnected) return false;
+          const menu = menuFor(el);
+          const options = menu ? all(menu, '[role="option"]').filter((o) => visible(o) && safeButton(o)) : [];
+          const index = F.pickPlace(options.map(text), value);
+          if (index < 0) continue;
+          options[index].click();
+          await pause(50);
+          picked = F.pickPlace([read(d)], value) === 0;
+          return picked;
+        }
+        return false;
+      } finally {
+        if (el.isConnected && attr(el, 'aria-expanded') === 'true')
+          el.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        // Don't leave a half-typed city behind for the user to notice.
+        if (!picked && el.isConnected && el.value === query) type('');
+        el.blur();
+      }
+    }
     async function write(d, values, getFile, active = () => true) {
       if (!active() || !available(d)) return false;
       const kind = F.classify(d).kind;
@@ -470,6 +527,7 @@
         return true;
       }
       if (!values.length) return false;
+      if (placeSearch(d)) return search(d, values, active);
       if (d.type === 'combo') return combo(d, values, active);
       if (d.members) {
         const i = F.pick(d.options, values),
@@ -486,6 +544,18 @@
       }
       // A text search box can look filled even when the ATS needs a location ID.
       if (d.el.matches('[aria-autocomplete="list"],.location-input')) return false;
+      if (datePicker(d.el)) {
+        const shown = F.usDate(values[0]);
+        if (!shown) return false;
+        const win = doc.defaultView;
+        d.el.focus();
+        nativeSet(d.el, 'value', shown);
+        d.el.dispatchEvent(new win.Event('input', { bubbles: true }));
+        await pause(50);
+        d.el.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        d.el.blur();
+        return d.el.value === shown;
+      }
       nativeSet(d.el, 'value', values[0]);
       changed(d.el);
       return d.el.value === values[0];

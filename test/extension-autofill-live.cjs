@@ -70,7 +70,6 @@ async function live() {
     const popup = await context.newPage();
     await popup.goto(new URL('/popup.html', worker.url()).href);
     await popup.locator('#portalUrl').fill('http://127.0.0.1:' + server.address().port);
-    await popup.locator('#save').click();
     await popup.locator('#autofillToken').fill('test-only');
     await popup.locator('#connect').click();
     await popup.getByText('Connected as pat@example.invalid').waitFor();
@@ -309,6 +308,78 @@ async function live() {
       2,
       'saving invalidated the profile cache'
     );
+    // Multi-step form, panel never opened: each step's answers are held, and
+    // the save card appears only once the page confirms the submission.
+    {
+      profile.answers = [];
+      const page = await context.newPage();
+      try {
+        await page.route('https://steps.myworkdayjobs.com/**', (r) =>
+          r.fulfill({
+            contentType: 'text/html',
+            body:
+              '<div data-automation-id="jobApplicationPage"><form id="f" onsubmit="event.preventDefault()">' +
+              '<h1 aria-current="step">Questions</h1><label>Favorite language for systems work<input id="q1"></label>' +
+              '<button id="next">Next</button></form></div><script>' +
+              'document.getElementById("next").onclick=()=>setTimeout(()=>{document.getElementById("f").innerHTML=' +
+              '`<h1 aria-current="step">More</h1><label>Why this team in particular<textarea id="q2"></textarea></label>' +
+              '<button type="button" id="submit">Submit application</button>`;' +
+              'document.getElementById("submit").onclick=()=>setTimeout(()=>{document.body.innerHTML=' +
+              '"<h1>Thank you for applying</h1><p>Your application was submitted.</p>"},300)},200);</script>',
+          })
+        );
+        await page.goto('https://steps.myworkdayjobs.com/Jobs/apply', { waitUntil: 'domcontentloaded' });
+        await page.locator('#q1').fill('Rust');
+        await page.waitForTimeout(500);
+        await page.locator('#next').click();
+        await page.locator('#q2').fill('A synthetic test answer.');
+        await page.locator('#submit').click();
+        await page.getByText('Thank you for applying').waitFor();
+        const cdp = await context.newCDPSession(page);
+        let card;
+        for (let i = 0; i < 80 && !card; i++) {
+          await page.waitForTimeout(100);
+          const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+          const shadows = (n) => [...(n.shadowRoots || []), ...(n.children || []).flatMap(shadows)];
+          for (const node of shadows(root)) {
+            const found = await cdp.send('DOM.querySelector', { nodeId: node.nodeId, selector: '.card' });
+            if (found.nodeId) card = found.nodeId;
+          }
+        }
+        assert.ok(card, 'save card appears after the confirmation');
+        const { object } = await cdp.send('DOM.resolveNode', { nodeId: card });
+        const call = async (fn) =>
+          (
+            await cdp.send('Runtime.callFunctionOn', {
+              objectId: object.objectId,
+              functionDeclaration: fn.toString(),
+              returnByValue: true,
+            })
+          ).result.value;
+        assert.deepEqual(
+          await call(function () {
+            return [this.querySelector('h2').textContent, [...this.querySelectorAll('li label')].map((l) => l.textContent)];
+          }),
+          ['Save 2 new answers?', ['Favorite language for systems work', 'Why this team in particular']]
+        );
+        const point = await call(function () {
+          const r = this.querySelector('button.main').getBoundingClientRect();
+          return [r.x + r.width / 2, r.y + r.height / 2];
+        });
+        await page.mouse.click(...point);
+        for (let i = 0; i < 30 && profile.answers.length < 2; i++) await page.waitForTimeout(100);
+        assert.deepEqual(
+          profile.answers.map((a) => [a.question, a.answer]),
+          [
+            ['Favorite language for systems work', 'Rust'],
+            ['Why this team in particular', 'A synthetic test answer.'],
+          ]
+        );
+        console.log('Multi-step save offer: ok');
+      } finally {
+        await page.close();
+      }
+    }
     await popup.locator('#autofillToken').fill('invalid-test-token');
     await popup.locator('#connect').click();
     await popup.getByText('Token rejected.', { exact: false }).waitFor();
