@@ -9,13 +9,38 @@ const NAV = [
   ['/autofill', 'Autofill', 'signed-in'],
   ['/settings', 'Settings'],
 ];
-const PROMPT_KEY = 'jb-autofill-prompt-dismissed';
+// One notice per update. Change `id` (and the text) when something ships;
+// each person then sees it for at most a day from the first time it shows,
+// and never again once they close it.
+const NOTICE = {
+  id: 'autofill-1.17',
+  text: 'Autofill now answers veteran, gender and race questions, and uses each resume’s own experience.',
+  link: '/autofill',
+  cta: 'Update the extension',
+};
+const DAY = 24 * 60 * 60 * 1000;
 
-function readDismissed() {
+function noticeVisible() {
   try {
-    return localStorage.getItem(PROMPT_KEY) === '1';
+    const key = 'jb-notice:' + NOTICE.id;
+    const seen = JSON.parse(localStorage.getItem(key) || 'null');
+    if (seen?.closed) return false;
+    if (!seen) {
+      localStorage.setItem(key, JSON.stringify({ first: Date.now() }));
+      return true;
+    }
+    return Date.now() - seen.first < DAY;
   } catch {
+    // Storage blocked: show nothing rather than nag on every visit.
     return false;
+  }
+}
+
+function closeNotice() {
+  try {
+    localStorage.setItem('jb-notice:' + NOTICE.id, JSON.stringify({ first: Date.now(), closed: true }));
+  } catch {
+    // Private mode: it's hidden for this visit anyway.
   }
 }
 
@@ -24,15 +49,11 @@ export default function TopBar({ total, isFetching, onRefresh }) {
   const { data } = useAccount();
   const signOut = useSignOut();
   const [menu, setMenu] = useState(false);
-  const [dismissed, setDismissed] = useState(readDismissed);
+  const [notice, setNotice] = useState(noticeVisible);
   const user = data?.user;
   const dismiss = () => {
-    setDismissed(true);
-    try {
-      localStorage.setItem(PROMPT_KEY, '1');
-    } catch {
-      // Private mode: it just shows again next visit.
-    }
+    setNotice(false);
+    closeNotice();
   };
 
   return (
@@ -88,14 +109,20 @@ export default function TopBar({ total, isFetching, onRefresh }) {
         )}
       </div>
     </header>
-    {user && !dismissed && path !== '/autofill' && path !== '/welcome' && (
+    {user && notice && path !== '/welcome' && (
       <div className="prompt-banner" role="note">
         <span>
-          <strong>New:</strong> fill job applications in one click.
+          <strong>New:</strong> {NOTICE.text}
         </span>
         <span className="prompt-actions">
-          <Link to="/autofill" className="btn btn-small">Get the extension</Link>
-          <button type="button" className="btn btn-small btn-ghost" onClick={dismiss}>Not now</button>
+          {path !== NOTICE.link && (
+            <Link to={NOTICE.link} className="link-button">
+              {NOTICE.cta}
+            </Link>
+          )}
+          <button type="button" className="notice-close" onClick={dismiss} aria-label="Close this notice">
+            ×
+          </button>
         </span>
       </div>
     )}

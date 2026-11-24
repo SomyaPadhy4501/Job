@@ -290,3 +290,29 @@ fieldset.section legend { font-weight: 600; font-size: 15px; padding: 0 6px; }
 }
 .tabs button.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-fg); }
 .history-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.prompt-banner { padding: 8px 10px 8px 14px; font-size: 13px; }
+.prompt-actions { align-items: center; gap: 12px; }
+.notice-close {
+  width: 28px; height: 28px; border: 0; border-radius: 50%; background: none; color: var(--accent-fg);
+  font-size: 20px; line-height: 1; cursor: pointer;
+}
+.notice-close:hover { background: rgba(10, 101, 204, 0.12); }
+.latex-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Resume upload: one drop zone, then a name. */
+.upload-card { gap: 12px; }
+.upload-card h3 { margin: 0; }
+.dropzone {
+  position: relative; display: flex; align-items: center; justify-content: center; text-align: center;
+  width: 100%; min-height: 110px; padding: 18px; border: 2px dashed var(--border-strong); border-radius: var(--radius-md);
+  background: var(--panel-hover); color: var(--text); cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover, .dropzone.is-over { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone.is-disabled { opacity: 0.55; cursor: not-allowed; }
+.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: inherit; }
+.dropzone > span { display: block; line-height: 1.6; }
+.dropzone small { display: block; margin-top: 2px; }
+.dropzone small { color: var(--text-muted); font-size: 12.5px; }
+.link-like { color: var(--accent); font-weight: 600; text-decoration: underline; }
+.upload-card .field { width: 100%; max-width: 420px; }
+.latex-cta h3 { margin: 0; }

@@ -38,7 +38,7 @@
     }
     if (typeof latest === 'string' && newer(latest, running)) {
       await chrome.storage.local.set({ updateAvailable: { version: latest, portal: portalUrl } });
-      await chrome.action.setBadgeBackgroundColor({ color: '#7c3aed' });
+      await chrome.action.setBadgeBackgroundColor({ color: '#0a65cc' });
       await chrome.action.setBadgeText({ text: 'NEW' });
       // Watch for the new files every 30 s until they arrive.
       if (!(await chrome.alarms.get(WATCH))) chrome.alarms.create(WATCH, { periodInMinutes: 0.5 });

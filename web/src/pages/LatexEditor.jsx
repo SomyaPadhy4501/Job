@@ -294,19 +294,14 @@ function Editor() {
 
   return (
     <div className="latex-page">
-      <div className="page-head">
-        <div>
-          <h2>{resumeId ? `Edit “${resume?.title || '…'}”` : 'New LaTeX resume'}</h2>
-          <p className="muted small">
-            Compiled in your browser with TeX Live (pdfLaTeX); your resume never leaves this page until you save it.{' '}
-            <a href="/resumes">Back to resumes</a>
-          </p>
-        </div>
+      <div className="page-head latex-head">
+        <h2>{resumeId ? `Edit “${resume?.title || '…'}”` : 'New LaTeX resume'}</h2>
+        <a className="btn btn-small btn-ghost" href="/resumes">← Resumes</a>
       </div>
 
       {draftOffer && (
         <div className="notice">
-          You have unsaved changes from earlier.{' '}
+          You have unsaved changes on this device.{' '}
           <button className="btn btn-small" onClick={() => { if (view.current) view.current.dispatch({ changes: { from: 0, to: view.current.state.doc.length, insert: draftOffer } }); else start(draftOffer); setDraftOffer(null); }}>
             Restore them
           </button>{' '}
@@ -324,7 +319,6 @@ function Editor() {
             <button className="btn btn-ghost" onClick={() => start(TEMPLATE)}>A blank template</button>
             <button className="btn btn-ghost" onClick={() => start('')}>Paste my own LaTeX</button>
           </div>
-          <p className="muted small">“My profile” fills the template with your education, experience and skills. You can change everything.</p>
         </div>
       )}
 

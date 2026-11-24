@@ -7,12 +7,12 @@
   --bg: #f1f2f4;
   --panel: #ffffff;
   --panel-hover: #f8f9fb;
-  --border: #e4e5e8;
-  --border-strong: #c8ccd1;
+  --border: #d5d9df;
+  --border-strong: #aeb5be;
 
   --text: #18191c;
-  --text-muted: #5e6670;
-  --text-subtle: #9199a3;
+  --text-muted: #474e57;
+  --text-subtle: #6b737d;
 
   --accent: #0a65cc;
   --accent-soft: #e7f0fa;
@@ -33,7 +33,7 @@
   --unknown-bg: #fef3c7;
   --unknown-fg: #92400e;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
   --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.10);
 
@@ -432,3 +432,6 @@ a { color: inherit; }
   .jobs-table thead th,
   .jobs-table tbody td { padding: 10px 12px; }
 }
+
+/* Placeholders readable everywhere (browser defaults are very faint). */
+input::placeholder, textarea::placeholder { color: var(--text-subtle); opacity: 1; }

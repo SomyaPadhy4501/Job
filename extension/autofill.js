@@ -55,24 +55,24 @@
       'button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border:1px solid #d4d7e0;' +
       'border-radius:8px;background:#fff;font-weight:600;cursor:pointer}' +
       'button:hover{border-color:#a5a9b8}button:disabled{opacity:.55;cursor:default}' +
-      'button.main{background:#7c3aed;border-color:#7c3aed;color:#fff}button.main:hover{background:#6d28d9}' +
-      'button.ghost{background:#fff;color:#5b21b6;border-color:#ddd6fe}' +
+      'button.main{background:#0a65cc;border-color:#0a65cc;color:#fff}button.main:hover{background:#0851a3}' +
+      'button.ghost{background:#fff;color:#0851a3;border-color:#cfe0f5}' +
       '.close{padding:4px 10px;font-weight:500;color:#6b7280}' +
-      ':host>button.main{border-radius:999px;padding:10px 18px;box-shadow:0 6px 18px rgba(124,58,237,.35)}' +
-      'strong{display:block;margin-top:4px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#5b21b6}' +
+      ':host>button.main{border-radius:999px;padding:10px 18px;box-shadow:0 6px 18px rgba(10,101,204,.35)}' +
+      'strong{display:block;margin-top:4px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#0851a3}' +
       'ul{display:flex;flex-direction:column;gap:6px;list-style:none}' +
       'li{display:block;padding:8px 10px;border:1px solid #eef0f4;border-radius:8px;background:#fafbfd;overflow-wrap:anywhere}' +
       'li br{display:none}' +
       'li label,.check{display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;color:#1a1d26}' +
-      'input[type=checkbox]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#7c3aed;border:1px solid #a5a9b8}' +
+      'input[type=checkbox]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#0a65cc;border:1px solid #a5a9b8}' +
       '.row{display:flex;gap:8px;flex-wrap:wrap}.ok{color:#047857}' +
       '.resumes{display:flex;flex-direction:column;gap:4px}' +
       '.resume-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e6e8ee;border-radius:8px;' +
       'font-size:13px;font-weight:500;color:#1a1d26;cursor:pointer;margin:0}' +
-      '.resume-row.on{border-color:#7c3aed;background:#f5f3ff}' +
+      '.resume-row.on{border-color:#0a65cc;background:#f3f8fd}' +
       '.resume-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      'input[type=radio]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#7c3aed;margin:0}' +
-      'button.small{padding:3px 9px;font-size:12px;font-weight:600;color:#5b21b6;border-color:#ddd6fe}'
+      'input[type=radio]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#0a65cc;margin:0}' +
+      'button.small{padding:3px 9px;font-size:12px;font-weight:600;color:#0851a3;border-color:#cfe0f5}'
   );
   const open = element('button', 'Autofill'),
     panel = element('section');

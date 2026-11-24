@@ -195,20 +195,6 @@ function AutofillPage() {
         </p>
       </section>
 
-      <section className="card section">
-        <h3>Trouble?</h3>
-        <ul>
-          <li>
-            <strong>“Token rejected”:</strong> create a new token above and connect again.
-          </li>
-          <li>
-            <strong>No Autofill button:</strong> make sure you're on the form itself, not the job description.
-          </li>
-          <li>
-            <strong>Developer-mode warning</strong> when the browser starts: normal, keep the extension.
-          </li>
-        </ul>
-      </section>
     </>
   );
 }

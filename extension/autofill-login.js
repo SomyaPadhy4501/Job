@@ -72,7 +72,7 @@
         'padding:12px 14px;max-width:340px;box-shadow:0 12px 32px rgba(15,23,42,.14)}' +
         'strong{display:block;margin-bottom:4px}p{margin:0 0 8px}' +
         'button{font:600 12.5px Inter,system-ui,sans-serif;margin:0 6px 0 0;padding:6px 10px;border-radius:8px;border:1px solid #d4d7e0;background:#fff;cursor:pointer}' +
-        'button.main{background:#7c3aed;border-color:#7c3aed;color:#fff}';
+        'button.main{background:#0a65cc;border-color:#0a65cc;color:#fff}';
       const box = document.createElement('div');
       box.setAttribute('role', 'status');
       root.append(style, box);
@@ -124,7 +124,7 @@
   }
 
   function outline(el) {
-    if (el) el.style.outline = '3px solid #7c3aed';
+    if (el) el.style.outline = '3px solid #0a65cc';
   }
 
   async function signIn(panel, email, password) {

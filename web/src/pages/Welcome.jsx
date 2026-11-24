@@ -56,7 +56,7 @@ export default function Welcome() {
       {step === 0 && (
         <>
           <p className="muted">
-            Upload your resumes and tag each one (SWE, AI Engineer…). Your profile fills in from them.
+            Upload your resumes and name each one (e.g. ML Engineer). Your profile fills in from them.
           </p>
           <Resumes />
           <StepNav onNext={next} nextLabel="Continue" />

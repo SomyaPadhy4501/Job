@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.17.0",
+  "version": "1.17.1",
   "description": "Sends the job listings a careers page loads to your own job board, and fills job applications from your profile. Personal use; load unpacked.",
   "permissions": [
     "storage",
@@ -25,7 +25,12 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Job Board Capture"
+    "default_title": "Job Board Capture",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
   "content_scripts": [
     {
@@ -93,5 +98,11 @@
       "all_frames": true
     }
   ],
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1/3oBLmYCSlotsErQo33k5kB/Xvc0hPvcanjzhQEy+hlBWCFbTbWWdnRberYxCz8a2ukIbhVmCH/QAivM1t+GhFOBu5/pcYeQLNS/lmoDetOK4j2hAusNXqCpAKczgl/Dz4C6BZN6UCjTp0H2YngBqprQ4FUEintAwDLParMef7a9l/XY79zmhNYoeWMxekp2qV0dGW1t2qnTBWYOeM5BSLcrnOdjWJRn4j2YyvKgjBsQThOCW7fCN/QdY3iT+nSvTv0Mz9Ns53q2VDYhKbTEds9bMsYvx5ahLAVep8h4O16VWGY1S4IuLgFq9QbQsumn5TgsKOZufa0hlqdrLmtTwIDAQAB"
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1/3oBLmYCSlotsErQo33k5kB/Xvc0hPvcanjzhQEy+hlBWCFbTbWWdnRberYxCz8a2ukIbhVmCH/QAivM1t+GhFOBu5/pcYeQLNS/lmoDetOK4j2hAusNXqCpAKczgl/Dz4C6BZN6UCjTp0H2YngBqprQ4FUEintAwDLParMef7a9l/XY79zmhNYoeWMxekp2qV0dGW1t2qnTBWYOeM5BSLcrnOdjWJRn4j2YyvKgjBsQThOCW7fCN/QdY3iT+nSvTv0Mz9Ns53q2VDYhKbTEds9bMsYvx5ahLAVep8h4O16VWGY1S4IuLgFq9QbQsumn5TgsKOZufa0hlqdrLmtTwIDAQAB",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

@@ -2,7 +2,6 @@ import { lazy, Suspense, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiBlob, formatBytes, formatDate, usePrivateQuery } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
-import TagInput from '../components/TagInput.jsx';
 import { Link } from '../router.jsx';
 
 const KEY = ['resumes'];
@@ -19,7 +18,7 @@ const PARSE_LABEL = {
 
 export default function Resumes() {
   return (
-    <RequireAuth reason="Sign in to keep your resumes, each with its own title and tags, for autofill.">
+    <RequireAuth reason="Sign in to keep your resumes for autofill.">
       <ResumesPage />
     </RequireAuth>
   );
@@ -29,26 +28,21 @@ function ResumesPage() {
   const { data, isLoading, error } = usePrivateQuery(KEY, '/api/me/resumes');
   if (isLoading) return <div className="card"><div className="skeleton skeleton-row" /></div>;
   if (error) return <div className="card error">{error.message}</div>;
-  const { resumes, limits, suggestedTags, storage } = data;
+  const { resumes, limits, storage } = data;
   return (
     <>
       <div className="page-head">
         <h2>Resumes</h2>
-        <p className="muted">
-          One resume per kind of role, tagged (SWE, AI Engineer…). The extension picks the best match for each job.
-        </p>
+        <p className="muted">One resume per kind of role. The extension picks the best match for each job.</p>
       </div>
       {storage ? (
-        <UploadCard limits={limits} suggestedTags={suggestedTags} full={resumes.length >= limits.maxResumes} />
+        <UploadCard limits={limits} full={resumes.length >= limits.maxResumes} />
       ) : (
         <div className="card notice">Resume uploads aren't available on this server yet.</div>
       )}
       {storage && (
         <div className="card latex-cta">
-          <div>
-            <h3>Write one in LaTeX</h3>
-            <p className="muted small">Edit LaTeX, see the PDF as you type, and save it here. Start from your profile or a template.</p>
-          </div>
+          <h3>Write one in LaTeX</h3>
           {/* A full page load: only the editor's page may run the compiler. */}
           <a className="btn btn-small" href="/resumes/latex" aria-disabled={resumes.length >= limits.maxResumes}>
             New LaTeX resume
@@ -60,30 +54,32 @@ function ResumesPage() {
       ) : (
         <div className="resume-list">
           {resumes.map((r) => (
-            <ResumeCard key={r.id} resume={r} suggestedTags={suggestedTags} />
+            <ResumeCard key={r.id} resume={r} />
           ))}
         </div>
       )}
       <p className="muted small">
-        {resumes.length} of {limits.maxResumes} resumes · {formatBytes(limits.usedBytes)} of {formatBytes(limits.maxTotalBytes)} ·{' '}
-        {limits.uploadsToday} of {limits.uploadsPerDay} uploads today
+        {resumes.length} of {limits.maxResumes} resumes
       </p>
     </>
   );
 }
 
-function UploadCard({ limits, suggestedTags, full }) {
+const ACCEPT = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const nameOf = (file) => file.name.replace(/\.(pdf|docx)$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 80);
+
+function UploadCard({ limits, full }) {
   const qc = useQueryClient();
   const fileInput = useRef(null);
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
-  const [tags, setTags] = useState([]);
+  const [over, setOver] = useState(false);
   const [result, setResult] = useState(null);
   const upload = useMutation({
     mutationFn: () => {
       const form = new FormData();
-      form.append('title', title);
-      form.append('tags', JSON.stringify(tags));
+      form.append('title', title.trim());
+      form.append('tags', '[]');
       form.append('file', file);
       return api('/api/me/resumes', { method: 'POST', form });
     },
@@ -91,12 +87,18 @@ function UploadCard({ limits, suggestedTags, full }) {
       setResult(data);
       setFile(null);
       setTitle('');
-      setTags([]);
       if (fileInput.current) fileInput.current.value = '';
       qc.invalidateQueries({ queryKey: KEY });
       if (data.imported?.length) qc.invalidateQueries({ queryKey: ['profile'] });
     },
   });
+  const choose = (f) => {
+    if (!f) return;
+    setFile(f);
+    setTitle(nameOf(f));
+    setResult(null);
+    upload.reset();
+  };
 
   const tooBig = file && file.size > limits.maxFileBytes;
   return (
@@ -104,59 +106,64 @@ function UploadCard({ limits, suggestedTags, full }) {
       className="card upload-card"
       onSubmit={(e) => {
         e.preventDefault();
-        if (file && !tooBig) upload.mutate();
+        if (file && !tooBig && title.trim()) upload.mutate();
       }}
     >
       <h3>Add a resume</h3>
-      <div className="form-grid">
+      <label
+        className={`dropzone${over ? ' is-over' : ''}${full ? ' is-disabled' : ''}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!full) setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          if (!full) choose(e.dataTransfer.files?.[0]);
+        }}
+      >
+        <input
+          ref={fileInput}
+          type="file"
+          accept={ACCEPT}
+          onChange={(e) => choose(e.target.files?.[0])}
+          disabled={full}
+        />
+        {file ? (
+          <span>
+            <strong>{file.name}</strong> · {formatBytes(file.size)} <span className="link-like">Change</span>
+          </span>
+        ) : (
+          <span>
+            Drop your resume here or <span className="link-like">choose a file</span>
+            <small>PDF or Word, up to {formatBytes(limits.maxFileBytes)}</small>
+          </span>
+        )}
+      </label>
+      {file && (
         <label className="field">
-          <span>File (PDF or Word .docx, up to {formatBytes(limits.maxFileBytes)})</span>
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={(e) => {
-              setFile(e.target.files?.[0] || null);
-              setResult(null);
-              upload.reset();
-            }}
-            disabled={full}
-          />
+          <span>Name it</span>
+          <input value={title} maxLength={80} required onChange={(e) => setTitle(e.target.value)} placeholder="e.g. ML Engineer" />
         </label>
-        <label className="field">
-          <span>Title (optional)</span>
-          <input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. ML / AI Engineer" />
-        </label>
-        <div className="field field-wide">
-          <span>Tags</span>
-          <TagInput value={tags} onChange={setTags} suggestions={suggestedTags} />
-        </div>
-      </div>
+      )}
       {tooBig && <p className="error">That file is over {formatBytes(limits.maxFileBytes)}.</p>}
       {full && <p className="notice">You have the most resumes allowed. Delete one to add another.</p>}
       {upload.error && <p className="error">{upload.error.message}</p>}
-      {result && (
-        <p className="success">
-          Uploaded “{result.resume.title}”.{' '}
-          {result.resume.parseStatus === 'parsed'
-            ? result.imported?.length
-              ? `Filled ${result.imported.length} profile fields from it; check them on your profile.`
-              : 'Its details are ready to review below.'
-            : PARSE_LABEL[result.resume.parseStatus]}
-        </p>
+      {result && <p className="success">Added “{result.resume.title}”.</p>}
+      {file && (
+        <button className="btn" disabled={tooBig || full || !title.trim() || upload.isPending}>
+          {upload.isPending ? 'Uploading…' : 'Upload'}
+        </button>
       )}
-      <button className="btn" disabled={!file || tooBig || full || upload.isPending}>
-        {upload.isPending ? 'Uploading…' : 'Upload'}
-      </button>
     </form>
   );
 }
 
-function ResumeCard({ resume, suggestedTags }) {
+function ResumeCard({ resume }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(resume.title);
-  const [tags, setTags] = useState(resume.tags);
   const [review, setReview] = useState(false);
   const [preview, setPreview] = useState(false);
   const done = () => qc.invalidateQueries({ queryKey: KEY });
@@ -185,32 +192,24 @@ function ResumeCard({ resume, suggestedTags }) {
           </h3>
         )}
         <span className="muted small">
-          {resume.fileName} · {formatBytes(resume.sizeBytes)} · added {formatDate(resume.createdAt)} ·{' '}
-          <span className={resume.parseStatus === 'parsed' ? '' : 'warn'}>{PARSE_LABEL[resume.parseStatus]}</span>
-          {resume.sourceStale && <span className="warn"> · PDF older than its LaTeX source</span>}
+          {resume.fileName} · {formatDate(resume.createdAt)}
+          {resume.parseStatus !== 'parsed' && <span className="warn"> · {PARSE_LABEL[resume.parseStatus]}</span>}
         </span>
       </div>
-      {editing ? (
-        <TagInput value={tags} onChange={setTags} suggestions={suggestedTags} />
-      ) : (
-        <div className="tag-list">
-          {resume.tags.length ? resume.tags.map((t) => <span key={t} className="pill">{t}</span>) : <span className="muted small">No tags</span>}
-        </div>
-      )}
       {error && <p className="error">{error.message}</p>}
       <div className="row-actions">
         {editing ? (
           <>
-            <button className="btn btn-small" disabled={save.isPending} onClick={() => save.mutate({ title, tags })}>
+            <button className="btn btn-small" disabled={save.isPending || !title.trim()} onClick={() => save.mutate({ title: title.trim() })}>
               Save
             </button>
-            <button className="btn btn-small btn-ghost" onClick={() => { setEditing(false); setTitle(resume.title); setTags(resume.tags); }}>
+            <button className="btn btn-small btn-ghost" onClick={() => { setEditing(false); setTitle(resume.title); }}>
               Cancel
             </button>
           </>
         ) : (
           <>
-            <button className="btn btn-small btn-ghost" onClick={() => setEditing(true)}>Edit title & tags</button>
+            <button className="btn btn-small btn-ghost" onClick={() => setEditing(true)}>Rename</button>
             {!resume.isDefault && (
               <button className="btn btn-small btn-ghost" disabled={save.isPending} onClick={() => save.mutate({ isDefault: true })}>
                 Make default
