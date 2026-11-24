@@ -105,6 +105,8 @@ async function enrichDescription(boardHost, job) {
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
     redirect: 'follow',
+    // A hung page used to hold its pool slot for the rest of the run.
+    signal: AbortSignal.timeout(CONFIG.requestTimeoutMs),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   const html = await res.text();

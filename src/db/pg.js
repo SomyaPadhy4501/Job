@@ -160,30 +160,79 @@ async function upsertJob(job, client) {
   return { inserted: 1, updated: 0 };
 }
 
+// Rows per transaction. One transaction for the whole run meant a single bad
+// row (say a dedupe_key clash with a scraper ingest landing at the same moment)
+// rolled back every job the run had fetched.
+const UPSERT_CHUNK = 250;
+
+// Redoes a failed chunk one row at a time, each behind a savepoint, so only
+// the rows that really fail are skipped. If every row fails, the problem isn't
+// the rows (connection lost, schema mismatch): throw so the run fails loudly.
+async function upsertRowByRow(client, rows) {
+  let inserted = 0;
+  let updated = 0;
+  let failed = 0;
+  let lastErr;
+  await client.query('BEGIN');
+  try {
+    for (const row of rows) {
+      await client.query('SAVEPOINT row_upsert');
+      try {
+        const r = await upsertJob(row, client);
+        await client.query('RELEASE SAVEPOINT row_upsert');
+        inserted += r.inserted;
+        updated += r.updated;
+      } catch (err) {
+        await client.query('ROLLBACK TO SAVEPOINT row_upsert');
+        failed++;
+        lastErr = err;
+        console.warn(`[db] skipped one job (${row.apply_url || row.dedupe_key}): ${err.message}`);
+      }
+    }
+    if (failed === rows.length) throw lastErr;
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
+  return { inserted, updated, failed };
+}
+
 /**
- * Bulk-upsert an array of normalised rows in a single transaction.
- * Returns { inserted, updated }.
+ * Bulk-upsert normalised rows in transactions of UPSERT_CHUNK rows.
+ * Returns { inserted, updated, failed }.
  */
 async function bulkUpsert(rows) {
-  if (!rows.length) return { inserted: 0, updated: 0 };
+  if (!rows.length) return { inserted: 0, updated: 0, failed: 0 };
   const client = await getPool().connect();
   let inserted = 0;
   let updated = 0;
+  let failed = 0;
   try {
-    await client.query('BEGIN');
-    for (const row of rows) {
-      const r = await upsertJob(row, client);
+    for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
+      const chunk = rows.slice(i, i + UPSERT_CHUNK);
+      let r;
+      try {
+        await client.query('BEGIN');
+        r = { inserted: 0, updated: 0, failed: 0 };
+        for (const row of chunk) {
+          const one = await upsertJob(row, client);
+          r.inserted += one.inserted;
+          r.updated += one.updated;
+        }
+        await client.query('COMMIT');
+      } catch {
+        await client.query('ROLLBACK').catch(() => {});
+        r = await upsertRowByRow(client, chunk);
+      }
       inserted += r.inserted;
       updated += r.updated;
+      failed += r.failed;
     }
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
   } finally {
     client.release();
   }
-  return { inserted, updated };
+  return { inserted, updated, failed };
 }
 
 async function pruneStaleJobs(days) {

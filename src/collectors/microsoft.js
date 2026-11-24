@@ -35,8 +35,11 @@ async function fetchQuery(query) {
       `&location=&start=${start}&sort_by=recent`;
     let data;
     try {
-      data = await fetchJson(url, { retries: 1 });
-    } catch {
+      data = await fetchJson(url, { retries: 2 });
+    } catch (err) {
+      // A failed first page is a failed query, not an empty one; a later page
+      // keeps the rows already read.
+      if (start === 0) throw err;
       break;
     }
     const positions = Array.isArray(data?.data?.positions) ? data.data.positions : [];
@@ -50,14 +53,19 @@ async function fetchQuery(query) {
 
 async function fetchCompany({ displayName }) {
   const byId = new Map();
+  let failedQueries = 0;
+  let lastErr;
   for (const q of QUERIES) {
     try {
       const rows = await fetchQuery(q);
       for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, r);
-    } catch {
-      /* one query failing is fine */
+    } catch (err) {
+      // One query failing is fine; all of them failing is a failed company.
+      failedQueries++;
+      lastErr = err;
     }
   }
+  if (failedQueries === QUERIES.length) throw lastErr;
 
   const out = [];
   for (const p of byId.values()) {

@@ -52,11 +52,20 @@ async function fetchPages(company, searchText, cap) {
   const limit = 20;
   let total = Infinity;
   while (offset < cap) {
-    const data = await fetchJson(`${baseUrl(company)}/jobs`, {
-      method: 'POST',
-      body: { appliedFacets: {}, limit, offset, searchText },
-      retries: 1,
-    });
+    let data;
+    try {
+      data = await fetchJson(`${baseUrl(company)}/jobs`, {
+        method: 'POST',
+        body: { appliedFacets: {}, limit, offset, searchText },
+        retries: 2,
+      });
+    } catch (err) {
+      // First page: the tenant really failed. Later page (usually a 429 deep
+      // into a big tenant): keep what was already read instead of losing it all.
+      if (offset === 0) throw err;
+      console.warn(`[workday] ${company.slug}: stopped at offset ${offset} (${err.message}); keeping ${all.length} rows`);
+      break;
+    }
     const items = Array.isArray(data?.jobPostings) ? data.jobPostings : [];
     if (offset === 0 && Number.isFinite(data?.total)) total = data.total;
     if (!items.length) break;

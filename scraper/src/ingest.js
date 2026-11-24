@@ -11,11 +11,25 @@ async function ingest(source, jobs) {
   const headers = { 'content-type': 'application/json' };
   if (CONFIG.ingestToken) headers['x-collect-token'] = CONFIG.ingestToken;
 
-  const res = await fetch(CONFIG.ingestUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ source, jobs }),
-  });
+  // Ingest is an upsert, so one retry after a network error or a 5xx (a Vercel
+  // cold start, a Neon hiccup) is safe. The timeout stops a hung request from
+  // holding the job until GitHub kills it.
+  const post = () =>
+    fetch(CONFIG.ingestUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ source, jobs }),
+      signal: AbortSignal.timeout(120_000),
+    });
+  let res;
+  try {
+    res = await post();
+    if (res.status >= 500) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    log.warn('ingest.retry', { source, error: err.message });
+    await new Promise((r) => setTimeout(r, 10_000));
+    res = await post();
+  }
 
   const text = await res.text();
   let body;

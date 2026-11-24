@@ -46,8 +46,11 @@ async function fetchQuery(company, query) {
       `&location=&start=${start}&num=${PAGE_SIZE}&sort_by=recent`;
     let data;
     try {
-      data = await fetchJson(url, { retries: 1 });
-    } catch {
+      data = await fetchJson(url, { retries: 2 });
+    } catch (err) {
+      // A failed first page is a failed query, not an empty one; a later page
+      // keeps the rows already read.
+      if (start === 0) throw err;
       break;
     }
     const positions = Array.isArray(data?.data?.positions) ? data.data.positions : [];
@@ -154,6 +157,8 @@ async function fetchCompany(company) {
   }
 
   const byId = new Map();
+  let failedQueries = 0;
+  let lastErr;
   for (const q of QUERIES) {
     try {
       const rows = await fetchQuery(company, q);
@@ -161,10 +166,13 @@ async function fetchCompany(company) {
         const id = r.id || r.displayJobId || r.atsJobId;
         if (id && !byId.has(String(id))) byId.set(String(id), r);
       }
-    } catch {
-      /* one query failing is fine */
+    } catch (err) {
+      // One query failing is fine; all of them failing is a failed company.
+      failedQueries++;
+      lastErr = err;
     }
   }
+  if (failedQueries === QUERIES.length) throw lastErr;
 
   const out = [];
   for (const p of byId.values()) {

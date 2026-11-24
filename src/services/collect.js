@@ -34,7 +34,10 @@ async function fetchCompanySafe(company) {
 }
 
 async function collectAll({ companies = COMPANIES } = {}) {
-  const runId = startRun();
+  // The Postgres store is async and the SQLite one isn't; await works for both.
+  // Without it the run id was a Promise, and prune / finishRun raced the
+  // process exit in GitHub Actions.
+  const runId = await startRun();
   const started = Date.now();
   log.info('collection.start', { runId, companies: companies.length });
 
@@ -110,7 +113,8 @@ async function collectAll({ companies = COMPANIES } = {}) {
   const deduped = dedupeBatch(normalized);
 
   // Bulk upsert in a single transaction (works for both SQLite and Postgres).
-  const { inserted, updated } = await bulkUpsert(deduped);
+  const { inserted, updated, failed = 0 } = await bulkUpsert(deduped);
+  if (failed > 0) log.warn('collection.rows_failed', { runId, failed });
 
   // Retention sweep: delete rows older than the retention window. Hits both
   // dated rows that slipped past normalize (e.g. curated lists that re-publish
@@ -118,10 +122,10 @@ async function collectAll({ companies = COMPANIES } = {}) {
   // stopped listing them — role filled or pulled).
   const expired = expiredUrls.length ? await deleteByApplyUrls(expiredUrls) : 0;
   if (expired > 0) log.info('collection.expired', { runId, expired });
-  const pruned = pruneStaleJobs(CONFIG.retentionDays);
+  const pruned = await pruneStaleJobs(CONFIG.retentionDays);
   if (pruned > 0) log.info('collection.pruned', { runId, pruned, days: CONFIG.retentionDays });
 
-  finishRun(runId, {
+  await finishRun(runId, {
     companies_ok: companiesOk,
     companies_fail: companiesFail,
     jobs_inserted: inserted,
@@ -138,10 +142,20 @@ async function collectAll({ companies = COMPANIES } = {}) {
     kept: deduped.length,
     inserted,
     updated,
+    rowsFailed: failed,
     seconds: took,
   });
 
-  return { runId, companiesOk, companiesFail, inserted, updated, kept: deduped.length };
+  return {
+    runId,
+    companiesOk,
+    companiesFail,
+    inserted,
+    updated,
+    rowsFailed: failed,
+    kept: deduped.length,
+    errors,
+  };
 }
 
 module.exports = { collectAll };

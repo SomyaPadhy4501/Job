@@ -9,7 +9,11 @@ const { closeBrowser } = require('./browser');
   try {
     const results = await runAll();
     console.log(JSON.stringify(results, null, 2));
-    process.exitCode = 0;
+    // Every target failing (ingest down, browser broken) is a failed run, so
+    // GitHub marks it red instead of green.
+    const allFailed = results.length > 0 && results.every((r) => !r.ok);
+    if (allFailed) console.error('run-once failed: every target failed');
+    process.exitCode = allFailed ? 1 : 0;
   } catch (err) {
     console.error('run-once failed:', err.message);
     process.exitCode = 1;
