@@ -273,3 +273,31 @@ $('clearSitePassword').onclick = async () => {
   showSitePassword('Removed.');
 };
 showSitePassword();
+
+// "Codes from Gmail": shown only when this copy has a Gmail client set up.
+async function showGmail(message) {
+  try {
+    const { available, email } = await autofill('gmailStatus');
+    $('gmailCard').hidden = !available;
+    $('gmailState').textContent = message || (email ? 'Connected: ' + email : 'Not connected.');
+    $('gmailDisconnect').disabled = !email;
+  } catch (err) {
+    $('gmailState').textContent = err.message;
+  }
+}
+$('gmailConnect').onclick = async () => {
+  $('gmailState').textContent = 'Opening Google…';
+  try {
+    // The account to suggest: the one the job board knows.
+    const hint = await autofill('getProfile').then((d) => d.profile?.contact?.email || d.user?.email, () => undefined);
+    const { email } = await autofill('gmailConnect', { hint });
+    showGmail('Connected: ' + email);
+  } catch (err) {
+    showGmail(err.message);
+  }
+};
+$('gmailDisconnect').onclick = async () => {
+  await autofill('gmailDisconnect').catch(() => {});
+  showGmail('Disconnected.');
+};
+showGmail();

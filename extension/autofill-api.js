@@ -131,6 +131,29 @@
       await chrome.storage.session.set({ [LEDGER]: ledger });
       return { password: saved.password, autoSignIn: !entry.failed };
     }
+    // ─── Gmail: codes and verify links (gmail.js) ───────────────────────
+    if (msg.type === 'autofill:gmailStatus' || msg.type === 'autofill:gmailConnect' || msg.type === 'autofill:gmailDisconnect') {
+      // Only the popup starts Google's consent window or changes the connection.
+      if (!isPopup) throw new Error('Use the extension popup.');
+      if (msg.type === 'autofill:gmailStatus') return AutofillGmail.status();
+      if (msg.type === 'autofill:gmailDisconnect') return AutofillGmail.disconnect().then(() => ({}));
+      const hint = typeof msg.hint === 'string' && msg.hint.includes('@') ? msg.hint.slice(0, 200) : undefined;
+      return { email: (await AutofillGmail.authorize(true, hint)).email };
+    }
+    if (msg.type === 'autofill:findCode' || msg.type === 'autofill:openVerifyLink') {
+      const site = JobApplicationPages.ats(url.hostname);
+      if (isPopup || !['workday', 'greenhouse'].includes(site))
+        throw new Error('Codes are read only for Workday and Greenhouse pages.');
+      const tenant = JobApplicationPages.workdayTenant(sender.url);
+      if (site === 'workday' && !tenant) throw new Error('Unknown Workday company.');
+      if (msg.type === 'autofill:openVerifyLink') {
+        if (site !== 'workday' || sender.frameId !== 0) throw new Error('Only Workday sign-in pages open verify links.');
+        return { opened: await AutofillGmail.openVerifyLink(tenant) };
+      }
+      const length = Number.isInteger(msg.length) && msg.length >= 4 && msg.length <= 10 ? msg.length : 0;
+      const charset = msg.charset === 'digits' ? 'digits' : 'alnum';
+      return { code: await AutofillGmail.findCode(site, tenant, { length, charset }) };
+    }
     // Answers typed into an application, held between steps and "submit" and
     // the next page, so the save prompt survives a page change and a
     // multi-step form (Workday) offers every step's answers. Per tab, 30

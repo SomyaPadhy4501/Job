@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Sends the job listings a careers page loads to your own job board, and fills job applications from your profile. Personal use; load unpacked.",
   "permissions": [
     "storage",
     "alarms",
     "activeTab",
-    "scripting"
+    "scripting",
+    "identity"
   ],
   "optional_host_permissions": [
     "https://*/*"
@@ -15,7 +16,9 @@
   "host_permissions": [
     "https://*.vercel.app/*",
     "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://127.0.0.1/*",
+    "https://gmail.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -75,6 +78,19 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.myworkdayjobs.com/*",
+        "https://*.myworkdaysite.com/*",
+        "https://boards.greenhouse.io/*",
+        "https://job-boards.greenhouse.io/*"
+      ],
+      "js": [
+        "autofill-codes.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1/3oBLmYCSlotsErQo33k5kB/Xvc0hPvcanjzhQEy+hlBWCFbTbWWdnRberYxCz8a2ukIbhVmCH/QAivM1t+GhFOBu5/pcYeQLNS/lmoDetOK4j2hAusNXqCpAKczgl/Dz4C6BZN6UCjTp0H2YngBqprQ4FUEintAwDLParMef7a9l/XY79zmhNYoeWMxekp2qV0dGW1t2qnTBWYOeM5BSLcrnOdjWJRn4j2YyvKgjBsQThOCW7fCN/QdY3iT+nSvTv0Mz9Ns53q2VDYhKbTEds9bMsYvx5ahLAVep8h4O16VWGY1S4IuLgFq9QbQsumn5TgsKOZufa0hlqdrLmtTwIDAQAB"

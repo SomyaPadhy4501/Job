@@ -78,7 +78,7 @@ const contractProfile = {
   answers: [{ question: 'Why us?', answer: 'Because.' }],
 };
 
-function load({ portalUrl = 'https://portal.example', routes = {}, granted = [] } = {}) {
+function load({ portalUrl = 'https://portal.example', routes = {}, granted = [], gmail } = {}) {
   const calls = [];
   let listener;
   const local = area({ portalUrl });
@@ -109,6 +109,7 @@ function load({ portalUrl = 'https://portal.example', routes = {}, granted = [] 
     URL,
     btoa,
     JobApplicationPages: pages,
+    AutofillGmail: gmail,
   };
   sandbox.globalThis = sandbox;
   vm.runInNewContext(source, sandbox);
@@ -326,4 +327,33 @@ test('Workday companies are told apart on both Workday hosts', () => {
   assert.equal(pages.workdayTenant('https://wd1.myworkdaysite.com/en-US/recruiting/Acme/External/job/1'), 'acme');
   assert.equal(pages.workdayTenant('https://wd1.myworkdaysite.com/recruiting/beta/x'), 'beta');
   assert.equal(pages.workdayTenant('https://jobs.lever.co/acme/1'), '');
+});
+
+test('Gmail: only the popup connects; codes only for Workday and Greenhouse pages', async () => {
+  const asked = [];
+  const gmail = {
+    status: async () => ({ available: true, email: null }),
+    authorize: async () => ({ email: 'pat@example.invalid' }),
+    disconnect: async () => {},
+    findCode: async (site, tenant, shape) => (asked.push({ site, tenant, shape }), '123456'),
+    openVerifyLink: async (tenant) => (asked.push({ verify: tenant }), true),
+  };
+  const api = load({ gmail, granted: ['https://careers.example/*'] });
+  assert.match((await api.send({ type: 'autofill:gmailConnect' }, WORKDAY())).error, /popup/);
+  assert.deepEqual((await api.send({ type: 'autofill:gmailConnect' }, FROM_POPUP)).data, { email: 'pat@example.invalid' });
+  for (const sender of [ATS_TAB, { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, FROM_POPUP]) {
+    assert.equal((await api.send({ type: 'autofill:findCode', length: 6 }, sender)).ok, false, sender.url);
+  }
+  const gh = { id: 'ext', url: 'https://job-boards.greenhouse.io/acme/jobs/1', tab: { id: 4 }, frameId: 3 };
+  assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 8, charset: 'whatever' }, gh)).data, { code: '123456' });
+  assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 99 }, WORKDAY())).data, { code: '123456' });
+  assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(0, 2))), [
+    { site: 'greenhouse', tenant: '', shape: { length: 8, charset: 'alnum' } },
+    { site: 'workday', tenant: 'acme', shape: { length: 0, charset: 'alnum' } },
+  ]);
+  // Verify links: Workday's top frame only.
+  assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, gh)).ok, false);
+  assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY({ frameId: 1 }))).ok, false);
+  assert.deepEqual((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY())).data, { opened: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(asked[2])), { verify: "acme" });
 });

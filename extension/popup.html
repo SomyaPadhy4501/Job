@@ -84,6 +84,13 @@
       <p class="muted">12+ characters with upper and lower case, a number and a symbol. Don't reuse a password from another site.</p>
     </section>
 
+    <section class="card" id="gmailCard" hidden aria-labelledby="gmail-title">
+      <h2 id="gmail-title">Codes from Gmail</h2>
+      <p class="muted">When Greenhouse or Workday emails you a code or a verify link mid-application, the extension reads it from Gmail and fills it in (it never presses submit). Read-only access; only mail from those sites, from the last 15 minutes.</p>
+      <p id="gmailState" role="status" class="muted"></p>
+      <div class="row"><button id="gmailConnect">Connect Gmail</button><button id="gmailDisconnect">Disconnect</button></div>
+    </section>
+
     <details class="card">
       <summary>Advanced: job collection (site owner)</summary>
       <label class="check"><input type="checkbox" id="enabled"> Capture listings on careers pages</label>

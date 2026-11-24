@@ -28,6 +28,24 @@ export default function Privacy() {
         <li>The extension sends your data only to this site, never to employers' sites except into the form you asked it to fill. It never submits an application.</li>
         <li>No ads and no third-party trackers.</li>
       </ul>
+      <h3>Optional features in the extension and editor</h3>
+      <ul>
+        <li>
+          <strong>Job site password.</strong> If you set one in the extension, it's kept only in that browser's extension
+          storage and used only on Workday sign-in pages. This site never receives it.
+        </li>
+        <li>
+          <strong>Codes from Gmail.</strong> If you connect Gmail in the extension, it gets read-only access through
+          Google's own consent screen. It looks only at mail from Workday and Greenhouse received in the last 15 minutes,
+          takes just the code or verification link, and never stores or sends your email anywhere. The access stays in the
+          extension (this site never sees it); Disconnect revokes it.
+        </li>
+        <li>
+          <strong>LaTeX editor.</strong> Your LaTeX is compiled in your browser. The compiler and TeX's package files come
+          from Siglum's public package service (packages.siglum.org); your resume's text is never sent there. What you
+          save is stored like any other resume, with the source encrypted.
+        </li>
+      </ul>
       <h3>Your controls</h3>
       <ul>
         <li>

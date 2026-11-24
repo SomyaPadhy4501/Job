@@ -447,6 +447,40 @@ async function live() {
         await page.close();
       }
     }
+    // Code boxes are noticed; without a Gmail client set up the extension
+    // says so instead of failing silently.
+    {
+      const page = await context.newPage();
+      try {
+        await page.route('https://job-boards.greenhouse.io/codes/**', (r) =>
+          r.fulfill({
+            contentType: 'text/html',
+            body:
+              '<div id="application-form"><p>Enter the security code we emailed you</p>' +
+              Array.from({ length: 8 }, (_, i) => `<input id="security-input-${i}" maxlength="1">`).join('') +
+              '</div>',
+          })
+        );
+        await page.goto('https://job-boards.greenhouse.io/codes/jobs/1', { waitUntil: 'domcontentloaded' });
+        const cdp = await context.newCDPSession(page);
+        let text = '';
+        for (let i = 0; i < 40 && !/Gmail/.test(text); i++) {
+          await page.waitForTimeout(250);
+          const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+          const shadows = (n) => [...(n.shadowRoots || []), ...(n.children || []).flatMap(shadows)];
+          for (const node of shadows(root)) {
+            const found = await cdp.send('DOM.querySelector', { nodeId: node.nodeId, selector: '[role="status"]' });
+            if (!found.nodeId) continue;
+            const { outerHTML } = await cdp.send('DOM.getOuterHTML', { nodeId: found.nodeId });
+            if (/Gmail/.test(outerHTML)) text = outerHTML;
+          }
+        }
+        assert.match(text, /Gmail isn.t set up/);
+        console.log('Code boxes noticed: ok');
+      } finally {
+        await page.close();
+      }
+    }
     await popup.locator('#autofillToken').fill('invalid-test-token');
     await popup.locator('#connect').click();
     await popup.getByText('Token rejected.', { exact: false }).waitFor();
