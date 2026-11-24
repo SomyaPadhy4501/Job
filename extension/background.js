@@ -1,7 +1,7 @@
 // Service worker: de-duplicates captured rows, posts them to the portal's
 // /admin/ingest in batches, keeps a short capture log for the popup, and opens
 // the saved boards once a day.
-importScripts('schedule.js', 'application-pages.js', 'config.js', 'gmail.js', 'autofill-api.js', 'updates.js', 'workday-collect.js');
+importScripts('schedule.js', 'application-pages.js', 'gmail.js', 'autofill-api.js', 'updates.js', 'workday-collect.js');
 
 const BATCH = 500;          // rows per request, at most…
 const BATCH_BYTES = 2_500_000; // …and bytes: Vercel rejects bodies over ~4.5 MB

@@ -99,6 +99,7 @@ version = "0.1.0"
 dependencies = [
  "accounts",
  "axum",
+ "base64 0.22.1",
  "db",
  "reqwest",
  "serde",
@@ -108,6 +109,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+ "url",
  "uuid",
 ]
 

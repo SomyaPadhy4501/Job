@@ -49,6 +49,13 @@ pub enum Field {
     AlertSpec,
     ChatAddress,
     QueueNote,
+    /// The Gmail account and refresh token of a connection.
+    GmailGrant,
+    /// A connection's cached access token and its expiry.
+    GmailAccess,
+    /// A Gmail connect in progress (PKCE verifier, state, nonce), kept in a
+    /// browser cookie rather than a table.
+    GmailFlow,
 }
 
 impl Field {
@@ -61,6 +68,9 @@ impl Field {
             Field::AlertSpec => "job_alerts.spec",
             Field::ChatAddress => "chat_links.address",
             Field::QueueNote => "apply_queue.note",
+            Field::GmailGrant => "gmail_connections.grant_data",
+            Field::GmailAccess => "gmail_connections.access_data",
+            Field::GmailFlow => "cookie.gmail_flow",
         }
     }
 }

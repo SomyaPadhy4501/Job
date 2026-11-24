@@ -42,6 +42,13 @@ struct TestApp {
 }
 
 fn app_with(tweak: impl FnOnce(&mut Config)) -> Option<TestApp> {
+    app_built(tweak, |s| s)
+}
+
+fn app_built(
+    tweak: impl FnOnce(&mut Config),
+    wrap: impl FnOnce(AppState) -> AppState,
+) -> Option<TestApp> {
     let Ok(url) = std::env::var("DATABASE_URL") else {
         eprintln!("DATABASE_URL is unset; skipping API tests");
         return None;
@@ -66,7 +73,7 @@ fn app_with(tweak: impl FnOnce(&mut Config)) -> Option<TestApp> {
         config,
     );
     Some(TestApp {
-        router: router(state),
+        router: router(wrap(state)),
         pool,
     })
 }
@@ -2540,4 +2547,586 @@ async fn telegram_links_one_account_per_chat_and_answers_commands() {
             who.send(Method::DELETE, &path, None, vec![]).await;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Gmail connector: the whole OAuth code + PKCE + OIDC flow against a fake
+// Google (token, revoke and Gmail endpoints).
+
+#[derive(Default)]
+struct FakeGoogle {
+    /// From the consent URL the server built.
+    challenge: String,
+    nonce: String,
+    /// What the token endpoint grants.
+    scope: String,
+    /// The refresh grant is still good.
+    refresh_ok: bool,
+    /// Gmail refuses the first access token (it "expired").
+    refuse_first_token: bool,
+    revoked: Vec<String>,
+    exchanges: usize,
+    messages: Vec<Value>,
+}
+
+type Fake = std::sync::Arc<std::sync::Mutex<FakeGoogle>>;
+
+fn b64url(s: &str) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(s)
+}
+
+fn gmail_message(id: &str, from: &str, minutes_ago: i64, mime: &str, body: &str) -> Value {
+    let at = (time::OffsetDateTime::now_utc().unix_timestamp() - minutes_ago * 60) * 1000;
+    json!({
+        "id": id,
+        "internalDate": at.to_string(),
+        "payload": {
+            "mimeType": mime,
+            "headers": [{"name": "From", "value": from}],
+            "body": {"data": b64url(body)},
+        }
+    })
+}
+
+async fn fake_google() -> (accounts::gmail::Endpoints, Fake) {
+    use axum::extract::{Path, State};
+    use axum::routing::{get, post};
+    use std::collections::HashMap;
+
+    let fake: Fake = Default::default();
+    {
+        let mut f = fake.lock().unwrap();
+        f.scope = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly".into();
+        f.refresh_ok = true;
+    }
+    async fn token(
+        State(fake): State<Fake>,
+        axum::Form(form): axum::Form<HashMap<String, String>>,
+    ) -> axum::response::Response {
+        use axum::response::IntoResponse;
+        let mut f = fake.lock().unwrap();
+        let bad =
+            |e: &str| (StatusCode::BAD_REQUEST, axum::Json(json!({"error": e}))).into_response();
+        if form.get("client_id").map(String::as_str) != Some(TEST_CLIENT_ID)
+            || form.get("client_secret").map(String::as_str) != Some("test-secret")
+        {
+            return bad("invalid_client");
+        }
+        match form.get("grant_type").map(String::as_str) {
+            Some("authorization_code") => {
+                let verifier = form.get("code_verifier").cloned().unwrap_or_default();
+                // PKCE: the verifier must hash to the challenge Google was shown.
+                if form.get("code").map(String::as_str) != Some("good-code")
+                    || accounts::gmail::Pkce::challenge_of(&verifier) != f.challenge
+                {
+                    return bad("invalid_grant");
+                }
+                f.exchanges += 1;
+                let now = time::OffsetDateTime::now_utc().unix_timestamp();
+                let id_token = sign_google_token(
+                    &json!({
+                        "iss": "https://accounts.google.com", "aud": TEST_CLIENT_ID, "sub": "gmail-sub",
+                        "email": "pat@gmail.example", "email_verified": true,
+                        "iat": now, "exp": now + 600, "nonce": f.nonce,
+                    }),
+                    TEST_KID,
+                );
+                axum::Json(json!({
+                    "access_token": "at-1", "expires_in": 3599, "refresh_token": "rt-1",
+                    "scope": f.scope, "token_type": "Bearer", "id_token": id_token,
+                }))
+                .into_response()
+            }
+            Some("refresh_token")
+                if f.refresh_ok
+                    && form.get("refresh_token").map(String::as_str) == Some("rt-1") =>
+            {
+                axum::Json(json!({"access_token": "at-2", "expires_in": 3599, "scope": f.scope}))
+                    .into_response()
+            }
+            _ => bad("invalid_grant"),
+        }
+    }
+    fn authorized(f: &FakeGoogle, headers: &HeaderMap) -> bool {
+        let t = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        t == "Bearer at-2" || (t == "Bearer at-1" && !f.refuse_first_token)
+    }
+    let app = axum::Router::new()
+        .route("/token", post(token))
+        .route(
+            "/revoke",
+            post(
+                |State(fake): State<Fake>,
+                 axum::Form(form): axum::Form<HashMap<String, String>>| async move {
+                    fake.lock()
+                        .unwrap()
+                        .revoked
+                        .push(form.get("token").cloned().unwrap_or_default());
+                    StatusCode::OK
+                },
+            ),
+        )
+        .route(
+            "/gmail/messages",
+            get(|State(fake): State<Fake>, headers: HeaderMap| async move {
+                let f = fake.lock().unwrap();
+                if !authorized(&f, &headers) {
+                    return Err(StatusCode::UNAUTHORIZED);
+                }
+                let ids: Vec<Value> = f.messages.iter().map(|m| json!({"id": m["id"]})).collect();
+                Ok(axum::Json(json!({ "messages": ids })))
+            }),
+        )
+        .route(
+            "/gmail/messages/{id}",
+            get(
+                |State(fake): State<Fake>, headers: HeaderMap, Path(id): Path<String>| async move {
+                    let f = fake.lock().unwrap();
+                    if !authorized(&f, &headers) {
+                        return Err(StatusCode::UNAUTHORIZED);
+                    }
+                    f.messages
+                        .iter()
+                        .find(|m| m["id"] == id.as_str())
+                        .cloned()
+                        .map(axum::Json)
+                        .ok_or(StatusCode::NOT_FOUND)
+                },
+            ),
+        )
+        .with_state(fake.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let endpoints = accounts::gmail::Endpoints {
+        authorize: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+        token: format!("{base}/token"),
+        revoke: format!("{base}/revoke"),
+        gmail: format!("{base}/gmail"),
+    };
+    (endpoints, fake)
+}
+
+fn gmail_app(endpoints: accounts::gmail::Endpoints) -> Option<TestApp> {
+    app_built(
+        |_| {},
+        |state| {
+            state.with_gmail(
+                accounts::gmail::GmailClient::new(
+                    TEST_CLIENT_ID,
+                    "test-secret",
+                    "http://localhost/api/connectors/gmail/callback",
+                    endpoints,
+                ),
+                test_verifier(),
+            )
+        },
+    )
+}
+
+/// Starts a connect; returns the consent URL's query, and tells the fake
+/// Google the challenge and nonce it was shown.
+async fn start_gmail(
+    b: &mut Browser<'_>,
+    fake: &Fake,
+) -> std::collections::HashMap<String, String> {
+    let res = b
+        .json(Method::POST, "/api/me/connectors/gmail/start", json!({}))
+        .await;
+    assert_eq!(
+        res.status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&res.body)
+    );
+    let cookie = res
+        .cookies()
+        .into_iter()
+        .find(|c| c.starts_with("jb_gmail="))
+        .expect("flow cookie");
+    assert!(
+        cookie.contains("HttpOnly")
+            && cookie.contains("SameSite=Lax")
+            && cookie.contains("Max-Age=600")
+    );
+    let url = url::Url::parse(res.json()["url"].as_str().unwrap()).unwrap();
+    let q: std::collections::HashMap<String, String> = url.query_pairs().into_owned().collect();
+    assert_eq!(q["response_type"], "code");
+    assert_eq!(q["code_challenge_method"], "S256");
+    assert!(!q.contains_key("code_verifier") && !url.as_str().contains("test-secret"));
+    let mut f = fake.lock().unwrap();
+    f.challenge = q["code_challenge"].clone();
+    f.nonce = q["nonce"].clone();
+    q
+}
+
+async fn callback(b: &mut Browser<'_>, query: &str) -> String {
+    let res = b
+        .get(&format!("/api/connectors/gmail/callback?{query}"))
+        .await;
+    assert_eq!(res.status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        res.headers.get(header::REFERRER_POLICY).unwrap(),
+        "no-referrer"
+    );
+    assert!(
+        res.cookies()
+            .iter()
+            .any(|c| c.starts_with("jb_gmail=;") && c.contains("Max-Age=0")),
+        "the flow cookie is always cleared"
+    );
+    let loc = res
+        .headers
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert!(loc.starts_with("/settings?gmail="), "{loc}");
+    loc.trim_start_matches("/settings?gmail=")
+        .trim_end_matches("#connectors")
+        .to_owned()
+}
+
+#[tokio::test]
+async fn gmail_connect_checks_state_pkce_and_nonce() {
+    let (endpoints, fake) = fake_google().await;
+    let Some(app) = gmail_app(endpoints) else {
+        return;
+    };
+    let mut web = Browser::new(&app);
+    web.sign_in().await;
+    assert_eq!(
+        web.get("/api/me/connectors").await.json()["gmail"],
+        json!({"available": true, "connected": false})
+    );
+
+    // A forged or stale state is refused, and uses up the flow.
+    let q = start_gmail(&mut web, &fake).await;
+    assert_eq!(
+        callback(&mut web, "state=forged&code=good-code").await,
+        "state"
+    );
+    let state = urlencode(&q["state"]);
+    assert_eq!(
+        callback(&mut web, &format!("state={state}&code=good-code")).await,
+        "expired"
+    );
+
+    // Another browser (an attacker who sends the victim's code or their own)
+    // has no flow cookie.
+    let q = start_gmail(&mut web, &fake).await;
+    let state = urlencode(&q["state"]);
+    let mut other = Browser::new(&app);
+    other.sign_in().await;
+    assert_eq!(
+        callback(&mut other, &format!("state={state}&code=good-code")).await,
+        "expired"
+    );
+
+    // A flow cookie moved to another user's id doesn't decrypt.
+    let sealed = web
+        .cookie("jb_gmail")
+        .unwrap()
+        .split_once('.')
+        .unwrap()
+        .1
+        .to_owned();
+    other
+        .jar
+        .push(("jb_gmail".into(), format!("{}.{sealed}", Uuid::new_v4())));
+    assert_eq!(
+        callback(&mut other, &format!("state={state}&code=good-code")).await,
+        "expired"
+    );
+
+    // The user said no.
+    assert_eq!(
+        callback(&mut web, &format!("state={state}&error=access_denied")).await,
+        "denied"
+    );
+
+    // A code that isn't good (or a verifier that doesn't match) fails.
+    let q = start_gmail(&mut web, &fake).await;
+    let state = urlencode(&q["state"]);
+    assert_eq!(
+        callback(&mut web, &format!("state={state}&code=stolen")).await,
+        "error"
+    );
+
+    // A nonce that isn't this flow's (a replayed ID token) fails.
+    let q = start_gmail(&mut web, &fake).await;
+    fake.lock().unwrap().nonce = "someone-elses".into();
+    assert_eq!(
+        callback(
+            &mut web,
+            &format!("state={}&code=good-code", urlencode(&q["state"]))
+        )
+        .await,
+        "error"
+    );
+
+    // Gmail unticked on the consent screen: refused, and the grant revoked.
+    let q = start_gmail(&mut web, &fake).await;
+    fake.lock().unwrap().scope = "openid email".into();
+    assert_eq!(
+        callback(
+            &mut web,
+            &format!("state={}&code=good-code", urlencode(&q["state"]))
+        )
+        .await,
+        "scope"
+    );
+    assert_eq!(fake.lock().unwrap().revoked, vec!["at-1".to_owned()]);
+    fake.lock().unwrap().scope =
+        "openid email https://www.googleapis.com/auth/gmail.readonly".into();
+    assert_eq!(
+        web.get("/api/me/connectors").await.json()["gmail"]["connected"],
+        false
+    );
+
+    // The real thing.
+    let q = start_gmail(&mut web, &fake).await;
+    assert_eq!(
+        callback(
+            &mut web,
+            &format!("state={}&code=good-code", urlencode(&q["state"]))
+        )
+        .await,
+        "connected"
+    );
+    let g = web.get("/api/me/connectors").await.json()["gmail"].clone();
+    assert_eq!(g["connected"], true);
+    assert_eq!(g["email"], "pat@gmail.example");
+    assert!(
+        g["scopes"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("https://www.googleapis.com/auth/gmail.readonly"))
+    );
+    // Tokens are stored encrypted, never in the clear.
+    let raw: (Vec<u8>, Option<Vec<u8>>) =
+        sqlx::query_as("SELECT g.grant_data, g.access_data FROM gmail_connections g JOIN users u ON u.id = g.user_id WHERE u.email = $1")
+            .bind(web.get("/api/auth/me").await.json()["user"]["email"].as_str().unwrap())
+            .fetch_one(&app.pool)
+            .await
+            .unwrap();
+    let all = [raw.0, raw.1.unwrap()].concat();
+    assert!(!all.windows(4).any(|w| w == b"rt-1" || w == b"at-1"));
+    assert!(
+        other.get("/api/me/connectors").await.json()["gmail"]["connected"] == false,
+        "only its owner's"
+    );
+
+    // Disconnect revokes the refresh token at Google.
+    let res = web
+        .send(Method::DELETE, "/api/me/connectors/gmail", None, Vec::new())
+        .await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert!(fake.lock().unwrap().revoked.contains(&"rt-1".to_owned()));
+    assert_eq!(
+        web.get("/api/me/connectors").await.json()["gmail"]["connected"],
+        false
+    );
+}
+
+fn urlencode(s: &str) -> String {
+    url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
+}
+
+#[tokio::test]
+async fn gmail_codes_for_the_extension() {
+    let (endpoints, fake) = fake_google().await;
+    let Some(app) = gmail_app(endpoints) else {
+        return;
+    };
+    let mut web = Browser::new(&app);
+    web.sign_in().await;
+    let token = web
+        .json(Method::POST, "/api/me/tokens", json!({}))
+        .await
+        .json()["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut ext = Browser::new(&app);
+    ext.bearer = Some(token);
+    ext.csrf = false;
+
+    let status = ext.get("/api/autofill/gmail").await.json();
+    assert_eq!(status["connected"], false);
+    let res = ext
+        .json(
+            Method::POST,
+            "/api/autofill/gmail/code",
+            json!({"site": "greenhouse"}),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::CONFLICT);
+    assert!(
+        res.json()["error"]
+            .as_str()
+            .unwrap()
+            .contains("Settings → Connectors")
+    );
+
+    let q = start_gmail(&mut web, &fake).await;
+    assert_eq!(
+        callback(
+            &mut web,
+            &format!("state={}&code=good-code", urlencode(&q["state"]))
+        )
+        .await,
+        "connected"
+    );
+    fake.lock().unwrap().messages = vec![
+        gmail_message(
+            "old",
+            "Acme <acme@myworkday.com>",
+            20,
+            "text/plain",
+            "Your code is 111111",
+        ),
+        gmail_message(
+            "other",
+            "Other <other@myworkday.com>",
+            1,
+            "text/plain",
+            "Your verification code is 222222",
+        ),
+        gmail_message(
+            "mine",
+            "Acme <acme@myworkday.com>",
+            1,
+            "text/plain",
+            "Your verification code is 482913. It expires soon.",
+        ),
+        gmail_message(
+            "link",
+            "Acme <acme@myworkday.com>",
+            1,
+            "text/html",
+            "<a href=\"https://evil.example/verify?x=1\">x</a><a href=\"https://acme.wd5.myworkdayjobs.com/en-US/External/activate?token=abc&amp;x=1\">Verify</a>",
+        ),
+        gmail_message(
+            "gh",
+            "Greenhouse <no-reply@us.greenhouse-mail.io>",
+            2,
+            "text/plain",
+            "Copy this code into the security code field:\n\nA1B2C3D4\n",
+        ),
+    ];
+    assert_eq!(
+        ext.get("/api/autofill/gmail").await.json()["email"],
+        "pat@gmail.example"
+    );
+
+    let (bearer, ip) = (ext.bearer.clone(), ext.ip.clone());
+    let code = |body: Value| {
+        let mut ext = Browser {
+            app: &app,
+            jar: Vec::new(),
+            bearer: bearer.clone(),
+            csrf: false,
+            ip: ip.clone(),
+        };
+        async move {
+            ext.json(Method::POST, "/api/autofill/gmail/code", body)
+                .await
+        }
+    };
+    let r = code(json!({"site": "workday", "tenant": "acme", "length": 6, "charset": "digits"}))
+        .await
+        .json();
+    assert_eq!(
+        r,
+        json!({"code": "482913", "messageId": "mine"}),
+        "this company, recent mail only"
+    );
+    let r = code(json!({"site": "workday", "tenant": "acme", "length": 6, "charset": "digits", "skip": ["mine"]})).await.json();
+    assert_eq!(r["code"], Value::Null, "a used email isn't read again");
+    let r = code(json!({"site": "greenhouse", "length": 8}))
+        .await
+        .json();
+    assert_eq!(r["code"], "A1B2C3D4");
+    assert_eq!(
+        code(json!({"site": "lever"})).await.status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        code(json!({"site": "workday", "tenant": "../x"}))
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+
+    let r = ext
+        .json(
+            Method::POST,
+            "/api/autofill/gmail/verify-link",
+            json!({"tenant": "acme"}),
+        )
+        .await
+        .json();
+    assert_eq!(
+        r["link"],
+        "https://acme.wd5.myworkdayjobs.com/en-US/External/activate?token=abc&x=1"
+    );
+    assert_eq!(r["messageId"], "link");
+
+    // The access token expires: refreshed once, then reading carries on.
+    fake.lock().unwrap().refuse_first_token = true;
+    let r = code(json!({"site": "greenhouse", "length": 8}))
+        .await
+        .json();
+    assert_eq!(r["code"], "A1B2C3D4");
+
+    // The user removed access at Google: the connection is dropped and the
+    // extension is told to reconnect.
+    {
+        let mut f = fake.lock().unwrap();
+        f.refresh_ok = false;
+    }
+    sqlx::query("UPDATE gmail_connections SET access_data = NULL WHERE user_id = (SELECT id FROM users WHERE email = $1)")
+        .bind(web.get("/api/auth/me").await.json()["user"]["email"].as_str().unwrap())
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    let res = code(json!({"site": "greenhouse"})).await;
+    assert_eq!(res.status, StatusCode::CONFLICT);
+    assert!(res.json()["error"].as_str().unwrap().contains("Reconnect"));
+    assert_eq!(
+        web.get("/api/me/connectors").await.json()["gmail"]["connected"],
+        false
+    );
+
+    // Cookies alone can't read codes: these are bearer routes.
+    let res = web
+        .json(
+            Method::POST,
+            "/api/autofill/gmail/code",
+            json!({"site": "greenhouse"}),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn gmail_routes_answer_503_when_not_configured() {
+    let Some(app) = app() else { return };
+    let mut web = Browser::new(&app);
+    web.sign_in().await;
+    assert_eq!(
+        web.get("/api/me/connectors").await.json()["gmail"],
+        json!({"available": false, "connected": false})
+    );
+    let res = web
+        .json(Method::POST, "/api/me/connectors/gmail/start", json!({}))
+        .await;
+    assert_eq!(res.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(callback(&mut web, "state=x&code=y").await, "unavailable");
 }

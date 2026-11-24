@@ -7,6 +7,9 @@
 //! - `/api/autofill/*`: what the extension reads and writes (bearer token).
 //! - `/api/cron/*`, `/api/admin/*`: housekeeping, the alert run and the
 //!   owner's usage page.
+//! - `/api/me/connectors`, `/api/connectors/gmail/callback`,
+//!   `/api/autofill/gmail/*`: the Gmail connector (OAuth code flow with PKCE
+//!   and OIDC) and the codes the extension asks it for.
 //! - `/api/me/alerts`, `/api/me/chat`, `/api/me/queue`: job alerts, the linked
 //!   Telegram chat and the apply queue; `/api/telegram/webhook` takes the
 //!   bot's messages, `/api/agent/*` is for an apply agent (bearer token,
@@ -23,6 +26,7 @@ pub mod auth;
 pub mod autofill;
 pub mod capture;
 pub mod chat;
+pub mod connectors;
 pub mod error;
 pub mod form_schema;
 pub mod housekeeping;
@@ -38,6 +42,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use accounts::crypto::{CryptoError, Keyring};
+use accounts::gmail::GmailClient;
 use accounts::google::GoogleVerifier;
 use accounts::storage::Storage;
 use axum::extract::{DefaultBodyLimit, State};
@@ -213,6 +218,10 @@ pub struct Inner {
     pub keys: Result<Keyring, CryptoError>,
     pub storage: Storage,
     pub google: GoogleVerifier,
+    /// The Gmail connector's OAuth client; `None` when it isn't configured.
+    pub gmail: Option<GmailClient>,
+    /// Checks the ID tokens of Gmail connects (audience: the Gmail client).
+    pub gmail_ids: GoogleVerifier,
     pub config: Config,
     /// For server-to-server calls (forwarding shared listings to ingest).
     pub http: reqwest::Client,
@@ -245,9 +254,19 @@ impl AppState {
             keys,
             storage,
             google,
+            gmail: None,
+            gmail_ids: GoogleVerifier::new(None),
             config,
             http,
         }))
+    }
+
+    /// Turns on the Gmail connector. Call before the state is shared.
+    pub fn with_gmail(mut self, client: GmailClient, ids: GoogleVerifier) -> Self {
+        let inner = Arc::get_mut(&mut self.0).expect("with_gmail before the state is shared");
+        inner.gmail = Some(client);
+        inner.gmail_ids = ids;
+        self
     }
 
     /// Lazy pool: no connection is opened until a handler needs one, so a cold
@@ -269,7 +288,15 @@ impl AppState {
             eprintln!("DATA_KEYS: {e}; account data routes will answer 503");
         }
         let google = GoogleVerifier::new(std::env::var("GOOGLE_CLIENT_ID").ok());
-        Self::new(db, keys, Storage::from_env(), google, config)
+        let gmail = GmailClient::from_env(&config.notify.site_url);
+        let state = Self::new(db, keys, Storage::from_env(), google, config);
+        match gmail {
+            Some(client) => {
+                let ids = GoogleVerifier::new(Some(client.client_id().to_owned()));
+                state.with_gmail(client, ids)
+            }
+            None => state,
+        }
     }
 
     pub fn pool(&self) -> Result<&PgPool, ApiError> {
@@ -345,6 +372,19 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/me/queue/{id}/events", get(queue::events))
         .route("/api/me/agent-tokens", post(queue::create_agent_token))
+        .route("/api/me/connectors", get(connectors::list))
+        .route(
+            "/api/me/connectors/gmail/start",
+            post(connectors::gmail_start),
+        )
+        .route(
+            "/api/me/connectors/gmail",
+            delete(connectors::gmail_disconnect),
+        )
+        .route(
+            "/api/connectors/gmail/callback",
+            get(connectors::gmail_callback),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::session_layer,
@@ -363,6 +403,12 @@ pub fn router(state: AppState) -> Router {
         .route("/api/autofill/form-schema", get(form_schema::form_schema))
         .route("/api/capture/jobs", post(capture::share))
         .route("/api/autofill/queue", get(queue::for_extension))
+        .route("/api/autofill/gmail", get(connectors::ext_status))
+        .route("/api/autofill/gmail/code", post(connectors::ext_code))
+        .route(
+            "/api/autofill/gmail/verify-link",
+            post(connectors::ext_verify_link),
+        )
         .route("/api/agent/queue", get(queue::agent_list))
         .route("/api/agent/queue/{id}", post(queue::agent_set))
         // Telegram and the alert run: their own secrets, no cookies.
@@ -397,6 +443,7 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         "encryption": state.keys.is_ok(),
         "storage": state.storage.driver(),
         "googleSignIn": state.google.client_id().is_some(),
+        "gmailConnector": state.gmail.is_some(),
     }))
 }
 

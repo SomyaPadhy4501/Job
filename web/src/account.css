@@ -129,6 +129,10 @@ fieldset.section legend { font-weight: 600; font-size: 15px; padding: 0 6px; }
 }
 .token-once p { margin: 0; flex-basis: 100%; }
 .token-once code { overflow-wrap: anywhere; font-size: 13px; }
+.connector { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; margin-top: 10px; }
+.connector p { margin: 6px 0; }
+.connector-head { display: flex; align-items: center; gap: 8px; }
+.connector-facts { margin: 8px 0; }
 .simple-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .simple-table th, .simple-table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
 .simple-table th { color: var(--text-muted); font-weight: 500; }

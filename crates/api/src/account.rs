@@ -129,6 +129,7 @@ pub async fn export(State(state): State<AppState>, signed: Signed) -> ApiResult<
         "alerts": alerts,
         "applyQueue": crate::queue::items_json(&state, user_id, &queue)?,
         "telegramLinked": db::chat::chat_link(pool, user_id, "telegram").await?.is_some(),
+        "gmailConnection": crate::connectors::export_json(&state, user_id).await?,
     });
     db::audit(pool, Some(user_id), "export").await?;
     let headers = [(
@@ -145,10 +146,18 @@ pub async fn delete_account(State(state): State<AppState>, signed: Signed) -> Ap
     signed.require_recent()?;
     let pool = state.pool()?;
     let user_id = signed.user.id;
+    // Read before the cascade deletes it, to revoke the grant at Google after.
+    let gmail = db::connectors::gmail_connection(pool, user_id)
+        .await
+        .ok()
+        .flatten();
     let mut tx = pool.begin().await.map_err(db::DbError::from)?;
     let keys = db::delete_user(&mut tx, user_id).await?;
     tx.commit().await.map_err(db::DbError::from)?;
     db::audit(pool, Some(user_id), "account_delete").await?;
+    if let Some(row) = gmail {
+        crate::connectors::revoke_row(&state, user_id, &row).await;
+    }
     let (deleted, failed) = delete_objects(&state, &keys).await;
     Ok((
         AppendHeaders(clear_cookies(&state)),

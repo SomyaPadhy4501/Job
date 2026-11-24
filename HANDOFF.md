@@ -38,6 +38,14 @@ this codebase. It exists so you don't have to re-derive context.
 - Node `/admin/*`: deny by default. With `COLLECT_TOKEN` it's compared in constant time; without one, only a non-production server answering a loopback request works (Vercel answers 503). Public routes cap page (1000) and filter length (200); async errors are a bare 500 (they used to crash the process).
 - Links: normalize drops non-http(s) `apply_url`; the web app renders job links through `webHref` (`web/src/safe-url.js`). `vercel.json` adds HSTS and `X-Frame-Options: DENY`. Dependencies: `npm audit fix` in both packages, plus a `qs` override.
 
+### Done 2026-11-24 (Gmail connector)
+- Settings → **Connectors** → Connect Gmail (`web/src/pages/Settings.jsx`). Replaces the extension's own implicit-flow Gmail sign-in (`response_type=token`, no PKCE, no refresh token), which never shipped because `gmailClientId` was empty.
+- Server side, OAuth 2.0 authorization code + **PKCE (S256)** + **OIDC**: `crates/accounts/src/gmail.rs` (client, PKCE, Gmail reading, code/link picking) and `crates/api/src/connectors.rs` (routes). `POST /api/me/connectors/gmail/start` seals `{state, verifier, nonce, exp}` with AES-GCM bound to the user id into `__Host-jb_gmail` (HttpOnly, SameSite=Lax, 10 min; the session cookie is Strict so it isn't sent on Google's redirect). `GET /api/connectors/gmail/callback` checks the cookie, `state` (constant time), trades code + verifier + client secret, verifies the ID token (Google keys, `aud` = Gmail client, nonce), requires `gmail.readonly` in the granted scopes (else revokes), and redirects to `/settings?gmail=<word>#connectors` with `Referrer-Policy: no-referrer`. A reconnect revokes the replaced grant.
+- `gmail_connections` (migration 009): refresh token and Gmail account encrypted (`Field::GmailGrant`), access token cached encrypted (`Field::GmailAccess`) until a minute before expiry. `invalid_grant` on refresh deletes the row (Settings shows Not connected). Disconnect and account deletion revoke at Google. Export lists the connected address only.
+- Extension 1.20.0: `gmail.js` asks `POST /api/autofill/gmail/code` / `/verify-link` with the autofill token (skip list of used message ids stays in `chrome.storage.session`), re-checks the code shape and the link (https, this tenant, verify path). `identity` permission, Google host permissions and `config.js` removed. Popup card links to Connectors.
+- Limits: 20 connect starts and 600 Gmail lookups per user per day. Tests: `cargo test -p accounts gmail`, `crates/api/tests/api.rs` `gmail_*` (fake Google: PKCE, state, nonce, scope, cross-browser, revocation), `test/extension-gmail.test.js`.
+- Not verified: a real Google consent round trip (needs the owner's client, step 2 under "Not verified / open").
+
 ### Done 2026-11-24 (closed-job detection)
 - Closed postings now leave the board within ~6 hours instead of lingering until retention. `src/services/closed.js`, run from `collectAll` after the upsert.
 - Rule: when a company's fetch succeeds with a complete, non-empty listing, each stored row of that source and company that nothing listed this run gets `missed_runs + 1`. At 2 the row is deleted. A row counts as listed if its link is in *any* collector's answer this run, or anything updated it since the run started (another source's copy, a scraper or extension ingest). So a job another source still lists is never deleted, whichever source inserted it. Any sighting resets the count. Failed, empty or `partial` answers never count. Neither does a company where more than half its rows (and more than 2) would go missing at once: that's logged as `closed.suspicious` and left alone. Two boards with one name: if either fails, neither is judged.
@@ -157,8 +165,9 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
     one job site password set in the popup, kept only in the worker's
     IndexedDB; ledger in `chrome.storage.session` (≤3 fills/company/10 min, no
     auto attempt after a failure until the password changes).
-  - Gmail (`gmail.js`, `autofill-codes.js`, `config.js`): codes and Workday
-    verify links from Gmail; **off until `gmailClientId` is set**.
+  - Gmail (`gmail.js`, `autofill-codes.js`): codes and Workday verify links,
+    asked from the portal's Gmail connector (Settings → Connectors); **off
+    until `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` are set on Vercel**.
 
 **Done 2026-11-24 (fourth session):**
 - The 403s were Vercel's automatic DDoS mitigation challenging the owner's
@@ -187,14 +196,25 @@ screen is still in **Testing** (only the owner's Gmail can sign in).
    the in-app browser; Google's popup only opens from the owner's own click):
    resume upload/download/delete on Backblaze, the cleanup cron (run it once
    from Vercel -> Settings -> Cron Jobs), and listing sharing end to end.
-2. Gmail setup (owner): a **separate** Google Cloud project (so the sign-in
-   consent screen can still be published without restricted-scope review),
-   enable Gmail API, consent screen in Testing with scope `gmail.readonly` and
-   the owner as test user, OAuth client type **Web application** with redirect
-   URI `https://deleknoaeibijjmfngfobapnpbekhcel.chromiumapp.org/`; put its
-   client id in `extension/config.js`. Then confirm live: the real From
-   addresses (Workday `<tenant>@myworkday.com`, Greenhouse
-   `*@*greenhouse*.io`) and Workday's verify-link path (`/verif|activat|confirm/`).
+2. Gmail setup (owner) — the connector is built (Settings → Connectors, see
+   "Done 2026-11-24 (Gmail connector)"); it stays off until:
+   a. A **separate** Google Cloud project (so the sign-in consent screen can
+      still be published without restricted-scope review): enable the Gmail
+      API; consent screen in **Testing** with scopes `openid`, `email`,
+      `gmail.readonly` and the owner as test user; OAuth client type **Web
+      application** with redirect URIs
+      `https://job-two-xi.vercel.app/api/connectors/gmail/callback` and
+      `http://localhost:5173/api/connectors/gmail/callback`.
+   b. Vercel env (Sensitive): `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`
+      (optional `GMAIL_REDIRECT_URI`; default `$SITE_URL/api/connectors/gmail/callback`).
+   c. Apply `migrations/009_gmail_connections.sql` (migrate.yml), deploy, and
+      reload the extension (1.20.0).
+   Then confirm live: the real From addresses (Workday
+   `<tenant>@myworkday.com`, Greenhouse `*@*greenhouse*.io`) and Workday's
+   verify-link path (`/verif|activat|confirm/`). Before letting anyone but
+   test users connect, Google requires restricted-scope verification **and a
+   CASA security assessment** for `gmail.readonly` held server-side; until
+   then the consent screen stays in Testing (100 test users max).
 3. Workday sign-in on a real tenant is only fixture-tested: whether Workday
    accepts the scripted press on `click_filter`, and its failure/verify
    messages, need the owner's own account. If scripted presses are ignored,
@@ -846,6 +866,7 @@ their own `DATA_KEYS` and bucket).
 | `SHARING_OPEN`       | Default on. `false` turns listing sharing off for everyone. |
 | `SHARES_PER_USER_PER_DAY` | Default `3000` listings per user per day. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` | The bot from @BotFather, its @name (no @), and 16+ characters of A–Z a–z 0–9 _ - given to `setWebhook` as `secret_token`. Without the secret the webhook answers 404; without the token no alerts are sent. `CRON_SECRET` must also be in GitHub Actions secrets: the collect workflow uses it to call `/api/cron/alerts`. |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | The Gmail connector's OAuth **Web application** client, in its own Google Cloud project (see "Gmail setup" above). Without both, Connectors shows Gmail as not set up. Optional `GMAIL_REDIRECT_URI` (default `$SITE_URL/api/connectors/gmail/callback`, must be registered on the client). |
 | `SITE_URL`           | Default `https://job-two-xi.vercel.app`: the address links in chat messages point to. |
 | Optional limits      | `MAX_RESUMES` (10), `MAX_USER_BYTES` (12 MB), `UPLOADS_PER_DAY` (5), `UPLOADS_PER_MONTH` (3000, all users), `R2_MAX_BYTES` (9 GB, all users), `SIGNINS_PER_IP_PER_DAY` (40). |
 

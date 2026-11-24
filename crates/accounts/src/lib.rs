@@ -1,10 +1,11 @@
 //! Accounts logic with no HTTP or SQL in it, so each piece is unit-tested on
-//! its own: field encryption, tokens, Google sign-in, the autofill profile
+//! its own: field encryption, tokens, Google sign-in, the Gmail connector, the autofill profile
 //! schema, saved answers, resume tags, upload checks, resume parsing, resume
 //! ranking and resume file storage.
 
 pub mod answers;
 pub mod crypto;
+pub mod gmail;
 pub mod google;
 pub mod parser;
 pub mod profile;

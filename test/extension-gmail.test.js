@@ -1,6 +1,7 @@
 'use strict';
-// gmail.js in the worker, against a fake Gmail API: which mail it reads and
-// what it hands back.
+// gmail.js in the worker, against a fake portal: what it asks for, what it
+// trusts in the answer, and which links it opens. Gmail itself is read by the
+// portal (crates/api/src/connectors.rs, tested in crates/api/tests/api.rs).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,133 +9,126 @@ const path = require('node:path');
 const vm = require('node:vm');
 const pages = require('../extension/application-pages');
 
+// Objects from the sandbox have its own prototypes.
+const plain = (v) => JSON.parse(JSON.stringify(v));
+
 const source = fs.readFileSync(path.join(__dirname, '../extension/gmail.js'), 'utf8');
-const b64url = (s) => Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
 
 function store(initial) {
   const data = { ...initial };
   return {
     data,
-    get: async (k) =>
-      typeof k === 'string'
-        ? k in data
-          ? { [k]: data[k] }
-          : {}
-        : Object.fromEntries(Object.keys(k || {}).map((x) => [x, x in data ? data[x] : k[x]])),
+    get: async (k) => (typeof k === 'string' ? (k in data ? { [k]: data[k] } : {}) : {}),
     set: async (v) => Object.assign(data, v),
     remove: async (k) => [].concat(k).forEach((x) => delete data[x]),
   };
 }
 
-function load(messages, { connected = true } = {}) {
+// `answers`: path -> the portal's JSON answer (or a function of the body).
+function load(answers) {
   const opened = [];
-  const queries = [];
+  const asked = [];
+  const session = store({ gmailToken: { token: 'old' } });
+  const local = store({ gmailEmail: 'old@example.invalid' });
   const sandbox = {
-    self: { JOB_CONFIG: { gmailClientId: 'client' } },
+    self: {},
     chrome: {
-      storage: {
-        session: store(connected ? { gmailToken: { token: 't', until: Date.now() + 60_000 } } : {}),
-        local: store(connected ? { gmailEmail: 'pat@example.invalid' } : {}),
-      },
+      storage: { session, local },
       tabs: {
         create: async (o) => (opened.push(o.url), { id: 1 }),
         remove: async () => {},
         onUpdated: { addListener() {}, removeListener() {} },
       },
-      identity: { getRedirectURL: () => 'https://id.chromiumapp.org/' },
-    },
-    fetch: async (url) => {
-      const u = new URL(url);
-      if (u.pathname.endsWith('/messages')) {
-        queries.push(u.searchParams.get('q'));
-        return new Response(JSON.stringify({ messages: messages.map((m) => ({ id: m.id })) }));
-      }
-      const id = u.pathname.split('/').pop();
-      const m = messages.find((x) => x.id === id);
-      return new Response(
-        JSON.stringify({
-          id,
-          internalDate: String(m.at ?? Date.now()),
-          payload: {
-            headers: [{ name: 'From', value: m.from }],
-            mimeType: m.html ? 'text/html' : 'text/plain',
-            body: { data: b64url(m.body) },
-          },
-        })
-      );
     },
     JobApplicationPages: pages,
     URL,
-    URLSearchParams,
-    TextDecoder,
-    atob,
-    crypto: globalThis.crypto,
-    setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); t.unref?.(); return t; },
-    Response,
+    setTimeout: (fn, ms) => {
+      const t = setTimeout(fn, ms);
+      t.unref?.();
+      return t;
+    },
   };
   sandbox.globalThis = sandbox;
   vm.runInNewContext(source, sandbox);
-  return { G: sandbox.self.AutofillGmail, opened, queries, sandbox };
+  async function request(p, init, optional, say) {
+    const body = init?.body ? JSON.parse(init.body) : null;
+    asked.push({ path: p, method: init?.method || 'GET', body, say });
+    const answer = answers[p];
+    if (answer === undefined) {
+      if (optional) return null;
+      throw new Error('Portal request failed (HTTP 404).');
+    }
+    const value = typeof answer === 'function' ? answer(body) : answer;
+    return new Response(JSON.stringify(value));
+  }
+  return { G: sandbox.self.AutofillGmail, request, opened, asked, session, local };
 }
 
-test('codes: only this company, recent mail, the requested shape, each email once', async () => {
-  const { G, queries } = load([
-    { id: 'old', from: 'Acme <acme@myworkday.com>', body: 'Your code is 111111', at: Date.now() - 20 * 60_000 },
-    { id: 'other', from: 'Other <other@myworkday.com>', body: 'Your verification code is 222222' },
-    { id: 'mine', from: 'Acme <acme@myworkday.com>', body: 'Your verification code is 482913. It expires soon.' },
-  ]);
-  assert.equal(await G.findCode('workday', 'acme', { length: 6, charset: 'digits' }), '482913');
-  assert.match(queries[0], /^from:myworkday\.com/);
-  assert.equal(await G.findCode('workday', 'acme', { length: 6, charset: 'digits' }), null, 'used once');
-});
-
-test('Greenhouse security codes and code shapes', async () => {
-  const { G, queries } = load([
-    {
-      id: 'g',
-      from: 'Greenhouse <no-reply@us.greenhouse-mail.io>',
-      body: 'Copy and paste this code into the security code field on your application:\n\nA1B2C3D4\n',
-    },
-  ]);
-  assert.equal(await G.findCode('greenhouse', '', { length: 8, charset: 'alnum' }), 'A1B2C3D4');
-  assert.match(queries[0], /greenhouse/);
-  assert.equal(G.pickCode('Your code: 1234', { length: 6, charset: 'digits' }), null, 'wrong length');
-  assert.equal(G.pickCode('Use code ABCDEF to continue', { length: 6, charset: 'alnum' }), null, 'a word, not a code');
-});
-
-test('verify links: this company only, opened by the worker', async () => {
-  const { G, opened } = load([
-    {
-      id: 'x',
-      from: 'Acme <acme@myworkday.com>',
-      html: true,
-      body:
-        '<a href="https://evil.example/verify?x=1">Verify</a>' +
-        '<a href="https://other.wd5.myworkdayjobs.com/verify?t=2">no</a>' +
-        '<a href="https://acme.wd5.myworkdayjobs.com/en-US/External/activate?token=abc&amp;x=1">Verify your account</a>',
-    },
-  ]);
-  assert.equal(await G.openVerifyLink('acme'), true);
-  assert.deepEqual(opened, ['https://acme.wd5.myworkdayjobs.com/en-US/External/activate?token=abc&x=1']);
-});
-
-test('silent sign-in rejected: one attempt, then a reconnect message', async () => {
-  const { G, queries, sandbox } = load([{ id: 'm', from: 'Acme <acme@myworkday.com>', body: 'Your code is 482913' }]);
-  sandbox.chrome.storage.session.data.gmailToken = { token: 'old', until: Date.now() - 1000 };
-  let attempts = 0;
-  sandbox.chrome.identity.launchWebAuthFlow = async () => {
-    attempts++;
-    throw new Error('User interaction required.');
-  };
-  await assert.rejects(G.findCode('workday', 'acme', { length: 6, charset: 'digits' }), {
-    message: 'Reconnect Gmail in the extension popup to fill codes.',
+test('codes: asks the portal with the shape and the used ids, remembers each email', async () => {
+  const { G, request, asked } = load({
+    'gmail/code': (b) => (b.skip.includes('m1') ? { code: null, messageId: null } : { code: '482913', messageId: 'm1' }),
   });
-  assert.equal(attempts, 1);
-  assert.equal(queries.length, 0);
+  assert.equal(await G.findCode(request, 'workday', 'acme', { length: 6, charset: 'digits' }), '482913');
+  assert.deepEqual(asked[0], {
+    path: 'gmail/code',
+    method: 'POST',
+    body: { site: 'workday', tenant: 'acme', length: 6, charset: 'digits', skip: [] },
+    say: true,
+  });
+  assert.equal(await G.findCode(request, 'workday', 'acme', { length: 6, charset: 'digits' }), null, 'used once');
+  assert.deepEqual(plain(asked[1].body.skip), ['m1']);
 });
 
-test('not connected: a clear message and no Gmail call', async () => {
-  const { G, queries } = load([], { connected: false });
-  await assert.rejects(G.findCode('workday', 'acme', {}), /Connect Gmail/);
-  assert.equal(queries.length, 0);
+test('codes: only the shape the page asked for, whatever the portal answers', async () => {
+  for (const [code, shape] of [
+    ['12345', { length: 6, charset: 'digits' }],
+    ['A1B2C3', { length: 6, charset: 'digits' }],
+    ['<img src=x>', { length: 0, charset: 'alnum' }],
+    [42, { length: 0, charset: 'alnum' }],
+  ]) {
+    const { G, request } = load({ 'gmail/code': { code, messageId: 'x1' } });
+    assert.equal(await G.findCode(request, 'greenhouse', '', shape), null, String(code));
+  }
+  const { G, request, asked } = load({ 'gmail/code': { code: 'A1B2C3D4', messageId: 'g1' } });
+  assert.equal(await G.findCode(request, 'greenhouse', '', { length: 8, charset: 'alnum' }), 'A1B2C3D4');
+  assert.equal('tenant' in asked[0].body, false);
+});
+
+test('verify links: this company only, https, opened by the worker', async () => {
+  for (const link of [
+    'https://evil.example/verify?x=1',
+    'https://other.wd5.myworkdayjobs.com/verify?t=2',
+    'http://acme.wd5.myworkdayjobs.com/verify?t=2',
+    'https://acme.wd5.myworkdayjobs.com/en-US/External/jobs',
+    'javascript:alert(1)',
+    null,
+  ]) {
+    const { G, request, opened } = load({ 'gmail/verify-link': { link, messageId: 'x' } });
+    assert.equal(await G.openVerifyLink(request, 'acme'), false, String(link));
+    assert.deepEqual(opened, []);
+  }
+  const good = 'https://acme.wd5.myworkdayjobs.com/en-US/External/activate?token=abc&x=1';
+  const { G, request, opened, session } = load({ 'gmail/verify-link': { link: good, messageId: 'v1' } });
+  assert.equal(await G.openVerifyLink(request, 'acme'), true);
+  assert.deepEqual(opened, [good]);
+  assert.deepEqual(plain(session.data.gmailUsed), ['v1']);
+});
+
+test('status, and the old in-extension token is cleared', async () => {
+  const { G, request, session, local } = load({ gmail: { available: true, connected: true, email: 'pat@gmail.example' } });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(session.data.gmailToken, undefined);
+  assert.equal(local.data.gmailEmail, undefined);
+  assert.deepEqual(plain(await G.status(request)), { available: true, connected: true, email: 'pat@gmail.example' });
+  // An older portal without the connector.
+  const old = load({});
+  assert.deepEqual(plain(await old.G.status(old.request)), { available: false, connected: false, email: null });
+});
+
+test('the portal saying "not connected" reaches the caller', async () => {
+  const { G } = load({});
+  const request = async () => {
+    throw new Error('Connect Gmail in Settings → Connectors on the job board to fill codes.');
+  };
+  await assert.rejects(G.findCode(request, 'workday', 'acme', {}), /Settings → Connectors/);
 });

@@ -353,33 +353,61 @@ test('Workday companies are told apart on both Workday hosts', () => {
   assert.equal(pages.workdayTenant('https://jobs.lever.co/acme/1'), '');
 });
 
-test('Gmail: only the popup connects; codes only for Workday and Greenhouse pages', async () => {
+test('Gmail: asked through the portal; codes only for Workday and Greenhouse pages', async () => {
   const asked = [];
   const gmail = {
-    status: async () => ({ available: true, email: null }),
-    authorize: async () => ({ email: 'pat@example.invalid' }),
-    disconnect: async () => {},
-    findCode: async (site, tenant, shape) => (asked.push({ site, tenant, shape }), '123456'),
-    openVerifyLink: async (tenant) => (asked.push({ verify: tenant }), true),
+    status: async (request) => (asked.push({ status: typeof request }), { available: true, connected: true, email: 'pat@gmail.example' }),
+    findCode: async (request, site, tenant, shape) => (asked.push({ site, tenant, shape, request: typeof request }), '123456'),
+    openVerifyLink: async (request, tenant) => (asked.push({ verify: tenant }), true),
   };
   const api = load({ gmail, granted: ['https://careers.example/*'] });
-  assert.match((await api.send({ type: 'autofill:gmailConnect' }, WORKDAY())).error, /popup/);
-  assert.deepEqual((await api.send({ type: 'autofill:gmailConnect' }, FROM_POPUP)).data, { email: 'pat@example.invalid' });
+  const gh = { id: 'ext', url: 'https://job-boards.greenhouse.io/acme/jobs/1', tab: { id: 4 }, frameId: 3 };
+  // Not connected to an account yet: nothing to ask.
+  assert.match((await api.send({ type: 'autofill:findCode', length: 6 }, gh)).error, /autofill token/);
+  await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
+  // Connecting happens on the portal now, never in the extension.
+  assert.equal((await api.send({ type: 'autofill:gmailConnect' }, FROM_POPUP)).ok, false);
+  assert.match((await api.send({ type: 'autofill:gmailStatus' }, WORKDAY())).error, /popup/);
+  assert.deepEqual((await api.send({ type: 'autofill:gmailStatus' }, FROM_POPUP)).data, {
+    available: true,
+    connected: true,
+    email: 'pat@gmail.example',
+  });
   for (const sender of [ATS_TAB, { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, FROM_POPUP]) {
     assert.equal((await api.send({ type: 'autofill:findCode', length: 6 }, sender)).ok, false, sender.url);
   }
-  const gh = { id: 'ext', url: 'https://job-boards.greenhouse.io/acme/jobs/1', tab: { id: 4 }, frameId: 3 };
   assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 8, charset: 'whatever' }, gh)).data, { code: '123456' });
   assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 99 }, WORKDAY())).data, { code: '123456' });
-  assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(0, 2))), [
-    { site: 'greenhouse', tenant: '', shape: { length: 8, charset: 'alnum' } },
-    { site: 'workday', tenant: 'acme', shape: { length: 0, charset: 'alnum' } },
+  assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(1, 3))), [
+    { site: 'greenhouse', tenant: '', shape: { length: 8, charset: 'alnum' }, request: 'function' },
+    { site: 'workday', tenant: 'acme', shape: { length: 0, charset: 'alnum' }, request: 'function' },
   ]);
   // Verify links: Workday's top frame only.
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, gh)).ok, false);
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY({ frameId: 1 }))).ok, false);
   assert.deepEqual((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY())).data, { opened: true });
-  assert.deepEqual(JSON.parse(JSON.stringify(asked[2])), { verify: "acme" });
+  assert.deepEqual(JSON.parse(JSON.stringify(asked[3])), { verify: 'acme' });
+});
+
+test("Gmail: the portal's own message reaches the page", async () => {
+  // The real gmail.js, wired to the real authenticated `request`.
+  const gmailSource = fs.readFileSync(path.join(__dirname, '../extension/gmail.js'), 'utf8');
+  const box = { self: {}, chrome: { storage: { session: area(), local: area() } }, JobApplicationPages: pages, URL };
+  box.globalThis = box;
+  vm.runInNewContext(gmailSource, box);
+  const api = load({
+    gmail: box.self.AutofillGmail,
+    routes: {
+      'POST /api/autofill/gmail/code': json({ error: 'Connect Gmail in Settings → Connectors on the job board to fill codes.', code: 'conflict' }, 409),
+    },
+  });
+  await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
+  const gh = { id: 'ext', url: 'https://job-boards.greenhouse.io/acme/jobs/1', tab: { id: 4 }, frameId: 3 };
+  assert.match((await api.send({ type: 'autofill:findCode', length: 6 }, gh)).error, /Settings → Connectors/);
+  const call = api.calls.find((c) => c.url.endsWith('/api/autofill/gmail/code'));
+  assert.equal(call.init.headers.Authorization, 'Bearer tok');
+  assert.equal(call.init.credentials, 'omit');
+  assert.deepEqual(JSON.parse(call.init.body), { site: 'greenhouse', length: 6, charset: 'alnum', skip: [] });
 });
 
 test('apply queue: the popup reads it, a job page may not, links are http(s) only', async () => {

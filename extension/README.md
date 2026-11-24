@@ -136,11 +136,18 @@ and click Create Account.
 
 ### Codes from Gmail
 
-**Connect Gmail** in the popup (read-only, Google's consent screen) and the
-extension fills the security / verification codes Greenhouse and Workday
-email mid-application, and opens Workday's "verify your account" link. It reads
-only mail from those sites from the last 15 minutes and never presses submit.
-Needs a Google OAuth client id in `config.js` (see HANDOFF.md).
+**Connect Gmail** on the job board, in Settings → Connectors (read-only,
+Google's consent screen; authorization-code flow with PKCE and OpenID Connect,
+run by the server). The extension then fills the security / verification codes
+Greenhouse and Workday email mid-application, and opens Workday's "verify your
+account" link. The worker asks the portal (`POST /api/autofill/gmail/code`,
+`/verify-link`, with the autofill token); the portal reads only mail from that
+site from the last 15 minutes and answers one code or one link. The extension
+holds no Google token and needs no `identity` permission (removed in 1.20.0).
+It still checks the answer: a code must have the shape the page asked for, a
+link must be https, this company's own Workday and a verify path. Never presses
+submit. The portal needs `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` (see
+HANDOFF.md).
 
 ### Safety rules (enforced in code and covered by tests)
 

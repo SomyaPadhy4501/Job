@@ -144,13 +144,12 @@
       return { password: saved.password, autoSignIn: !entry.failed };
     }
     // ─── Gmail: codes and verify links (gmail.js) ───────────────────────
-    if (msg.type === 'autofill:gmailStatus' || msg.type === 'autofill:gmailConnect' || msg.type === 'autofill:gmailDisconnect') {
-      // Only the popup starts Google's consent window or changes the connection.
+    // Gmail is connected on the portal (Settings → Connectors); here only the
+    // job page asking is checked, then the portal is asked for the code.
+    let gmailAsk = null;
+    if (msg.type === 'autofill:gmailStatus') {
       if (!isPopup) throw new Error('Use the extension popup.');
-      if (msg.type === 'autofill:gmailStatus') return AutofillGmail.status();
-      if (msg.type === 'autofill:gmailDisconnect') return AutofillGmail.disconnect().then(() => ({}));
-      const hint = typeof msg.hint === 'string' && msg.hint.includes('@') ? msg.hint.slice(0, 200) : undefined;
-      return { email: (await AutofillGmail.authorize(true, hint)).email };
+      gmailAsk = { kind: 'status' };
     }
     if (msg.type === 'autofill:findCode' || msg.type === 'autofill:openVerifyLink') {
       const site = JobApplicationPages.ats(url.hostname);
@@ -160,11 +159,12 @@
       if (site === 'workday' && !tenant) throw new Error('Unknown Workday company.');
       if (msg.type === 'autofill:openVerifyLink') {
         if (site !== 'workday' || sender.frameId !== 0) throw new Error('Only Workday sign-in pages open verify links.');
-        return { opened: await AutofillGmail.openVerifyLink(tenant) };
+        gmailAsk = { kind: 'link', tenant };
+      } else {
+        const length = Number.isInteger(msg.length) && msg.length >= 4 && msg.length <= 10 ? msg.length : 0;
+        const charset = msg.charset === 'digits' ? 'digits' : 'alnum';
+        gmailAsk = { kind: 'code', site, tenant, shape: { length, charset } };
       }
-      const length = Number.isInteger(msg.length) && msg.length >= 4 && msg.length <= 10 ? msg.length : 0;
-      const charset = msg.charset === 'digits' ? 'digits' : 'alnum';
-      return { code: await AutofillGmail.findCode(site, tenant, { length, charset }) };
     }
     // Answers typed into an application, held between steps and "submit" and
     // the next page, so the save prompt survives a page change and a
@@ -204,7 +204,9 @@
     if (!auth?.token || auth.origin !== origin(portalUrl))
       throw new Error('Connect the autofill token for this portal in the extension popup.');
     if (msg.binding && msg.binding !== auth.binding) throw new Error('Account changed. Reopen Autofill.');
-    async function request(path, init, optional = false) {
+    // `say`: show the portal's own error message (short, plain text), for
+    // answers the user can act on ("Connect Gmail in Settings → Connectors").
+    async function request(path, init, optional = false, say = false) {
       const res = await fetch(auth.origin + '/api/autofill/' + path, {
         ...init,
         headers: { Authorization: 'Bearer ' + auth.token, ...(init?.headers || {}) },
@@ -219,9 +221,17 @@
         await chrome.storage.session.remove(CACHE);
         throw new Error('Token rejected. Reconnect autofill in the extension popup with a new token from the portal Settings page.');
       }
-      if (!res.ok) throw new Error('Portal request failed (HTTP ' + res.status + ').');
+      if (!res.ok) {
+        const said = say ? await res.json().then((d) => d?.error, () => null) : null;
+        if (typeof said === 'string' && said.length <= 200) throw new Error(said);
+        throw new Error('Portal request failed (HTTP ' + res.status + ').');
+      }
       return res;
     }
+    if (gmailAsk?.kind === 'status') return AutofillGmail.status(request);
+    if (gmailAsk?.kind === 'link') return { opened: await AutofillGmail.openVerifyLink(request, gmailAsk.tenant) };
+    if (gmailAsk?.kind === 'code')
+      return { code: await AutofillGmail.findCode(request, gmailAsk.site, gmailAsk.tenant, gmailAsk.shape) };
     if (msg.type === 'autofill:getProfile') {
       const version = revision;
       const cached = (await chrome.storage.session.get(CACHE))[CACHE];

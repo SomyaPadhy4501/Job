@@ -145,6 +145,7 @@ async function configure(token) {
     await chrome.storage.local.remove('autofillDefault');
     $('autofillToken').value = '';
     await showConnection();
+    showGmail();
   } catch (err) { $('account').textContent = err.message; }
 }
 $('connect').onclick = () => {
@@ -333,31 +334,24 @@ $('clearSitePassword').onclick = async () => {
 };
 showSitePassword();
 
-// "Codes from Gmail": shown only when this copy has a Gmail client set up.
-async function showGmail(message) {
+// "Codes from Gmail": shown when the connected portal offers the Gmail
+// connector. Connecting and disconnecting happen on the portal.
+async function showGmail() {
   try {
-    const { available, email } = await autofill('gmailStatus');
+    const { available, connected, email } = await autofill('gmailStatus');
     $('gmailCard').hidden = !available;
-    $('gmailState').textContent = message || (email ? 'Connected: ' + email : 'Not connected.');
-    $('gmailDisconnect').disabled = !email;
-  } catch (err) {
-    $('gmailState').textContent = err.message;
+    $('gmailState').textContent = connected ? 'Connected: ' + email : 'Not connected. Connect Gmail on the job board.';
+    $('gmailManage').textContent = connected ? 'Manage in Connectors' : 'Connect in Connectors';
+  } catch {
+    // No account connected here yet, or an older portal: nothing to show.
+    $('gmailCard').hidden = true;
   }
 }
-$('gmailConnect').onclick = async () => {
-  $('gmailState').textContent = 'Opening Google…';
-  try {
-    // The account to suggest: the one the job board knows.
-    const hint = await autofill('getProfile').then((d) => d.profile?.contact?.email || d.user?.email, () => undefined);
-    const { email } = await autofill('gmailConnect', { hint });
-    showGmail('Connected: ' + email);
-  } catch (err) {
-    showGmail(err.message);
-  }
-};
-$('gmailDisconnect').onclick = async () => {
-  await autofill('gmailDisconnect').catch(() => {});
-  showGmail('Disconnected.');
+$('gmailManage').onclick = async () => {
+  const { portalUrl } = await chrome.storage.local.get({ portalUrl: defaults.portalUrl });
+  const base = new URL(portalUrl);
+  if (base.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(base.hostname)) return;
+  chrome.tabs.create({ url: base.origin + '/settings#connectors' });
 };
 showGmail();
 

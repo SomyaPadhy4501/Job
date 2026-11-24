@@ -35,10 +35,13 @@ export default function Privacy() {
           storage and used only on Workday sign-in pages. This site never receives it.
         </li>
         <li>
-          <strong>Codes from Gmail.</strong> If you connect Gmail in the extension, it gets read-only access through
-          Google's own consent screen. It looks only at mail from Workday and Greenhouse received in the last 15 minutes,
-          takes just the code or verification link, and never stores or sends your email anywhere. The access stays in the
-          extension (this site never sees it); Disconnect revokes it.
+          <strong>Codes from Gmail.</strong> If you connect Gmail in Settings → Connectors, Google's own consent screen
+          asks you to allow read-only Gmail access. This site then keeps that permission (a Google refresh token,
+          encrypted) so the extension can ask for the security code or Workday verification link a job site just emailed
+          you. Only mail from Workday and Greenhouse received in the last 15 minutes is looked at, and only the code or
+          link is used; no email is stored or sent anywhere else. Disconnect (or deleting your account) revokes the
+          permission at Google and deletes it here. You can also remove it any time from your Google account's
+          third-party access page.
         </li>
         <li>
           <strong>LaTeX editor.</strong> Your LaTeX is compiled in your browser. The compiler and TeX's package files come
