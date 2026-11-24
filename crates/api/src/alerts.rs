@@ -275,7 +275,9 @@ pub async fn create(
         .await?
         .is_none()
     {
-        return Err(ApiError::bad("Link Telegram first; alerts go to your Telegram chat."));
+        return Err(ApiError::bad(
+            "Link Telegram first; alerts go to your Telegram chat.",
+        ));
     }
     if db::alerts::count_alerts(pool, user_id).await? >= MAX_ALERTS {
         return Err(ApiError::Forbidden(format!(
