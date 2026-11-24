@@ -186,22 +186,42 @@ async function inspect({ tenant, wd, site }) {
   const list = await call(`${base}/jobs`, { appliedFacets: {}, limit: 20, offset: 0, searchText: 'software engineer' });
   if (!list.data) return list;
   const posts = Array.isArray(list.data.jobPostings) ? list.data.jobPostings : [];
-  const out = { total: list.data.total || 0, us: posts.filter((j) => looksUS(j.locationsText || '')).length, name: '' };
-  if (posts[0]) {
+  const us = posts.filter((j) => looksUS(j.locationsText || ''));
+  const out = { total: list.data.total || 0, us: us.length, name: '' };
+  // A US posting names the US entity ("Deutsche Bank", not its Bangalore branch).
+  const pick = us[0] || posts[0];
+  if (pick) {
     await sleep(500);
-    const detail = await call(`${base}${posts[0].externalPath}`);
+    const detail = await call(`${base}${pick.externalPath}`);
     if (detail.blocked) return detail;
     out.name = String(detail.data?.hiringOrganization?.name || '').trim();
   }
   return out;
 }
 
-// The employer's legal name, cleaned the way USCIS keys are, as a display name:
-// "Fidelity Investments Institutional Operations Company LLC" → "Fidelity
-// Investments Institutional Operations".
+// Workday's hiringOrganization is the legal entity of one posting, often with
+// a cost-centre code or a foreign subsidiary's country and form: "631 Booz
+// Allen Hamilton United States", "Aptiv India Private", "Asml Us Lp Us20".
+// Codes go, then country and entity words at either end.
+const LEGAL_JUNK = new Set(('the usa us u s uk india canada taiwan japan china germany france mexico brazil ireland singapore australia ' +
+  'netherlands poland spain italy iberica america americas united states kingdom international global private pvt pte limited ltd ' +
+  'sas sa ulc bhd gmbh ag bv nv plc inc llc lp llp corp corporation company co federal operations personnel holdings group de of and').split(' '));
+const CODE = /^(\d+|[a-z]{1,3}\d{2,})$/;
+
+function legalKey(legal) {
+  let words = String(legal || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9\s-]/g, ' ').split(/[\s-]+/).filter((w) => w && !CODE.test(w));
+  const junk = (w) => LEGAL_JUNK.has(w) || w.length === 1;
+  while (words.length && junk(words[0])) words = words.slice(1);
+  while (words.length && junk(words[words.length - 1])) words = words.slice(0, -1);
+  return words.join('-');
+}
+
+// A display name from the legal name; '' when there is none or it is a
+// sentence rather than a name (some foreign entities run past six words).
 function nameFrom(legal) {
-  const key = String(legal || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9\s-]/g, ' ').trim().split(/[\s-]+/).filter(Boolean).join('-');
-  return key ? display(stripSuffixes(key)) : '';
+  const key = legalKey(legal);
+  if (!key || key.split('-').length > 6) return '';
+  return display(stripSuffixes(key));
 }
 
 // Which checked employers go into the data file: live software hits, and not
@@ -211,11 +231,13 @@ function nameFrom(legal) {
 // every opening twice.
 function keepDiscovered(row, covered = buildCovered(CONFIGURED)) {
   if (!(row.softwareHits > 0)) return false;
-  const name = row.legalName || row.displayName || '';
-  const key = String(name).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9\s-]/g, ' ').trim().split(/[\s-]+/).filter(Boolean).join('-');
-  const core = stripSuffixes(key);
-  if (SKIP_NAME.test(name) || SKIP.has(key) || SKIP.has(core.join('-')) || SCRAPER.includes(core[0])) return false;
-  return !covered(key);
+  for (const name of [row.legalName, row.displayName]) {
+    const key = legalKey(name);
+    if (!key) continue;
+    const core = stripSuffixes(key);
+    if (SKIP_NAME.test(String(name)) || SKIP.has(key) || SKIP.has(core.join('-')) || SCRAPER.includes(core[0]) || covered(key)) return false;
+  }
+  return true;
 }
 
 async function verifyAll(list, concurrency) {
@@ -274,7 +296,15 @@ async function main() {
   const targets = all ? [...matched, ...rest] : matched;
   if (process.argv.includes('--verify') || writeTo) {
     const blocked = await verifyAll(targets, arg('--concurrency', 3));
-    if (blocked) console.log(`# Verify stopped early, Workday blocked this machine (${blocked})`);
+    if (blocked) {
+      console.log(`# Verify stopped early, Workday blocked this machine (${blocked})`);
+      // A cut-short check would drop every employer it never reached.
+      if (writeTo) {
+        console.log(`# Not writing ${writeTo}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
   }
 
   if (writeTo) {
@@ -284,9 +314,12 @@ async function main() {
         tenant: t.tenant,
         wd: t.wd,
         site: t.sites[0].site,
-        displayName: nameFrom(t.check.name) || t.displayName || t.tenant,
+        // A tenant that is a sponsor's whole name ("tmobile") names the
+        // employer better than one posting's legal entity does.
+        displayName: (t.strong && t.displayName) || nameFrom(t.check.name) || t.displayName || t.tenant,
         legalName: t.check.name || undefined,
         sponsor: t.sponsor,
+        strong: t.strong,
         approvals: t.approvals,
         softwareHits: t.check.total,
         usOnFirstPage: t.check.us,
@@ -294,6 +327,14 @@ async function main() {
       .filter((r) => keepDiscovered(r))
       .sort((a, b) => a.tenant.localeCompare(b.tenant));
     const checked = targets.filter((t) => t.check).length;
+    // Common Crawl index pages fail now and then; a list that shrank by a
+    // fifth is a bad crawl, not 20% of Workday employers leaving.
+    const previous = fs.existsSync(writeTo) ? JSON.parse(fs.readFileSync(writeTo, 'utf8')).companies.length : 0;
+    if (rows.length < previous * 0.8) {
+      console.log(`# Not writing ${writeTo}: ${rows.length} employers, down from ${previous}`);
+      process.exitCode = 1;
+      return;
+    }
     fs.writeFileSync(writeTo, `${JSON.stringify({ generatedAt: new Date().toISOString(), crawls: ids, companies: rows }, null, 1)}\n`);
     console.log(`# Wrote ${rows.length} live Workday employers (${rows.filter((r) => r.softwareHits > 0).length} with software hits) of ${checked} checked to ${writeTo}`);
     return;

@@ -1,0 +1,47 @@
+name: discover-workday
+
+# Monthly: find every Workday employer in the latest Common Crawl indexes,
+# check each live (one software search and one posting, through Node's https
+# module), and commit src/data/workday-discovered.json, which workday-wide.yml
+# collects. The script keeps the old file if Workday blocks the run partway or
+# the list shrinks by a fifth (a bad crawl).
+on:
+  schedule:
+    - cron: '17 6 3 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: discover-workday
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Discover and check Workday employers
+        run: node scripts/discover-workday.js --all --write src/data/workday-discovered.json --concurrency 3
+
+      - name: Commit the refreshed list
+        run: |
+          if git diff --quiet -- src/data/workday-discovered.json; then
+            echo "No change."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/data/workday-discovered.json
+          git commit -m "chore(workday): refresh discovered employers"
+          git push
