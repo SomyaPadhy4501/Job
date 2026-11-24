@@ -8,6 +8,7 @@
 
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 
@@ -114,3 +115,16 @@ writeFileSync(
   ) + '\n'
 );
 console.log(`packed ${entries.length} files from ${source} → downloads/job-board-extension.zip (${archive.length} bytes, v${manifest.version})`);
+
+// The Workday employers, for the extension's Workday collection
+// (extension/workday-collect.js). Workday blocks GitHub's runners (Cloudflare,
+// since 2026-11-24), so the owner's browser reads these boards instead. The
+// list comes from src/config.js, so adding a tenant there reaches the
+// extension with the next deploy.
+const require = createRequire(import.meta.url);
+const { COMPANIES } = require(join(here, '../../src/config.js'));
+const tenants = COMPANIES.filter((c) => c.source === 'workday' && c.tenant && c.wd && c.site).map(
+  ({ slug, displayName, tenant, wd, site, searches }) => ({ slug, displayName, tenant, wd, site, ...(searches ? { searches } : {}) })
+);
+writeFileSync(join(out, 'workday-tenants.json'), JSON.stringify({ tenants }) + '\n');
+console.log(`listed ${tenants.length} Workday employers → downloads/workday-tenants.json`);

@@ -257,6 +257,25 @@ years of experience and ITAR/clearance wording.
 Chrome has to be running for this; on a Mac, add Chrome to System Settings →
 General → Login Items so it starts with the machine.
 
+## Workday employers (site owner)
+
+Workday's Cloudflare answers the server collector's requests with HTTP 429
+(since 2026-11-24), so the extension can read the Workday employers instead.
+Turn on **Collect Workday employers from this computer** under Advanced (it
+asks Chrome for access to `*.myworkdayjobs.com`), with the collect token set.
+
+- Every 6 hours, in the background: no windows or tabs open.
+- The employer list is `/downloads/workday-tenants.json`, built from
+  `src/config.js` at each deploy, so new employers need no extension update.
+- One request at a time, one a second, the same calls each careers site makes
+  (`workday-collect.js`). A run of ~256 employers takes about an hour.
+- Only US, technical postings from the last 14 days are sent, as source
+  `workday` (the server filters them again). Descriptions are read for up to
+  40 postings per employer, and never twice for the same posting.
+- The first 429, 403 or block page ends the run until the next one, so your
+  own Workday sign-ins aren't put at risk. The popup shows the last run.
+- **Run Workday now** starts one immediately.
+
 ## Privacy
 
 The collect token and portal settings live in `chrome.storage.local`. The

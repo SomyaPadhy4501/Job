@@ -120,10 +120,13 @@
         <input type="number" id="autoEveryHours" min="1" max="24" style="width:56px;display:inline;padding:2px 6px"> hours</label>
       <label class="check"><input type="checkbox" id="autoClose"> Close the window when done</label>
       <label class="check" title="These sites ban automated collection and restrict accounts for it. When on, the extension only reads job lists on pages you open yourself."><input type="checkbox" id="allowSensitive"> Capture LinkedIn / Indeed / Glassdoor pages I browse (account risk)</label>
+      <label class="check" title="Workday blocks the server's collector, so this browser reads the Workday employers' job lists instead, in the background: one request a second, stopping at the first sign of a limit. No windows open."><input type="checkbox" id="workdayEnabled"> Collect Workday employers from this computer (every 6 hours)</label>
+      <div class="muted" id="workdayStatus"></div>
       <div class="muted" id="lastRun"></div>
       <div class="row">
         <button id="save">Save</button>
         <button id="open">Open my boards</button>
+        <button id="workdayNow">Run Workday now</button>
       </div>
       <div class="log" id="log"><span class="muted">No captures yet.</span></div>
     </details>

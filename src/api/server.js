@@ -213,6 +213,9 @@ function createApp() {
           filterUSOnly: CONFIG.filterUSOnly,
           filterSoftwareOnly: CONFIG.filterSoftwareOnly,
           entryLevelMode: CONFIG.entryLevelMode,
+          // As in a collect run: a dated posting past the window isn't stored
+          // (the scraper and the extension's Workday rows now carry dates).
+          retentionDays: CONFIG.retentionDays,
         }
       );
       if (!n) { rejected++; continue; }
