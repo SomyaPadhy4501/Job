@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.jsx';
+import InstallHint from './components/InstallHint.jsx';
 import { ME } from './account.js';
 import './styles.css';
 import './account.css';
@@ -45,6 +46,15 @@ createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
+      <InstallHint />
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+// Installable app (public/sw.js): production only, so the dev server's hot
+// reload is never served from a cache.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

@@ -439,3 +439,23 @@ a { color: inherit; }
 
 /* Placeholders readable everywhere (browser defaults are very faint). */
 input::placeholder, textarea::placeholder { color: var(--text-subtle); opacity: 1; }
+
+/* "Add to Home Screen" tip for iPhone Safari (components/InstallHint.jsx). */
+.install-hint {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  font-size: 14px;
+}
