@@ -9,8 +9,11 @@
 //   Sign In once, only after the user has interacted with the page (never in
 //   an unattended window). If that fails, it offers Create account or Forgot
 //   password, and makes no more automatic attempts until the password changes.
-// - Create-account form: fills email, password and verify password. The
-//   "I agree" box and the Create Account button are always left to the user.
+// - Create-account form: fills email, password and verify password, ticks
+//   Workday's own "I agree" box and presses Create Account once (the user
+//   asked for this; same conditions as Sign In). With a CAPTCHA on the form,
+//   or anything off, it stops and asks instead. Then the verify-email link is
+//   opened from Gmail by autofill-codes.js.
 // Clicks are limited to Workday's sign-in controls, found by automation id,
 // inside the sign-in panel. No CAPTCHA is ever touched.
 (() => {
@@ -170,6 +173,13 @@
     }, 500);
   }
 
+  // A real CAPTCHA (not Workday's "noCaptchaWrapper" around its buttons).
+  function captcha(panel) {
+    return !!panel.querySelector(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="turnstile"], .g-recaptcha, .h-captcha, .cf-turnstile, [data-automation-id*="captcha" i]:not([data-automation-id="noCaptchaWrapper"])'
+    );
+  }
+
   async function createAccount(panel, email, password, verify) {
     const creds = await credentials();
     if (!creds || !panel.isConnected) return;
@@ -177,8 +187,60 @@
     set(password, creds.password);
     set(verify, creds.password);
     const agree = $(panel, 'createAccountCheckbox');
-    outline(agree?.closest('[data-automation-id^="formField"]') || agree);
-    say('Email and password are filled in. Read the terms, tick “I agree”, then click Create Account.');
+    const button = $(panel, 'createAccountSubmitButton');
+    const create = () => {
+      // Workday's own terms box only, inside this panel.
+      if (agree && !agree.checked) press(agree, panel);
+      if (agree && !agree.checked) agree.click();
+      if (agree && !agree.checked) {
+        outline(agree.closest('[data-automation-id^="formField"]') || agree);
+        say('Tick “I agree”, then click Create Account.');
+        return;
+      }
+      press(button, panel);
+      watchCreate(panel);
+    };
+    const mayPress =
+      creds.auto &&
+      !userTyped &&
+      !!button &&
+      !captcha(panel) &&
+      document.visibilityState === 'visible' &&
+      navigator.userActivation?.hasBeenActive;
+    if (!mayPress) {
+      outline(button);
+      say(
+        captcha(panel)
+          ? 'Email and password are filled in. Solve the check on the page, tick “I agree”, then click Create Account.'
+          : 'Email and password are filled in. Create the account with your job site password?',
+        captcha(panel) || !button ? [] : [['Create account', () => { hide(); create(); }, true]]
+      );
+      return;
+    }
+    // Let Workday's form notice the typed values first.
+    await new Promise((r) => setTimeout(r, 400));
+    if (panel.isConnected) create();
+  }
+
+  // Created: the form goes away (Workday then asks to verify the email, or
+  // signs in). Still there after ~10 s: say so, and try nothing more.
+  function watchCreate(panel) {
+    const started = Date.now();
+    const timer = setInterval(async () => {
+      const verify = panel.querySelector('input[type="password"][data-automation-id="verifyPassword"]');
+      if (!visible(panel) || !document.contains(panel) || !visible(verify)) {
+        clearInterval(timer);
+        say('Account created with your job site password. If Workday asks you to verify your email, the link is opened from Gmail for you.');
+        return;
+      }
+      if (Date.now() - started < 10000) return;
+      clearInterval(timer);
+      await ask('loginResult', { result: 'failed' }).catch(() => {});
+      const signInLink = $(panel, 'signInLink');
+      say('Workday didn’t create the account. You may already have one here, or the password doesn’t fit its rules.', [
+        ...(signInLink ? [['Sign in instead', () => { hide(); signInLink.click(); }, true]] : []),
+      ]);
+    }, 500);
   }
 
   function step() {

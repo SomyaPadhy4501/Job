@@ -33,6 +33,7 @@ async function live() {
     ],
   };
   const requests = [];
+  const gmailAsks = [];
   const server = http.createServer(async (req, res) => {
     requests.push(req.url);
     if (req.headers.authorization !== 'Bearer test-only') {
@@ -55,6 +56,11 @@ async function live() {
       res
         .writeHead(200, { 'Content-Type': 'application/json' })
         .end(JSON.stringify({ saved: profile.answers.length }));
+    } else if (req.url === '/api/autofill/gmail/code' && req.method === 'POST') {
+      let body = '';
+      for await (const part of req) body += part;
+      gmailAsks.push(JSON.parse(body));
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ code: 'A1B2C3D4', messageId: 'm1' }));
     } else res.writeHead(404).end();
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
@@ -395,30 +401,51 @@ async function live() {
               '<div data-automation-id="formField-verifyPassword"><label for="v">Verify New Password</label><input id="v" type="password" data-automation-id="verifyPassword"></div>' +
               '<label for="beecatcher">Enter website. This input is for robots only</label><input id="beecatcher" data-automation-id="beecatcher">' +
               '<div data-automation-id="formField-"><input type="checkbox" id="agree" data-automation-id="createAccountCheckbox"><label for="agree">I agree</label></div>' +
-              '<button data-automation-id="createAccountSubmitButton" id="create" onclick="window.__created=true;return false">Create Account</button></form></div></div>',
+              '<button data-automation-id="createAccountSubmitButton" id="create" onclick="window.__created={agree:document.getElementById(\'agree\').checked,e:document.getElementById(\'e\').value,v:document.getElementById(\'v\').value,bot:document.getElementById(\'beecatcher\').value};this.closest(\'form\').remove();return false">Create Account</button></form></div></div>',
           })
         );
         await page.goto('https://create.myworkdayjobs.com/en-US/External/job/1/apply', { waitUntil: 'domcontentloaded' });
         await page.mouse.click(5, 5);
-        await page.waitForFunction(() => document.getElementById('v').value, null, { timeout: 15000 });
-        assert.deepEqual(
-          await page.evaluate(() => ({
-            e: document.getElementById('e').value,
-            p: document.getElementById('p').value,
-            v: document.getElementById('v').value,
-            bot: document.getElementById('beecatcher').value,
-            agree: document.getElementById('agree').checked,
-            created: !!window.__created,
-          })),
-          { e: 'pat@example.invalid', p: 'Str0ng!Password-x', v: 'Str0ng!Password-x', bot: '', agree: false, created: false }
-        );
+        // Email and both passwords filled, "I agree" ticked, Create Account
+        // pressed once; the bot-trap field left empty.
+        await page.waitForFunction(() => window.__created, null, { timeout: 15000 });
+        assert.deepEqual(await page.evaluate(() => window.__created), {
+          agree: true,
+          e: 'pat@example.invalid',
+          v: 'Str0ng!Password-x',
+          bot: '',
+        });
         console.log('Workday create account: ok');
+
+        // With a CAPTCHA on the form: filled, but nothing is ticked or pressed.
+        await page.route('https://captcha.myworkdayjobs.com/**', (r) =>
+          r.fulfill({
+            contentType: 'text/html',
+            body:
+              '<div data-automation-id="applyFlowPage"><div data-automation-id="signInContent">' +
+              '<form><div data-automation-id="formField-email"><input id="e" data-automation-id="email"></div>' +
+              '<div data-automation-id="formField-password"><input id="p" type="password" data-automation-id="password"></div>' +
+              '<div data-automation-id="formField-verifyPassword"><input id="v" type="password" data-automation-id="verifyPassword"></div>' +
+              '<div class="g-recaptcha"></div>' +
+              '<div data-automation-id="formField-"><input type="checkbox" id="agree" data-automation-id="createAccountCheckbox"></div>' +
+              '<button data-automation-id="createAccountSubmitButton" onclick="window.__created=true;return false">Create Account</button></form></div></div>',
+          })
+        );
+        await page.goto('https://captcha.myworkdayjobs.com/en-US/External/job/1/apply', { waitUntil: 'domcontentloaded' });
+        await page.mouse.click(5, 5);
+        await page.waitForFunction(() => document.getElementById('v').value, null, { timeout: 15000 });
+        await page.waitForTimeout(1500);
+        assert.deepEqual(await page.evaluate(() => ({ agree: document.getElementById('agree').checked, created: !!window.__created })), {
+          agree: false,
+          created: false,
+        });
+        console.log('Workday create account with a CAPTCHA left to you: ok');
       } finally {
         await page.close();
       }
     }
-    // Code boxes are noticed; without a Gmail client set up the extension
-    // says so instead of failing silently.
+    // Greenhouse security code boxes: the code is asked from the portal for
+    // this board and company, then filled one character per box.
     {
       const page = await context.newPage();
       try {
@@ -426,27 +453,20 @@ async function live() {
           r.fulfill({
             contentType: 'text/html',
             body:
+              '<title>Job Application for Software Engineer at Codes Inc</title>' +
               '<div id="application-form"><p>Enter the security code we emailed you</p>' +
               Array.from({ length: 8 }, (_, i) => `<input id="security-input-${i}" maxlength="1">`).join('') +
               '</div>',
           })
         );
         await page.goto('https://job-boards.greenhouse.io/codes/jobs/1', { waitUntil: 'domcontentloaded' });
-        const cdp = await context.newCDPSession(page);
-        let text = '';
-        for (let i = 0; i < 40 && !/Gmail/.test(text); i++) {
-          await page.waitForTimeout(250);
-          const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
-          const shadows = (n) => [...(n.shadowRoots || []), ...(n.children || []).flatMap(shadows)];
-          for (const node of shadows(root)) {
-            const found = await cdp.send('DOM.querySelector', { nodeId: node.nodeId, selector: '[role="status"]' });
-            if (!found.nodeId) continue;
-            const { outerHTML } = await cdp.send('DOM.getOuterHTML', { nodeId: found.nodeId });
-            if (/Gmail/.test(outerHTML)) text = outerHTML;
-          }
-        }
-        assert.match(text, /Gmail isn.t set up/);
-        console.log('Code boxes noticed: ok');
+        await page.waitForFunction(() => document.getElementById('security-input-7').value, null, { timeout: 15000 });
+        assert.equal(
+          await page.evaluate(() => [...document.querySelectorAll('[id^="security-input-"]')].map((i) => i.value).join('')),
+          'A1B2C3D4'
+        );
+        assert.deepEqual(gmailAsks[0], { site: 'greenhouse', tenant: 'codes', company: 'Codes Inc', length: 8, charset: 'alnum', skip: [] });
+        console.log('Greenhouse code filled for this company: ok');
       } finally {
         await page.close();
       }

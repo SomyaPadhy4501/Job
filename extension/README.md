@@ -131,8 +131,10 @@ extension storage). On a Workday sign-in page the extension chooses "Sign in
 with email", fills your profile email and the password, and presses Sign In
 once you've interacted with the page. If that fails it offers Create account
 or Forgot password and stops trying until you change the password. On
-**Create Account** it fills email and both password boxes; you tick "I agree"
-and click Create Account.
+**Create Account** it fills email and both password boxes, ticks "I agree" and
+presses Create Account; Workday's "verify your email" link is then opened from
+Gmail (Alerts & Connectors). With a CAPTCHA on the form it fills the boxes and
+leaves the rest to you.
 
 ### Codes from Gmail
 
@@ -157,7 +159,10 @@ HANDOFF.md).
   Send, Sign in, Register, Create account, Remove or Delete, even when one is
   rendered as a dropdown option. The one exception is Workday's own sign-in
   panel (`autofill-login.js`, below): it may press **Sign in with email** and
-  **Sign In**, never **Create Account** or "I agree".
+  **Sign In**, and on the create-account form tick Workday's own **I agree**
+  and press **Create Account** once (only after you've interacted with the
+  page, never with a CAPTCHA on the form, never again after a failure until
+  the password changes).
 - **Never touches CAPTCHAs** (reCAPTCHA, hCaptcha, Turnstile) and never ticks
   a checkbox: consent, acknowledgement, privacy, attestation, signature,
   background-check and "share my data" controls are always left to you.
