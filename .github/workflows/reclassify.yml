@@ -16,6 +16,10 @@ on:
           - 'false'
           - 'true'
 
+# The scripts keep AI-tagged sponsorship when AI tagging is on (see AI_TAGGING.md).
+env:
+  AI_TAGGING: ${{ vars.AI_TAGGING }}
+
 jobs:
   reclassify:
     runs-on: ubuntu-latest

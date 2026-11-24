@@ -17,6 +17,12 @@ const { classifySponsorship } = require('../services/classifier');
 
 const APPLY = process.argv.includes('--apply');
 
+// Rule-based sponsorship would overwrite the AI tagger's verdicts.
+if (APPLY && process.env.AI_TAGGING === 'true') {
+  console.error('AI_TAGGING is on: sponsorship comes from the AI tagger in the collect cron. Not applying rule-based sponsorship.');
+  process.exit(1);
+}
+
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is required');
   process.exit(1);

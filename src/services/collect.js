@@ -14,7 +14,9 @@ const {
   jobsForCompanies,
   recordMisses,
   describedApplyUrls,
+  storedTags,
 } = require('../db');
+const aiTagger = require('./ai-tagger');
 const log = require('../logger');
 
 async function runWithConcurrency(items, limit, worker) {
@@ -177,6 +179,36 @@ async function collectAll({ companies = COMPANIES } = {}) {
 
   const deduped = dedupeBatch(normalized);
 
+  // AI tagging (src/services/ai-tagger.js): the model replaces the rule-based
+  // role and sponsorship on new or changed postings before they are saved.
+  // Skipped inside Vercel functions (/admin/collect), which can't wait on a
+  // model for minutes. Never fails the collect: on any problem the rule tags
+  // computed by normalizeJob are saved, as they always were.
+  let tags;
+  if (aiTagger.enabled() && !process.env.VERCEL) {
+    try {
+      const options = require('./model-options').modelOptions();
+      const limit = Number(process.env.AI_TAG_LIMIT || 150);
+      const minutes = Number(process.env.AI_TAG_MINUTES || 15);
+      tags = await aiTagger.tagJobs(deduped, {
+        lookup: storedTags,
+        options,
+        limit: Number.isFinite(limit) && limit >= 0 ? limit : 150,
+        deadline: Date.now() + (Number.isFinite(minutes) && minutes > 0 ? minutes : 15) * 60_000,
+        onError: (job, err) => log.debug('tags.error', { url: job.apply_url, error: err.message }),
+        onTag: (job, rules, tag) => log.debug('tags.verdict', {
+          title: job.job_title, company: job.company_name,
+          role: `${rules.role_type}->${job.role_type}`, sponsorship: `${rules.sponsorship}->${job.sponsorship}`,
+          specialty: tag.specialty, reason: tag.reason, quote: tag.quote,
+        }),
+      });
+      log.info('tags.review', { runId, model: options.model, ...tags });
+      if (tags.unavailable) log.warn('tags.unavailable', { runId, note: 'model unreachable; remaining new postings keep their rule tags' });
+    } catch (err) {
+      log.error('tags.failed', { runId, error: err.message });
+    }
+  }
+
   // Bulk upsert in a single transaction (works for both SQLite and Postgres).
   const { inserted, updated, failed = 0 } = await bulkUpsert(deduped);
   if (failed > 0) log.warn('collection.rows_failed', { runId, failed });
@@ -227,6 +259,7 @@ async function collectAll({ companies = COMPANIES } = {}) {
     closed,
     kept: deduped.length,
     errors,
+    ...(tags && { tags }),
   };
 }
 

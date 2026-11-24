@@ -1,0 +1,93 @@
+[
+  {
+    "company_name": "Cloudflare",
+    "job_title": "Product Engineer",
+    "apply_url": "https://example.org/jobs/1",
+    "location": "United States",
+    "description": "Design and maintain backend APIs for merchant payments. We offer visa sponsorship for this position.",
+    "expected": {
+      "role_type": "SWE",
+      "specialty": "Backend",
+      "reason": "offered",
+      "quote": "We offer visa sponsorship for this position."
+    }
+  },
+  {
+    "company_name": "Cloudflare",
+    "job_title": "Product Engineer",
+    "apply_url": "https://example.org/jobs/2",
+    "location": "United States",
+    "description": "Calibrate production machinery and inspect factory equipment.",
+    "expected": {
+      "role_type": "OTHER",
+      "specialty": "",
+      "reason": "silent",
+      "quote": ""
+    }
+  },
+  {
+    "company_name": "Cloudflare",
+    "job_title": "Software Engineer",
+    "apply_url": "https://example.org/jobs/3",
+    "location": "United States",
+    "description": "Build web services. We do not offer visa sponsorship for this role.",
+    "expected": {
+      "role_type": "SWE",
+      "specialty": "Backend",
+      "reason": "refused",
+      "quote": "We do not offer visa sponsorship for this role."
+    }
+  },
+  {
+    "company_name": "Cloudflare",
+    "job_title": "ML Platform Engineer",
+    "apply_url": "https://example.org/jobs/4",
+    "location": "United States",
+    "description": "Build and deploy machine learning inference pipelines. H-1B transfers only.",
+    "expected": {
+      "role_type": "MLE",
+      "specialty": "ML Infrastructure",
+      "reason": "conditional",
+      "quote": "H-1B transfers only."
+    }
+  },
+  {
+    "company_name": "Cloudflare",
+    "job_title": "Software Engineer",
+    "apply_url": "https://example.org/jobs/5",
+    "location": "United States",
+    "description": "Build mobile applications for Android. Sponsorship may be considered case by case.",
+    "expected": {
+      "role_type": "MOBILE",
+      "specialty": "Android",
+      "reason": "conditional",
+      "quote": "Sponsorship may be considered case by case."
+    }
+  },
+  {
+    "company_name": "Cloudflare",
+    "job_title": "Data Scientist",
+    "apply_url": "https://example.org/jobs/6",
+    "location": "United States",
+    "description": "Design experiments and analyze customer behavior.",
+    "expected": {
+      "role_type": "DS",
+      "specialty": "Experimentation",
+      "reason": "silent",
+      "quote": ""
+    }
+  },
+  {
+    "company_name": "Cloudflare",
+    "job_title": "Backend Developer",
+    "apply_url": "https://example.org/jobs/7",
+    "location": "United States",
+    "description": "Write server-side APIs. Will you now or in the future require visa sponsorship?",
+    "expected": {
+      "role_type": "SWE",
+      "specialty": "Backend",
+      "reason": "silent",
+      "quote": ""
+    }
+  }
+]
