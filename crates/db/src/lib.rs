@@ -23,8 +23,9 @@ pub type Tx<'a> = Transaction<'a, Postgres>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
-    /// The accounts tables don't exist yet (migration 004 not applied).
-    #[error("the accounts tables are missing; apply migrations/004_accounts.sql")]
+    /// A table the query needs doesn't exist: a migration in `migrations/`
+    /// hasn't been applied to this database.
+    #[error("a table is missing; apply the pending migrations in migrations/")]
     NotMigrated,
     /// A unique constraint refused the write. Carries the constraint name.
     #[error("already exists ({0})")]
@@ -37,7 +38,13 @@ impl From<sqlx::Error> for DbError {
     fn from(err: sqlx::Error) -> Self {
         if let sqlx::Error::Database(db) = &err {
             match db.code().as_deref() {
-                Some("42P01") => return DbError::NotMigrated,
+                Some("42P01") => {
+                    // Postgres says `relation "<table>" does not exist`: the
+                    // table's name only, no values, so it's safe to log. It
+                    // tells the owner which migration is missing.
+                    eprintln!("db error: {} (apply the pending migrations)", db.message());
+                    return DbError::NotMigrated;
+                }
                 Some("23505") => {
                     return DbError::Conflict(db.constraint().unwrap_or("unique").to_owned());
                 }

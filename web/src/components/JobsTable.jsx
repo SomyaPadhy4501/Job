@@ -146,19 +146,25 @@ function QueueButton({ jobId }) {
   else if (add.isSuccess) label = add.data?.added === false ? 'In your queue' : 'Queued';
   else if (add.isError) label = 'Try again';
   return (
-    <button
-      type="button"
-      className="btn btn-small btn-ghost nowrap"
-      disabled={add.isPending || add.isSuccess}
-      title={add.isError ? add.error.message : undefined}
-      onClick={(e) => {
-        // Inside a company group the whole row toggles it open.
-        e.stopPropagation();
-        add.mutate();
-      }}
-    >
-      {label}
-    </button>
+    <>
+      <button
+        type="button"
+        className="btn btn-small btn-ghost nowrap"
+        disabled={add.isPending || add.isSuccess}
+        onClick={(e) => {
+          // Inside a company group the whole row toggles it open.
+          e.stopPropagation();
+          add.mutate();
+        }}
+      >
+        {label}
+      </button>
+      {add.isError && (
+        <span className="error small" role="alert">
+          {add.error.message}
+        </span>
+      )}
+    </>
   );
 }
 

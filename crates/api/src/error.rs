@@ -69,9 +69,9 @@ impl IntoResponse for ApiError {
 impl From<db::DbError> for ApiError {
     fn from(err: db::DbError) -> Self {
         match err {
-            db::DbError::NotMigrated => {
-                ApiError::Unavailable("Accounts aren't set up on this server yet.".into())
-            }
+            db::DbError::NotMigrated => ApiError::Unavailable(
+                "This isn't set up on the server yet: its database needs an update.".into(),
+            ),
             db::DbError::Conflict(_) => ApiError::Conflict("That already exists.".into()),
             db::DbError::Other(e) => {
                 // The error kind only: sqlx messages can quote values.
