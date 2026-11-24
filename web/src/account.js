@@ -13,8 +13,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function api(path, { method = 'GET', body, form } = {}) {
-  const init = { method, credentials: 'same-origin', cache: 'no-store', headers: {} };
+export async function api(path, { method = 'GET', body, form, headers = {} } = {}) {
+  const init = { method, credentials: 'same-origin', cache: 'no-store', headers: { ...headers } };
   if (method !== 'GET') init.headers['X-Requested-With'] = 'fetch';
   if (form) {
     init.body = form;
@@ -112,6 +112,12 @@ export function useSignOut() {
     } finally {
       qc.removeQueries({ predicate: (q) => !PUBLIC_KEYS.includes(q.queryKey[0]) });
       qc.setQueryData(ME, { user: null });
+      // Unsaved LaTeX drafts are personal: they go with the session.
+      try {
+        for (const k of Object.keys(localStorage)) if (k.startsWith('latex-draft:')) localStorage.removeItem(k);
+      } catch {
+        // Storage blocked: nothing was saved there either.
+      }
     }
   };
 }

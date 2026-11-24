@@ -44,6 +44,18 @@ function ResumesPage() {
       ) : (
         <div className="card notice">Resume uploads aren't available on this server yet.</div>
       )}
+      {storage && (
+        <div className="card latex-cta">
+          <div>
+            <h3>Write one in LaTeX</h3>
+            <p className="muted small">Edit LaTeX, see the PDF as you type, and save it here. Start from your profile or a template.</p>
+          </div>
+          {/* A full page load: only the editor's page may run the compiler. */}
+          <a className="btn btn-small" href="/resumes/latex" aria-disabled={resumes.length >= limits.maxResumes}>
+            New LaTeX resume
+          </a>
+        </div>
+      )}
       {resumes.length === 0 ? (
         <div className="card muted">No resumes yet.</div>
       ) : (
@@ -176,6 +188,7 @@ function ResumeCard({ resume, suggestedTags }) {
         <span className="muted small">
           {resume.fileName} · {formatBytes(resume.sizeBytes)} · added {formatDate(resume.createdAt)} ·{' '}
           <span className={resume.parseStatus === 'parsed' ? '' : 'warn'}>{PARSE_LABEL[resume.parseStatus]}</span>
+          {resume.sourceStale && <span className="warn"> · PDF older than its LaTeX source</span>}
         </span>
       </div>
       {editing ? (
@@ -208,6 +221,9 @@ function ResumeCard({ resume, suggestedTags }) {
               {preview ? 'Hide preview' : 'Preview'}
             </button>
             <a className="btn btn-small btn-ghost" href={`/api/me/resumes/${resume.id}/file`}>Download</a>
+            {resume.hasSource && (
+              <a className="btn btn-small btn-ghost" href={`/resumes/latex?id=${resume.id}`}>Edit LaTeX</a>
+            )}
             <button className="btn btn-small btn-ghost" onClick={() => setReview((r) => !r)} aria-expanded={review}>
               {review ? 'Hide details' : 'Review details'}
             </button>

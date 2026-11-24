@@ -10,3 +10,4 @@ node_modules/
 .claude/worktrees/
 .claude/settings.local.json
 /web/public/pdfjs/
+/web/public/siglum/

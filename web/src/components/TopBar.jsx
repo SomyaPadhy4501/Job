@@ -52,7 +52,7 @@ export default function TopBar({ total, isFetching, onRefresh }) {
       </div>
       <nav className="nav" aria-label="Main">
         {NAV.filter(([, , only]) => !only || user).map(([to, label]) => (
-          <Link key={to} to={to} className={`nav-link${path === to ? ' is-active' : ''}`} aria-current={path === to ? 'page' : undefined}>
+          <Link key={to} to={to} className={`nav-link${path === to || (to !== '/' && path.startsWith(`${to}/`)) ? ' is-active' : ''}`} aria-current={path === to ? 'page' : undefined}>
             {label}
           </Link>
         ))}

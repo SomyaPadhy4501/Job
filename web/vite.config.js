@@ -17,6 +17,18 @@ function pdfjsAssets() {
   return { name: 'pdfjs-assets', buildStart: copy, configureServer: copy };
 }
 
+// The LaTeX engine's worker, at a fixed versioned path: vercel.json gives
+// /siglum/* its own CSP (it runs the hash-checked engine from a blob: URL).
+function siglumWorker() {
+  const copy = () => {
+    const pkg = JSON.parse(readFileSync(new URL('./node_modules/@siglum/engine/package.json', import.meta.url), 'utf8'));
+    const from = fileURLToPath(new URL('./node_modules/@siglum/engine/src/worker.js', import.meta.url));
+    const to = fileURLToPath(new URL(`./public/siglum/worker-${pkg.version}.js`, import.meta.url));
+    if (existsSync(from)) cpSync(from, to);
+  };
+  return { name: 'siglum-worker', buildStart: copy, configureServer: copy };
+}
+
 // Dev server runs on 5173 and proxies API calls to the Express backend on
 // whichever port run-all.sh picked (default 4000). Production build is pure
 // static — served by the Express backend out of web/dist/.
@@ -53,10 +65,16 @@ function vercelHeaders() {
 }
 
 export default defineConfig({
-  plugins: [react(), pdfjsAssets(), vercelHeaders()],
+  plugins: [react(), pdfjsAssets(), siglumWorker(), vercelHeaders()],
   // Which Vercel environment built this ('production', 'preview', or '' locally).
-  define: { __VERCEL_ENV__: JSON.stringify(process.env.VERCEL_ENV || '') },
-  optimizeDeps: { esbuildOptions: { target: 'es2022' } },
+  define: { __VERCEL_ENV__: JSON.stringify(process.env.VERCEL_ENV || ''), global: 'globalThis' },
+  // Siglum (LaTeX engine) setup from its docs: its optional BLAKE3 entry
+  // doesn't bundle, and one copy of its filesystem package.
+  resolve: {
+    alias: { 'blake3-wasm/browser.js': fileURLToPath(new URL('./src/latex/blake3-disabled.js', import.meta.url)) },
+    dedupe: ['@siglum/filesystem'],
+  },
+  optimizeDeps: { esbuildOptions: { target: 'esnext' } },
   // Same /api proxy for `vite preview` (production build + production CSP).
   preview: { port: 4173, proxy: { '/api': { target: 'http://localhost:4100', changeOrigin: false } } },
   server: {
@@ -71,8 +89,8 @@ export default defineConfig({
     },
   },
   build: {
-    // pdf.js uses top-level await.
-    target: 'es2022',
+    // pdf.js uses top-level await; Siglum is tested with esnext.
+    target: 'esnext',
     outDir: 'dist',
     emptyOutDir: true,
   },

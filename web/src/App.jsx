@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import Board from './pages/Board.jsx';
 import Resumes from './pages/Resumes.jsx';
 import Profile from './pages/Profile.jsx';
@@ -10,8 +11,12 @@ import TopBar from './components/TopBar.jsx';
 import { useAccount } from './account.js';
 import { Link, usePath } from './router.jsx';
 
+// The LaTeX editor carries CodeMirror and the compiler: loaded on demand.
+const LatexEditor = lazy(() => import('./pages/LatexEditor.jsx'));
+
 const PAGES = {
   '/resumes': Resumes,
+  '/resumes/latex': LatexEditor,
   '/profile': Profile,
   '/settings': Settings,
   '/autofill': Autofill,
@@ -35,7 +40,9 @@ export default function App() {
   return (
     <Shell>
       {Page ? (
-        <Page />
+        <Suspense fallback={<div className="card"><div className="skeleton skeleton-row" /></div>}>
+          <Page />
+        </Suspense>
       ) : (
         <div className="card">
           <h2>Page not found</h2>
@@ -52,7 +59,7 @@ function Shell({ children }) {
   return (
     <div className="app">
       <TopBar />
-      <main className="main page">{children}</main>
+      <main className={`main page${usePath().startsWith('/resumes/latex') ? ' page-wide' : ''}`}>{children}</main>
     </div>
   );
 }
