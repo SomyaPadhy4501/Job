@@ -344,7 +344,6 @@ every filter off (783 in the default view), from 16,480 stored.
 - `scripts/probe-yc-ats.js` — discovers YC companies that publish on Greenhouse/Lever/Ashby. Writes config-ready blocks to stdout; redirect into a file for the verifier.
 - `scripts/verify-yc-ats.js` — verifies probe output before merge (Greenhouse exact-name match via `/boards/{slug}` metadata; Lever/Ashby via slug-variant provenance). 12 collisions caught on the first run (e.g. `greenhouse:beam` → "Bridge to Enter Advanced Mathematics" nonprofit, not YC Beam). 357 entries verified and merged into `src/config.js` on 2026-04-24.
 - `scripts/probe-topstartups.js` — discovers non-YC curated startups (Anduril, ClickHouse, Chainguard, Harvey, Abridge, Semgrep, …) from topstartups.io. Scrapes the infinite-scroll page, filters US-HQ, reuses the same ATS probe + name-match verification as the YC flow. 277 entries merged.
-- `HOSTING.md` — plan to move off local to Vercel + Neon Postgres + GitHub Actions (free tier, zero-ops).
 
 **Investigated and rejected (2026-04-24):**
 - `startup.jobs` — Cloudflare 403 challenge on every endpoint (including RSS). Same bucket as LinkedIn/Indeed/Glassdoor.
@@ -457,7 +456,6 @@ them together at the process level only.
 | `run-all.sh` | **Unified launcher — what the user runs** |
 | `README.md` | Project-level documentation (slightly stale re: cadence; defer to HANDOFF.md) |
 | `HANDOFF.md` | This file |
-| `HOSTING.md` | Target hosted-deployment plan (Vercel + Neon + GitHub Actions). Read if the user wants to move off local. |
 | `scripts/probe-yc-ats.js` | One-shot: discovers YC US-hiring companies on Greenhouse/Lever/Ashby and prints copy-paste-ready config entries to stdout. See §Tools & Scripts. |
 | `scripts/verify-yc-ats.js` | Verifier: for each entry in a probe-output file, confirms the ATS board belongs to the claimed YC company. Greenhouse: exact-name match on `/boards/{slug}` metadata. Lever/Ashby: provenance (slug must be derivable from YC name or website). Writes `scripts/yc-ats-verified.txt` (config-ready) and `scripts/yc-ats-rejected.txt` (with reason). |
 | `scripts/probe-topstartups.js` | topstartups.io-sourced company discovery with built-in verification. Paginates the infinite-scroll homepage, filters US-HQ, probes Greenhouse/Lever/Ashby. Writes `scripts/topstartups-ats-discovered.txt` and `scripts/topstartups-ats-rejected.txt`. |
@@ -676,10 +674,8 @@ when `web/src/*` is newer than `web/dist/index.html`, and Express serves
 the built bundle on the same port as the API.
 
 ### Migration note: Vercel
-When moving to the hosted architecture in HOSTING.md, the React code here
-drops into a Next.js app as-is (components are framework-agnostic,
-TanStack Query runs identically on Next.js). The rewrite there is mostly
-wiring, not re-architecting.
+The React code is framework-agnostic: it would drop into a Next.js app as-is
+(TanStack Query runs identically there) if that is ever wanted.
 
 ## Normalize pipeline (`src/services/normalize.js`)
 
@@ -775,6 +771,75 @@ Lever/Ashby provenance). Writes `scripts/topstartups-ats-discovered.txt`
 and `scripts/topstartups-ats-rejected.txt`. Review the discovered file
 before pasting into `src/config.js::COMPANIES`; delete the artifacts once
 merged.
+
+---
+
+## Configuration (env vars and secrets)
+
+Moved here from HOSTING.md (deleted 2026-11-24).
+
+| Name             | Where                              | Value                                             |
+|------------------|------------------------------------|---------------------------------------------------|
+| `DATABASE_URL`   | Vercel env + GitHub Actions secret | Neon connection string (use the pooled one)       |
+| `COLLECT_TOKEN`  | Vercel env + GitHub Actions secret | Random 32-byte hex, gates `/admin/*` routes       |
+| `INGEST_URL`     | GitHub Actions secret (scraper)    | `https://<vercel-domain>/admin/ingest`            |
+| `FILTER_US`      | Vercel env + Actions env           | `true`                                            |
+| `FILTER_SOFTWARE`| Vercel env + Actions env           | `true`                                            |
+| `ENTRY_LEVEL_MODE`| Vercel env + Actions env          | `permissive` (see `src/config.js`)                |
+| `RETENTION_DAYS` | Vercel env + Actions env           | default `14` (drops rows older than N days at collect end)|
+| `VISIBLE_DAYS`   | Vercel env + Actions env           | default `7` (how far back the board shows postings)|
+
+**Do not** commit any of these. Vercel has an env-var UI; GitHub Actions has
+repo Settings → Secrets and variables → Actions.
+
+### Accounts and autofill (the Rust `/api` function)
+
+All **Vercel only**, marked Sensitive. Never put `DATA_KEYS` or the R2 keys in
+GitHub Actions: Actions also holds `DATABASE_URL`, and the two together would
+decrypt everything. Give preview deployments their own values (a Neon branch,
+their own `DATA_KEYS` and bucket).
+
+| Name                 | Value |
+|----------------------|-------|
+| `GOOGLE_CLIENT_ID`   | OAuth client id (Google Cloud → Credentials → Web client). Authorized JavaScript origins: the Vercel URL and `http://localhost:5173`. |
+| `DATA_KEYS`          | `1:<base64 of 32 random bytes>` (`openssl rand -base64 32`). To rotate, add `2:<new key>`; old values stay readable and are re-encrypted on their next write. Losing every key loses every profile and answer. |
+| `DATA_KEY_CURRENT`   | Optional: the key version new writes use (default: the highest). |
+| `STORAGE_DRIVER`     | `r2` (Cloudflare R2) or `s3` (Backblaze B2 or another S3-compatible service) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | With `STORAGE_DRIVER=r2`: a **private** R2 bucket and an API token scoped to that bucket only (Object Read & Write). R2 needs a card on file, even on the free tier. |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | With `STORAGE_DRIVER=s3`: any S3-compatible **private** bucket. Backblaze B2 (10 GB free, no card): endpoint `https://s3.<region>.backblazeb2.com`, region like `us-west-004` (both shown on the bucket page), and an application key limited to that bucket with Read and Write. |
+| `SIGNUPS_OPEN`       | `false` at launch. `true` lets anyone create an account (publish the privacy page first). |
+| `SIGNUP_ALLOWLIST`   | Comma-separated Google `sub` ids that may sign up while sign-ups are closed (your own). Find yours in the `users` table after one dev sign-in, or decode your Google ID token. |
+| `OWNER_SUBS`         | Comma-separated Google `sub` ids that see the usage panel in Settings. |
+| `MAX_USERS`          | Default `500`. |
+| `CRON_SECRET`        | At least 16 random characters. Vercel Cron sends it to `/api/cron/cleanup` daily (see `vercel.json`). |
+| `INGEST_URL`, `COLLECT_TOKEN` | Also on the Rust function, for "Share job listings I browse": `INGEST_URL=https://<site>/admin/ingest` and the same `COLLECT_TOKEN` the Node backend checks. Users never see the token; their extension token is checked, listings are filtered and capped, then forwarded server to server. Without both, sharing answers 503. |
+| `SHARING_OPEN`       | Default on. `false` turns listing sharing off for everyone. |
+| `SHARES_PER_USER_PER_DAY` | Default `3000` listings per user per day. |
+| Optional limits      | `MAX_RESUMES` (10), `MAX_USER_BYTES` (12 MB), `UPLOADS_PER_DAY` (5), `UPLOADS_PER_MONTH` (3000, all users), `R2_MAX_BYTES` (9 GB, all users), `SIGNINS_PER_IP_PER_DAY` (40). |
+
+Without `DATA_KEYS`, R2 or `GOOGLE_CLIENT_ID`, the matching account routes
+answer 503 and the public board keeps working. `GET /api/health` reports which
+pieces are configured.
+
+Neon's free plan is 1 GB (not 0.5 GB as written above) and 100 compute-hours a
+month shared with the collector. Anonymous visitors never touch the accounts
+tables: the web app calls `/api/auth/me` only when the `jb_li` cookie is set.
+
+### Hosting red lines (don't)
+
+- Don't introduce Airflow, Prefect, Dagster, or any orchestrator. Cron is
+  sufficient at this scale and for this DAG shape.
+- Don't put the API on a 24/7 VM just to preserve `src/scheduler.js`. The
+  scheduler was a convenient local-dev pattern, not a deployment target.
+- Don't migrate to a paid tier without asking. Somya's constraint is $0.
+- Don't add a second database (e.g. Redis for cache). Neon is enough.
+- Don't rewrite the collectors to run "inside" Vercel functions. Functions
+  have a 10–60 s timeout depending on plan; a full collect run can exceed
+  that. Collectors belong in GitHub Actions.
+- Don't host the Playwright scraper on Vercel. Chromium + serverless = pain.
+  GitHub Actions runners have Chromium preinstalled; use them.
+- Don't delete `run-all.sh` or the local SQLite path. Keeping local dev
+  working is non-negotiable — it's how changes get tested before deploy.
 
 ---
 
@@ -950,7 +1015,7 @@ cd web && npm run dev                            # http://localhost:5173, proxie
 ```
 
 Production rollout: apply migration 004 (`migrate.yml`, verify then apply),
-set the Vercel env in HOSTING.md → "Accounts and autofill", deploy a preview
+set the Vercel env in "Configuration (env vars and secrets)" → "Accounts and autofill" below, deploy a preview
 first and check `GET /api/health` (Rust) and `/jobs` (Node) both answer, then
 sign in, upload, edit the profile, create a token, export, and delete a test
 account. Launch with `SIGNUPS_OPEN=false` and your own `sub` in `SIGNUP_ALLOWLIST`.
@@ -978,10 +1043,6 @@ The Rust function now runs in production, and `form-schema` exists. Part C
 6. **Tighten US location filter.** Strip out `Vancouver, BC, CA` false positives (the bare `ca` token currently matches California's state code).
 7. **"Posted in last N days" filter.** User hinted at this earlier. Easy — another URL param + WHERE clause + UI dropdown.
 8. **Microsoft description enrichment.** Per-job `/api/pcsx/position_details` call for the top 50–100 filtered positions. Would light up sponsorship for MS rows.
-
-### Platform / hosting (blocked on Somya's decision)
-
-9. **Migrate to the hosted architecture in `HOSTING.md`.** Vercel (frontend + read API) + Neon Postgres (DB) + GitHub Actions (2h collect cron + 6h scrape cron). Zero-cost, zero-ops. Biggest mechanical change is porting `src/db/index.js` from `better-sqlite3` to `pg`. See HOSTING.md for the full checklist and open questions.
 
 ---
 
