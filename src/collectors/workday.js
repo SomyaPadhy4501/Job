@@ -216,6 +216,10 @@ function postedAgeDays(s) {
   return m[2] === 'hour' ? 0 : m[2] === 'day' ? n : m[2] === 'week' ? n * 7 : n * 30;
 }
 
+function applyUrl({ tenant, wd, site }, externalPath) {
+  return `https://${tenant}.wd${wd}.myworkdayjobs.com/en-US/${site}${externalPath}`;
+}
+
 async function fetchCompany(company) {
   const { slug, displayName, tenant, wd, site } = company;
   if (!tenant || !wd || !site) {
@@ -224,7 +228,17 @@ async function fetchCompany(company) {
 
   const list = await fetchList(company);
 
-  const candidates = pickCandidates(list);
+  // A description costs a request against Workday's per-IP limit, so only
+  // postings that can still reach the board get one: within the retention
+  // window (a "30+ Days Ago" row is dropped anyway) and not already stored
+  // with a description (upsert keeps the stored one when this run sends none).
+  const described = company.described || new Set();
+  const maxAge = CONFIG.retentionDays || Infinity;
+  const candidates = pickCandidates(list).filter((j) => {
+    const age = postedAgeDays(j.postedOn);
+    if (age !== 9999 && age > maxAge) return false;
+    return !described.has(applyUrl(company, j.externalPath));
+  });
   const enrichTargets = candidates.slice(0, DEFAULT_ENRICH_MAX);
 
   const descByPath = new Map();
@@ -248,7 +262,7 @@ async function fetchCompany(company) {
     // but the public URL needs the "/en-US/{site}" prefix — without it Workday
     // redirects through a resolver that eventually lands on
     // community.workday.com/invalid-url.
-    apply_url: `https://${tenant}.wd${wd}.myworkdayjobs.com/en-US/${site}${j.externalPath}`,
+    apply_url: applyUrl(company, j.externalPath),
     description: descByPath.get(j.externalPath) || '',
     date_posted: parsePostedOn(j.postedOn),
   }));

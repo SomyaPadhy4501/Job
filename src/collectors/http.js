@@ -82,6 +82,23 @@ const RATE_LIMIT_RETRIES = 4;
 const GIVE_UP_AFTER = 25;
 const strikes = new Map();
 
+// The first 429 from each platform is logged with what came with it, which
+// tells a rate limit (Retry-After, a short wait) from a block on the runner's
+// address (a WAF page, no Retry-After). Workday answered 255 of 256 employers
+// with 429 on 2026-11-24 from GitHub's runners while a home connection got 200.
+const noted429 = new Set();
+async function noteFirst429(platform, res) {
+  if (noted429.has(platform)) return;
+  noted429.add(platform);
+  const body = await res.text().catch(() => '');
+  const headers = {};
+  for (const h of ['retry-after', 'server', 'cf-ray', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'content-type']) {
+    const v = res.headers.get(h);
+    if (v) headers[h] = v;
+  }
+  console.warn(`[http] first 429 from ${platform}: ${JSON.stringify(headers)} ${body.replace(/\s+/g, ' ').slice(0, 300)}`);
+}
+
 function platformOf(url) {
   try {
     return new URL(url).hostname.split('.').slice(-2).join('.');
@@ -140,6 +157,7 @@ async function fetchJson(url, { retries = 2, headers = {}, method = 'GET', body 
         const err = new Error(`HTTP ${res.status} for ${url}`);
         err.status = res.status;
         err.retryAfter = Number(res.headers.get('retry-after')) || 0;
+        if (res.status === 429) await noteFirst429(platform, res);
         throw err;
       }
       const data = await res.json();
@@ -186,6 +204,7 @@ async function runWithConcurrency(items, limit, worker) {
 function resetRateLimits() {
   cooldownUntil.clear();
   strikes.clear();
+  noted429.clear();
 }
 
 module.exports = { fetchJson, runWithConcurrency, resetRateLimits, GIVE_UP_AFTER };

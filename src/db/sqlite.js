@@ -455,6 +455,14 @@ function pruneStaleJobs(days) {
 }
 
 // See pg.js.
+// See pg.js.
+function describedApplyUrls(source) {
+  const rows = getDb()
+    .prepare("SELECT apply_url FROM jobs WHERE source = ? AND COALESCE(description, '') <> ''")
+    .all(source);
+  return new Set(rows.map((r) => r.apply_url));
+}
+
 function jobsForCompanies(source, names) {
   const stmt = getDb().prepare(
     'SELECT id, company_name, apply_url, last_seen_at, missed_runs FROM jobs WHERE source = ? AND company_name = ?'
@@ -709,4 +717,5 @@ module.exports = {
   deleteByApplyUrls,
   jobsForCompanies,
   recordMisses,
+  describedApplyUrls,
 };

@@ -13,6 +13,7 @@ const {
   deleteByApplyUrls,
   jobsForCompanies,
   recordMisses,
+  describedApplyUrls,
 } = require('../db');
 const log = require('../logger');
 
@@ -97,10 +98,23 @@ async function collectAll({ companies = COMPANIES } = {}) {
   // live on separate hosts, so they can safely run wider — while sources that
   // rate-limit by IP across every tenant (Getro, Eightfold) must stay narrow
   // however many entries they have.
+  // Workday counts every request against one limit per IP, and reading each
+  // posting's description costs one. Jobs whose description is already stored
+  // are skipped: on 2026-11-24 re-reading them every run helped push 255 of
+  // 256 Workday employers into HTTP 429.
+  let workdayDescribed = new Set();
+  if (companies.some((c) => c.source === 'workday')) {
+    try {
+      workdayDescribed = await describedApplyUrls('workday');
+    } catch (err) {
+      log.warn('collection.described_lookup_failed', { runId, error: err.message });
+    }
+  }
+
   const bySource = new Map();
   for (const c of companies) {
     if (!bySource.has(c.source)) bySource.set(c.source, []);
-    bySource.get(c.source).push(c);
+    bySource.get(c.source).push(c.source === 'workday' ? { ...c, described: workdayDescribed } : c);
   }
   const groups = await Promise.all(
     [...bySource.entries()].map(([source, list]) =>

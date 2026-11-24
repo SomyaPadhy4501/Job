@@ -260,6 +260,17 @@ async function deleteByApplyUrls(urls) {
 
 // Stored rows of one source's companies, for closed-job detection
 // (src/services/closed.js). Needs migrations/006_missed_runs.sql.
+// Apply links of a source's jobs that already have a description, so a
+// collector can skip re-reading them (upsert keeps a stored description when
+// a run brings none).
+async function describedApplyUrls(source) {
+  const { rows } = await getPool().query(
+    `SELECT apply_url FROM jobs WHERE source = $1 AND COALESCE(description, '') <> ''`,
+    [source],
+  );
+  return new Set(rows.map((r) => r.apply_url));
+}
+
 async function jobsForCompanies(source, names) {
   const { rows } = await getPool().query(
     `SELECT id, company_name, apply_url, last_seen_at, missed_runs
@@ -511,4 +522,5 @@ module.exports = {
   deleteByApplyUrls,
   jobsForCompanies,
   recordMisses,
+  describedApplyUrls,
 };
