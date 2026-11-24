@@ -7,6 +7,7 @@ import { api, useAccount } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
 import { acquireCompiler, firstError, lowMemoryDevice, missingFont, releaseCompiler, withLatinModern } from '../latex/engine.js';
 import { fromProfile, TEMPLATE } from '../latex/fromProfile.js';
+import { resumeId } from '../safe-url.js';
 
 const PdfViewer = lazy(() => import('../components/PdfViewer.jsx'));
 
@@ -21,7 +22,7 @@ export default function LatexEditor() {
   );
 }
 
-const resumeIdFromUrl = () => new URLSearchParams(window.location.search).get('id') || '';
+const resumeIdFromUrl = () => resumeId(new URLSearchParams(window.location.search).get('id'));
 const draftKey = (userId, id) => `latex-draft:${userId}:${id || 'new'}`;
 function readDraft(key) {
   try {

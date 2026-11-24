@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { JobRow, JobsHead, TableState, PostedCell, LevelPill, RestrictionPill, ROLE_LABEL } from './JobsTable.jsx';
 import { useCompanyJobs } from '../hooks/useJobs.js';
+import { webHref } from '../safe-url.js';
 
 // Grouped view: one row per company, ordered by its newest posting. Every row
 // shows that newest job in full — title, level, location, when it was posted,
@@ -43,7 +44,7 @@ function NewestJobCells({ job }) {
       <span className="muted nowrap"><PostedCell row={job} /></span>
       <a
         className="apply-btn"
-        href={job.apply_url}
+        href={webHref(job.apply_url)}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}

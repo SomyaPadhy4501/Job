@@ -1,3 +1,5 @@
+import { webHref } from '../safe-url.js';
+
 const ROLE_LABEL = {
   SWE: 'SWE',
   MLE: 'MLE',
@@ -158,7 +160,7 @@ export function JobRow({ row: r, hideCompany = false }) {
       </td>
       <td className="muted nowrap"><PostedCell row={r} /></td>
       <td>
-        <a className="apply-btn" href={r.apply_url} target="_blank" rel="noopener noreferrer">
+        <a className="apply-btn" href={webHref(r.apply_url)} target="_blank" rel="noopener noreferrer">
           Apply
         </a>
       </td>
