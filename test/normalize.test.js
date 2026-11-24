@@ -314,3 +314,16 @@ test('one-word and renamed brands resolve; same-word strangers do not', () => {
   // Posting text still wins over the alias.
   assert.strictEqual(classifySponsorship('We are unable to sponsor visas for this role.', 'OpenAI'), 'NO');
 });
+
+test('only http(s) apply links are kept: a javascript: or data: link is dropped', () => {
+  const { normalizeJob } = require('../src/services/normalize');
+  const row = (apply_url) => normalizeJob(
+    { source: 'test', company_name: 'Acme', job_title: 'Software Engineer', location: 'Austin, TX', apply_url },
+    { filterUSOnly: true, filterSoftwareOnly: true, entryLevelMode: 'off' },
+  );
+  assert.ok(row('https://boards.greenhouse.io/acme/jobs/1'));
+  for (const bad of ['javascript:alert(document.cookie)', ' JavaScript:alert(1)', 'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)', '//evil.example/x', '/jobs/1']) {
+    assert.strictEqual(row(bad), null, bad);
+  }
+});

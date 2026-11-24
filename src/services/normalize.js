@@ -74,6 +74,14 @@ function stripTracking(url) {
   return u.toString();
 }
 
+function isWebUrl(url) {
+  try {
+    return ['http:', 'https:'].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
 // Comparison key only — never stored or linked. Also ignores scheme, case of
 // the host, a leading "www." , a trailing slash and parameter order.
 //
@@ -609,6 +617,9 @@ function normalizeJob(raw, { filterUSOnly, filterSoftwareOnly, entryLevelMode, r
   const date_posted = parseDateToIso(raw.date_posted);
 
   if (!company_name || !job_title || !apply_url) return null;
+  // The board renders this as a link: only a real web address, never
+  // javascript: or data: (a crafted feed or captured page could send one).
+  if (!isWebUrl(apply_url)) return null;
 
   // Retention: reject rows we already know are older than the window.
   // Null-dated rows fall through here — the DB sweep prunes them later via
