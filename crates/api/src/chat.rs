@@ -73,9 +73,90 @@ pub enum Command {
     Help,
 }
 
+// The menu under the message box (Telegram's reply keyboard). Pressing a
+// button sends its label as a message, so `parse` reads the labels too.
+pub const JOBS_BUTTON: &str = "🔎 New jobs";
+pub const ALERTS_BUTTON: &str = "🔔 My alerts";
+pub const PAUSE_BUTTON: &str = "⏸ Pause alerts";
+pub const RESUME_BUTTON: &str = "▶️ Resume alerts";
+/// The menu, row by row.
+pub const MENU: [[&str; 2]; 2] = [[JOBS_BUTTON, ALERTS_BUTTON], [PAUSE_BUTTON, RESUME_BUTTON]];
+
+/// One job in a reply, for apps that can show it richer than plain text.
+#[derive(Debug, Clone)]
+pub struct JobCard {
+    pub id: i32,
+    pub company: String,
+    pub title: String,
+    pub place: Option<String>,
+    /// http(s) only (see `safe_url`).
+    pub url: String,
+}
+
+/// An answer to one message: `head`, then `jobs` (if any), then `foot`.
+/// [`Reply::plain`] is the whole answer as plain text, for any chat app; an
+/// adapter that can show formatting and buttons uses the parts.
+#[derive(Debug, Clone, Default)]
+pub struct Reply {
+    pub head: String,
+    pub jobs: Vec<JobCard>,
+    pub foot: String,
+    /// Show the menu ([`MENU`]) under the message.
+    pub menu: bool,
+}
+
+impl Reply {
+    pub fn plain(&self) -> String {
+        let mut text = self.head.clone();
+        for job in &self.jobs {
+            let place = job
+                .place
+                .as_deref()
+                .map(|l| format!(" · {l}"))
+                .unwrap_or_default();
+            text.push_str(&format!(
+                "\n#{} {} — {}{place}\n{}\n",
+                job.id, job.company, job.title, job.url
+            ));
+        }
+        if !self.foot.is_empty() {
+            text.push('\n');
+            text.push_str(&self.foot);
+        }
+        text
+    }
+
+    fn with_menu(mut self) -> Self {
+        self.menu = true;
+        self
+    }
+}
+
+impl From<String> for Reply {
+    fn from(head: String) -> Self {
+        Reply {
+            head,
+            ..Reply::default()
+        }
+    }
+}
+
+impl From<&str> for Reply {
+    fn from(head: &str) -> Self {
+        head.to_owned().into()
+    }
+}
+
 /// Reads a command. `/jobs@SomeBot` (groups) counts as `/jobs`.
 pub fn parse(text: &str) -> Command {
     let text = text.trim();
+    match text {
+        JOBS_BUTTON => return Command::Jobs,
+        ALERTS_BUTTON => return Command::Alerts,
+        PAUSE_BUTTON => return Command::Pause,
+        RESUME_BUTTON => return Command::Resume,
+        _ => {}
+    }
     let (head, rest) = text.split_once(char::is_whitespace).unwrap_or((text, ""));
     let name = head.split('@').next().unwrap_or("").to_ascii_lowercase();
     let arg = rest.trim().to_owned();
@@ -133,7 +214,7 @@ pub async fn address_of(
     Ok(String::from_utf8(raw).ok())
 }
 
-const HELP: &str = "Commands:\n\
+const HELP: &str = "Use the buttons below, or these commands:\n\
 /jobs – the newest jobs for your alerts\n\
 /alerts – your alerts\n\
 /pause – stop all alerts (/resume to restart)\n\
@@ -143,8 +224,8 @@ const HELP: &str = "Commands:\n\
 const NOT_LINKED: &str = "This chat isn’t linked to an account yet. On the job board, open Alerts, \
 press “Link Telegram”, and send the code here.";
 
-/// Answers one message. Returns the reply text.
-pub async fn handle(state: &AppState, msg: &Incoming<'_>) -> ApiResult<String> {
+/// Answers one message.
+pub async fn handle(state: &AppState, msg: &Incoming<'_>) -> ApiResult<Reply> {
     let pool = state.pool()?;
     let hash = address_hash(state, msg.channel, msg.address)?;
     let subject = format!("chat:{}", hex(&hash[..12]));
@@ -167,16 +248,16 @@ pub async fn handle(state: &AppState, msg: &Incoming<'_>) -> ApiResult<String> {
     let site = &state.config.notify.site_url;
     Ok(match command {
         Command::Link(_) => unreachable!("handled above"),
-        Command::Help => HELP.into(),
+        Command::Help => Reply::from(HELP).with_menu(),
         Command::Jobs => jobs_reply(state, user.id).await?,
-        Command::Alerts => alerts_reply(state, user.id).await?,
+        Command::Alerts => alerts_reply(state, user.id).await?.into(),
         Command::Pause => {
             let n = db::alerts::set_all_paused(pool, user.id, true).await?;
-            format!("Paused {n} alert(s). Send /resume to turn them back on.")
+            format!("Paused {n} alert(s). Send /resume to turn them back on.").into()
         }
         Command::Resume => {
             let n = db::alerts::set_all_paused(pool, user.id, false).await?;
-            format!("Turned {n} alert(s) back on.")
+            format!("Turned {n} alert(s) back on.").into()
         }
         Command::Apply(arg) if arg.is_empty() => {
             "Send /apply and a job number from /jobs, like /apply 1234.".into()
@@ -195,6 +276,7 @@ pub async fn handle(state: &AppState, msg: &Incoming<'_>) -> ApiResult<String> {
                     "{first}: {} — {}.\nYou submit the application yourself: {site}/queue\nStatus: {}",
                     item.company, item.title, item.status
                 )
+                .into()
             }
         },
         Command::Unlink => {
@@ -211,7 +293,7 @@ async fn link(
     hash: &[u8; 32],
     subject: &str,
     code: &str,
-) -> ApiResult<String> {
+) -> ApiResult<Reply> {
     let pool = state.pool()?;
     let code = normalize_code(code);
     let user_id = if code.len() == CODE_LEN {
@@ -240,12 +322,13 @@ async fn link(
     db::chat::link_chat(&mut tx, user_id, msg.channel.as_str(), hash, &address).await?;
     tx.commit().await.map_err(db::DbError::from)?;
     db::audit(pool, Some(user_id), "chat_link").await?;
-    Ok(format!(
+    Ok(Reply::from(format!(
         "Linked. Alerts set to Telegram will arrive here.\n\n{HELP}"
     ))
+    .with_menu())
 }
 
-async fn jobs_reply(state: &AppState, user_id: Uuid) -> ApiResult<String> {
+async fn jobs_reply(state: &AppState, user_id: Uuid) -> ApiResult<Reply> {
     let site = state.config.notify.site_url.clone();
     let rows = db::alerts::list_alerts(state.pool()?, user_id).await?;
     let mut filters: Vec<Filters> = Vec::new();
@@ -266,32 +349,37 @@ async fn jobs_reply(state: &AppState, user_id: Uuid) -> ApiResult<String> {
     jobs.sort_by(|a, b| b.first_seen_at.cmp(&a.first_seen_at));
     jobs.truncate(8);
     if jobs.is_empty() {
-        return Ok(format!(
-            "Nothing new matches your alerts this week. Browse the board: {site}/"
-        ));
+        return Ok(
+            format!("Nothing new matches your alerts this week. Browse the board: {site}/").into(),
+        );
     }
-    let mut text = if rows.is_empty() {
-        "Newest jobs (you have no alerts yet, so these are the board’s defaults):\n".to_owned()
+    let head = if rows.is_empty() {
+        "Newest jobs (you have no alerts yet, so these are the board’s defaults):\n"
     } else {
-        "Newest jobs for your alerts:\n".to_owned()
+        "Newest jobs for your alerts:\n"
     };
-    for job in &jobs {
-        let place = job
-            .location
-            .as_deref()
-            .filter(|l| !l.trim().is_empty())
-            .map(|l| format!(" · {l}"))
-            .unwrap_or_default();
-        text.push_str(&format!(
-            "\n#{} {} — {}{place}\n{}\n",
-            job.id,
-            job.company_name,
-            job.job_title,
-            safe_url(&job.apply_url, &site)
-        ));
-    }
-    text.push_str("\nSend /apply <number> to add one to your apply queue.");
-    Ok(text)
+    let cards = jobs
+        .iter()
+        .map(|job| JobCard {
+            id: job.id,
+            company: job.company_name.clone(),
+            title: job.job_title.clone(),
+            place: job
+                .location
+                .as_deref()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .map(str::to_owned),
+            url: safe_url(&job.apply_url, &site).to_owned(),
+        })
+        .collect();
+    Ok(Reply {
+        head: head.into(),
+        jobs: cards,
+        foot: "Tap “Queue” under a job, or send /apply <number>, to add it to your apply queue."
+            .into(),
+        menu: false,
+    })
 }
 
 async fn alerts_reply(state: &AppState, user_id: Uuid) -> ApiResult<String> {
@@ -398,6 +486,34 @@ mod tests {
         assert_eq!(parse("/apply  #1234 "), Command::Apply("#1234".into()));
         assert_eq!(parse("/pause"), Command::Pause);
         assert_eq!(parse("hello"), Command::Help);
+        assert_eq!(
+            parse(JOBS_BUTTON),
+            Command::Jobs,
+            "menu buttons send their label"
+        );
+        assert_eq!(parse(ALERTS_BUTTON), Command::Alerts);
+        assert_eq!(parse(PAUSE_BUTTON), Command::Pause);
+        assert_eq!(parse(RESUME_BUTTON), Command::Resume);
+    }
+
+    #[test]
+    fn a_reply_reads_as_plain_text_too() {
+        let reply = Reply {
+            head: "Newest jobs:\n".into(),
+            jobs: vec![JobCard {
+                id: 7,
+                company: "Acme".into(),
+                title: "Engineer".into(),
+                place: Some("Austin, TX".into()),
+                url: "https://acme.example/7".into(),
+            }],
+            foot: "Bye.".into(),
+            menu: false,
+        };
+        assert_eq!(
+            reply.plain(),
+            "Newest jobs:\n\n#7 Acme — Engineer · Austin, TX\nhttps://acme.example/7\n\nBye."
+        );
     }
 
     #[test]

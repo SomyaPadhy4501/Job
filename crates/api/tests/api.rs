@@ -1864,6 +1864,21 @@ async fn say(hook: &mut Browser<'_>, chat: i64, kind: &str, text: &str, secret: 
     .await
 }
 
+/// A tap on an inline button (`callback_data`) in a chat.
+async fn tap(hook: &mut Browser<'_>, chat: i64, kind: &str, data: &str) -> Res {
+    let body = json!({ "update_id": 2, "callback_query": { "id": "tap-1", "data": data,
+                       "from": { "id": chat },
+                       "message": { "message_id": 1, "chat": { "id": chat, "type": kind } } } });
+    hook.send_with(
+        Method::POST,
+        "/api/telegram/webhook",
+        Some("application/json"),
+        serde_json::to_vec(&body).unwrap(),
+        &[("x-telegram-bot-api-secret-token", HOOK)],
+    )
+    .await
+}
+
 /// A random private chat id, so parallel tests never share a chat.
 fn new_chat_id() -> i64 {
     (Uuid::new_v4().as_u128() % 1_000_000_000_000) as i64 + 1
@@ -2368,6 +2383,12 @@ async fn telegram_links_one_account_per_chat_and_answers_commands() {
     )
     .await;
     assert!(reply(&res).starts_with("Linked"), "{}", reply(&res));
+    assert_eq!(res.json()["parse_mode"], "HTML");
+    assert_eq!(
+        res.json()["reply_markup"]["keyboard"][0][0]["text"],
+        "🔎 New jobs",
+        "linking shows the menu"
+    );
     assert_eq!(
         a.get("/api/me/chat").await.json()["telegram"]["linked"],
         true
@@ -2408,8 +2429,18 @@ async fn telegram_links_one_account_per_chat_and_answers_commands() {
     );
 
     let job = insert_job(&app.pool, &company, "Backend Engineer").await;
-    let jobs = reply(&say(&mut hook, chat_a, "private", "/jobs", HOOK).await);
-    assert!(jobs.contains(&format!("#{job}")), "{jobs}");
+    let jobs_res = say(&mut hook, chat_a, "private", "🔎 New jobs", HOOK).await;
+    let jobs = reply(&jobs_res);
+    assert!(
+        jobs.contains(&format!("#{job}")),
+        "the menu button lists jobs: {jobs}"
+    );
+    assert!(jobs.contains("<b>"), "jobs are formatted: {jobs}");
+    let buttons = jobs_res.json()["reply_markup"]["inline_keyboard"].to_string();
+    assert!(
+        buttons.contains(&format!("\"queue:{job}\"")),
+        "each job has a Queue button: {buttons}"
+    );
     let queued = reply(
         &say(
             &mut hook,
@@ -2425,6 +2456,27 @@ async fn telegram_links_one_account_per_chat_and_answers_commands() {
     assert_eq!(items[0]["jobId"], job);
     assert_eq!(items[0]["addedVia"], "telegram");
     assert_eq!(b.get("/api/me/queue").await.json()["items"], json!([]));
+
+    // Tapping "Queue" does what /apply does, and answers with a notice.
+    let tapped = tap(&mut hook, chat_a, "private", &format!("queue:{job}")).await;
+    assert_eq!(tapped.json()["method"], "answerCallbackQuery");
+    assert_eq!(tapped.json()["callback_query_id"], "tap-1");
+    let notice = tapped.json()["text"].as_str().unwrap_or("").to_owned();
+    assert!(
+        notice.starts_with("Already in your apply queue"),
+        "{notice}"
+    );
+    // A tap from another, unlinked chat adds nothing to anyone's queue.
+    let stranger = tap(&mut hook, new_chat_id(), "private", &format!("queue:{job}")).await;
+    let notice = stranger.json()["text"].as_str().unwrap_or("").to_owned();
+    assert!(notice.contains("isn’t linked"), "{notice}");
+    assert_eq!(
+        a.get("/api/me/queue").await.json()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 
     let paused = reply(&say(&mut hook, chat_a, "private", "/pause", HOOK).await);
     assert!(paused.starts_with("Paused 1"), "{paused}");
