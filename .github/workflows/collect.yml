@@ -73,3 +73,13 @@ jobs:
           ADZUNA_APP_KEY:    ${{ secrets.ADZUNA_APP_KEY }}
           # COLLECT_TOKEN is only needed if you want to also hit /admin/collect.
           # The npm run collect script writes directly to Neon via DATABASE_URL.
+
+      # Job alerts (email and Telegram) for the jobs this collect found. Only
+      # after a successful collect; does nothing until CRON_SECRET is set in
+      # the repository's secrets (the same value as in Vercel).
+      - name: Send job alerts
+        if: steps.due.outputs.due != 'false'
+        run: bash .github/scripts/send-alerts.sh
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL:    https://job-two-xi.vercel.app
