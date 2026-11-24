@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const { CONFIG } = require('../config');
@@ -10,13 +11,51 @@ const { normalizeJob } = require('../services/normalize');
 const { dedupeBatch } = require('../services/dedupe');
 const log = require('../logger');
 
+// Free-text filters longer than this are cut: nothing real is this long, and
+// an unbounded value makes the LIKE scan and the cache key arbitrarily large.
+const MAX_FILTER_CHARS = 200;
+// Deepest page served. Past this the OFFSET is only a way to load the database.
+const MAX_PAGE = 1000;
+
+const text = (v) => String(v ?? '').trim().slice(0, MAX_FILTER_CHARS);
+
+// Express 4 doesn't catch a rejected promise: the request hangs and Node
+// exits on the unhandled rejection. Answer 500 with no details instead.
+const safe = (handler) => (req, res, next) =>
+  Promise.resolve(handler(req, res, next)).catch((err) => {
+    log.error('http.error', { path: req.path, error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Something went wrong.' });
+  });
+
+// The /admin routes. Deny by default: with COLLECT_TOKEN set, only a request
+// carrying it (compared in constant time); without one, only a local
+// development server answering a request from this machine.
+function adminAllowed(req) {
+  const expected = process.env.COLLECT_TOKEN;
+  if (expected) {
+    const given = String(req.get('x-collect-token') || '');
+    const digest = (s) => crypto.createHash('sha256').update(s).digest();
+    return crypto.timingSafeEqual(digest(given), digest(expected)) ? 'ok' : 'denied';
+  }
+  const production = process.env.VERCEL || process.env.NODE_ENV === 'production';
+  const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+  return !production && local ? 'ok' : 'unconfigured';
+}
+
+function requireAdmin(req, res, next) {
+  const verdict = adminAllowed(req);
+  if (verdict === 'ok') return next();
+  if (verdict === 'unconfigured') return res.status(503).json({ error: 'Admin routes are off: COLLECT_TOKEN is not set.' });
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
 // Filter parsing shared by /jobs and /companies, so the grouped view and the
 // flat list always apply the same filters.
 function parseFilters(req) {
-  const search = (req.query.search || '').toString().trim();
-  const title = (req.query.title || '').toString().trim();
+  const search = text(req.query.search);
+  const title = text(req.query.title);
   const sponsorshipRaw = (req.query.sponsorship || '').toString().toUpperCase();
-  const company = (req.query.company || '').toString().trim();
+  const company = text(req.query.company);
   const roleRaw = (req.query.role || '').toString().toUpperCase();
   const levelRaw = (req.query.level || '').toString().toLowerCase();
 
@@ -32,8 +71,7 @@ function parseFilters(req) {
   // Source filter — only let through sources we actually have. Pulled live
   // from the DB rather than hardcoded so new collectors become filterable
   // without a second edit.
-  const sourceRaw = (req.query.source || '').toString().trim();
-  const source = sourceRaw || '';
+  const source = text(req.query.source);
 
   // Restriction filter — fail CLOSED, unlike the sponsorship whitelist above.
   // An unrecognised `sponsorship` value degrading to "no filter" only widens
@@ -49,9 +87,9 @@ function parseFilters(req) {
 function parsePage(req) {
   const limit = Math.min(
     CONFIG.maxPageSize,
-    Math.max(1, Number(req.query.limit) || CONFIG.defaultPageSize)
+    Math.max(1, Math.floor(Number(req.query.limit)) || CONFIG.defaultPageSize)
   );
-  const page = Math.max(1, Number(req.query.page) || 1);
+  const page = Math.min(MAX_PAGE, Math.max(1, Math.floor(Number(req.query.page)) || 1));
   return { limit, page, offset: (page - 1) * limit };
 }
 
@@ -71,12 +109,12 @@ function createApp() {
     res.json({ ok: true, uptime: process.uptime() });
   });
 
-  app.get('/stats', async (_req, res) => {
+  app.get('/stats', safe(async (_req, res) => {
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
     res.json(await statsSummary());
-  });
+  }));
 
-  app.get('/jobs', async (req, res) => {
+  app.get('/jobs', safe(async (req, res) => {
     const { search, title, sponsorship, company, role, level, source, restriction } = parseFilters(req);
     const { limit, page, offset } = parsePage(req);
 
@@ -109,11 +147,11 @@ function createApp() {
     // Vercel edge cache: serve fresh for 30 s, then stale while revalidating.
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
     res.json(body);
-  });
+  }));
 
   // Grouped view: one row per company with its matching role count. The UI
   // expands a company by calling /jobs?company=<name> with the same filters.
-  app.get('/companies', async (req, res) => {
+  app.get('/companies', safe(async (req, res) => {
     const filters = parseFilters(req);
     const { limit, page, offset } = parsePage(req);
     const cacheKey = JSON.stringify({ route: 'companies', ...filters, limit, offset });
@@ -141,27 +179,22 @@ function createApp() {
     res.setHeader('x-cache', 'MISS');
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
     res.json(body);
-  });
+  }));
 
-  app.get('/jobs/:id', async (req, res) => {
+  app.get('/jobs/:id', safe(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
     const row = await getJobById(id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
   // Ingest a batch of jobs from an external collector (e.g. the Playwright
   // scraper microservice). Body shape:
   //   { source: "google" | "meta" | ..., jobs: [ <raw-job-shape> ] }
   // Each job runs through the same normalize/dedupe/upsert pipeline as our
-  // in-process collectors. Token-protected via COLLECT_TOKEN if set.
-  app.post('/admin/ingest', async (req, res) => {
-    const expected = process.env.COLLECT_TOKEN;
-    if (expected) {
-      const given = req.get('x-collect-token');
-      if (given !== expected) return res.status(401).json({ error: 'Unauthorized' });
-    }
+  // in-process collectors. Needs COLLECT_TOKEN (see requireAdmin).
+  app.post('/admin/ingest', requireAdmin, async (req, res) => {
 
     const { source, jobs } = req.body || {};
     if (!source || !Array.isArray(jobs)) {
@@ -198,24 +231,19 @@ function createApp() {
       res.json({ ok: true, source, received: jobs.length, inserted, updated, rejected });
     } catch (err) {
       log.error('ingest.error', { source, error: err.message });
-      res.status(500).json({ ok: false, error: err.message });
+      res.status(500).json({ ok: false, error: 'Ingest failed. See the server log.' });
     }
   });
 
-  // On-demand trigger (protected by a shared token if COLLECT_TOKEN is set).
-  app.post('/admin/collect', async (req, res) => {
-    const expected = process.env.COLLECT_TOKEN;
-    if (expected) {
-      const given = req.get('x-collect-token');
-      if (given !== expected) return res.status(401).json({ error: 'Unauthorized' });
-    }
+  // On-demand trigger. Needs COLLECT_TOKEN (see requireAdmin).
+  app.post('/admin/collect', requireAdmin, async (req, res) => {
     try {
       const result = await collectAll();
       jobsCache.clear();
       res.json({ ok: true, result });
     } catch (err) {
       log.error('collect.error', { error: err.message });
-      res.status(500).json({ ok: false, error: err.message });
+      res.status(500).json({ ok: false, error: 'Collect failed. See the server log.' });
     }
   });
 
