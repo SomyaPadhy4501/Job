@@ -26,6 +26,11 @@ const YES_PATTERNS = [
   // qualified applicant for employment authorization for this position." Without
   // this the JD's own yes was invisible and the row was YES only through USCIS.
   /consider(?:s|ing)? sponsor/,
+  // Offers in the employer's own voice: "We do sponsor and take over
+  // sponsorship of employment visas", "We sponsor H1B, O1, EB1" (Wispr),
+  // "we're happy to sponsor international candidates".
+  /\bwe (?:do |can |also |gladly |happily |currently )?sponsor\b[^.]{0,60}\b(?:visas?|h-?1-?b|o-?1|green cards?|immigration)/,
+  /(?<!not |n't |never )\b(?:happy|glad|willing|open) to sponsor\b/,
 ];
 
 // Only statements that the employer will not sponsor. A NO here hides the row
@@ -39,8 +44,10 @@ const YES_PATTERNS = [
 //
 // SPONSORSHIP allows the qualifiers postings put in front of the noun ("visa",
 // "employment visa", "H-1B"). Spelling it as `(?:visa |immigration )?` missed
-// "do not provide employment visa sponsorship".
-const SPONSORSHIP = '(?:(?:employment|employment-based|work|visa|immigration|h-?1b)[ -]){0,2}sponsorship';
+// "do not provide employment visa sponsorship". "related" and "sponsored" cover
+// "immigration-related sponsorship" and "employer-sponsored visa sponsorship".
+const SPONSORSHIP =
+  '(?:(?:employment|employment-based|work|visa|immigration|h-?1b|related|employer|sponsored)[ -]){0,3}sponsorship';
 
 // Words allowed between "sponsorship" and its verdict, as in PayPal's "Visa
 // Sponsorship through PayPal is not available for this position". Counted in
@@ -56,7 +63,9 @@ const NO_PATTERNS = [
   /cannot sponsor/,
   /(?:will|would|do|does|are|can) not (?:currently )?sponsor/,
   /not (?:currently )?consider(?:ing)? (?:[a-z-]+ ){0,3}sponsor/,
-  /won'?t sponsor/,
+  /(?:won|can)'?t sponsor/,
+  // Everlaw: "is not sponsoring US employment visas for this role".
+  /\bnot (?:currently )?sponsoring\b[^.]{0,40}\b(?:visas?|h-?1b|immigration|employment)/,
   new RegExp(`(?:will|would|do|does|is|are|can) not (?:currently )?(?:offer|provide) ${SPONSORSHIP}`),
   new RegExp(`not (?:currently )?(?:offering|providing) ${SPONSORSHIP}`),
   new RegExp(`not in a position to (?:sponsor|(?:offer|provide) ${SPONSORSHIP})`),
@@ -69,10 +78,54 @@ const NO_PATTERNS = [
   new RegExp(`${SPONSORSHIP}(?: (?:available|offered|provided))?: ?(?:no|none|n/a)\\b`),
   new RegExp(`${SPONSORSHIP}${QUALIFIER} (?:is|are|will be) unavailable`),
   new RegExp(`${SPONSORSHIP}${QUALIFIER} (?:isn|aren|won)['’]?t (?:be )?(?:available|offered|provided|considered|possible)`),
-  /without (?:the need for |requiring |needing )?(?:any )?(?:current or future |now or in the future )?(?:employer |visa |company |immigration )?sponsorship/,
+  // "...authorized to work in the US without current sponsorship", "...without
+  // the need for current or future employer-sponsored visa sponsorship". Not
+  // "with or without sponsorship", which restricts no one, and not Amazon's
+  // export clause, "...without sponsorship for an export license".
+  /(?<!with or )\bwithout (?:the need for |requiring |needing )?(?:any )?(?:(?:current|future|now|or|in|the|employer|employer-sponsored|visa|company|immigration)[ -]){0,6}sponsorship(?! for an? export)/,
+  // Only a citizen or green-card holder can meet these.
+  /\bpermanent (?:u\.?s\.? |us )?work authori[sz]ation\b/,
+  /\bauthori[sz]ed to work for any employer\b/,
   /not (?:now or in the future )?require[^.]{0,40}sponsorship/,
   /unable to (?:consider|accept)[^.]{0,80}sponsorship/,
 ];
+
+// A refusal that only covers some candidates or roles is not a NO: "we're not
+// able to sponsor new H-1B visas for candidates outside the US" (Firecrawl,
+// which also supports transfers) and "we can't guarantee sponsorship for every
+// role". Hiding those rows would hide jobs a candidate in the US can get.
+const HEDGE =
+  /\b(?:every|all) (?:roles?|candidates?|positions?|cases?)\b|\bguarantee|\bfor (?:candidates?|applicants?|people|individuals?) (?:who are |currently )?(?:based |located |living |residing )?(?:outside|abroad)\b/;
+
+// The sentence around a match: from the last sentence break before it to the
+// first one after. Breaks are ". ", "; " and newlines, so "U.S." stays inside.
+function sentenceAround(t, start, end) {
+  const from = Math.max(t.lastIndexOf('. ', start), t.lastIndexOf('; ', start), t.lastIndexOf('\n', start));
+  const stops = ['. ', '; ', '\n'].map((c) => t.indexOf(c, end)).filter((i) => i >= 0);
+  return t.slice(from + 1, stops.length ? Math.min(...stops) : t.length);
+}
+
+function refuses(t) {
+  for (const p of NO_PATTERNS) {
+    const re = new RegExp(p.source, 'g');
+    for (const m of t.matchAll(re)) {
+      if (!HEDGE.test(sentenceAround(t, m.index, m.index + m[0].length))) return true;
+    }
+  }
+  return false;
+}
+
+// Lowercased, with tags and apostrophe entities undone, so a refusal stored
+// with markup ("is <strong>not</strong> available") or a double-encoded
+// "can&#39;t" reads like the plain sentence. Curly apostrophes become straight.
+function prepare(text) {
+  return text
+    .replace(/<[^>]+>/g, '')
+    .replace(/&(?:amp;)?(?:#0*39|#x27|apos|[lr]squo);/gi, "'")
+    .replace(/[‘’]/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .toLowerCase();
+}
 
 // Reads the description the way a person skims it: find each sentence that
 // mentions sponsoring and ask whether anything near it says no. This catches
@@ -319,12 +372,10 @@ function normSlug(s) {
 // here. First key that resolves wins.
 function classifySponsorship(text, companyName, fallbackCompanyNames = []) {
   if (!text || typeof text !== 'string') return 'UNKNOWN';
-  const t = text.toLowerCase();
+  const t = prepare(text);
 
   // 1. Explicit NO beats everything
-  for (const p of NO_PATTERNS) {
-    if (p.test(t)) return 'NO';
-  }
+  if (refuses(t)) return 'NO';
   // 2. The description doubts sponsorship in words the patterns can't name.
   //    Must come before the YES check: "visa sponsorship" alone is a YES
   //    pattern, so a refusal that merely mentions it would otherwise read as one.

@@ -33,7 +33,7 @@ jobs:
       actions: read          # due.sh lists this workflow's runs
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Is a scrape due?
         id: due
@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/due.sh scrape.yml "Run one-shot scrape (all targets)" 170 55
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.due.outputs.due != 'false'
         with:
           node-version: '22'

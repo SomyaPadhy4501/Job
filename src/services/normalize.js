@@ -456,6 +456,9 @@ const SENIORITY_WORDS = [
   /\blead\b/, /\barchitect\b/,
   /\s(iii|iv|v|vi)\b/i, // space + III/IV/…
   /\s-\s*(iii|iv|v|vi)\b/i,
+  // Numeric level 3+: "Software Engineer 3", "SDE3". The same rung as III,
+  // which was already here. `\b` after the digit keeps "3D" and "5G" out.
+  /\b(engineer|developer|scientist|sde|swe)\s*[3-6]\b/i,
 ];
 
 const ENTRY_POSITIVE = [

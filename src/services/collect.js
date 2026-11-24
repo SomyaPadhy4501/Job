@@ -1,6 +1,6 @@
 'use strict';
 
-const { COMPANIES, CONFIG } = require('../config');
+const { SCHEDULED_COMPANIES, CONFIG } = require('../config');
 const { getCollector } = require('../collectors');
 const { normalizeJob, parseDateToIso, stripTracking } = require('./normalize');
 const { dedupeBatch } = require('./dedupe');
@@ -85,7 +85,7 @@ async function closeMissing(results, since, runId) {
   }
 }
 
-async function collectAll({ companies = COMPANIES } = {}) {
+async function collectAll({ companies = SCHEDULED_COMPANIES } = {}) {
   // The Postgres store is async and the SQLite one isn't; await works for both.
   // Without it the run id was a Promise, and prune / finishRun raced the
   // process exit in GitHub Actions.

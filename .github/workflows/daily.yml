@@ -1,0 +1,66 @@
+name: daily
+
+# Sources on metered free plans, run once a day instead of with every collect.
+# The regular collect never touches them (`cadence: 'daily'` in src/config.js).
+# Manual "Run workflow" clicks spend the same quota, so don't loop them.
+#
+# JSearch (src/collectors/jsearch.js): Google for Jobs, currently Tesla. Free
+# plan: 200 requests/month, a hard limit. One run costs at most 4 (one per
+# query), ~124/month. Does nothing until the JSEARCH_API_KEY secret is set.
+
+on:
+  schedule:
+    - cron: '53 14 * * *'   # daily; :53 stays clear of collect's :11/:41 triggers
+  workflow_dispatch:
+
+# Its own group: sharing collect's would let a queued daily run cancel a
+# queued collect (GitHub keeps one pending run per group).
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    env:
+      HAS_JSEARCH_KEY: ${{ secrets.JSEARCH_API_KEY != '' }}
+
+    steps:
+      - name: No JSearch key
+        if: env.HAS_JSEARCH_KEY != 'true'
+        run: echo "JSEARCH_API_KEY is not set; nothing to collect."
+
+      - uses: actions/checkout@v7
+        if: env.HAS_JSEARCH_KEY == 'true'
+
+      - uses: actions/setup-node@v7
+        if: env.HAS_JSEARCH_KEY == 'true'
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: env.HAS_JSEARCH_KEY == 'true'
+        run: npm ci
+
+      - name: Collect JSearch sources
+        if: env.HAS_JSEARCH_KEY == 'true'
+        run: npm run collect -- --source jsearch
+        env:
+          DATABASE_URL:         ${{ secrets.DATABASE_URL }}
+          REQUIRE_DATABASE_URL: '1'
+          FILTER_US:            'true'
+          FILTER_SOFTWARE:      'true'
+          ENTRY_LEVEL_MODE:     'permissive'
+          RETENTION_DAYS:       '14'
+          VISIBLE_DAYS:         '7'
+          # RapidAPI key with the free JSearch Basic plan.
+          JSEARCH_API_KEY:      ${{ secrets.JSEARCH_API_KEY }}
+          AI_TAGGING:           ${{ vars.AI_TAGGING }}
+          MINA_BASE_URL:        ${{ vars.MINA_BASE_URL }}
+          MINA_MODEL:           ${{ vars.MINA_MODEL }}
+          MINA_API_KEY:         ${{ secrets.MINA_API_KEY }}

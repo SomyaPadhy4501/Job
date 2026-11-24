@@ -691,6 +691,14 @@ const COMPANIES = [
   // Wayfair moved to the jsonld source above on 2026-11-24.
   { source: 'adzuna', slug: 'linkedin', displayName: 'LinkedIn', company: 'LinkedIn' },
 
+  // ── JSearch / Google for Jobs (see src/collectors/jsearch.js) ─────────────
+  // Full descriptions, unlike Adzuna, and only rows whose apply link is on
+  // `applyHost` are kept. `cadence: 'daily'` keeps these out of the regular
+  // collect: the free plan is 200 requests/month, so they run once a day from
+  // .github/workflows/daily.yml. Inert until JSEARCH_API_KEY is set.
+  { source: 'jsearch', slug: 'tesla', displayName: 'Tesla', employer: 'Tesla',
+    applyHost: 'tesla.com', cadence: 'daily' },
+
   // ─── Oracle HCM / Candidate Experience ───────────────────────────────────
   { source: 'oracle_hcm', slug: 'oracle', displayName: 'Oracle', apiHost: 'eeho.fa.us2.oraclecloud.com', siteNumber: 'CX_45001', uiBaseUrl: 'https://careers.oracle.com/en/sites/jobsearch' },
   { source: 'oracle_hcm', slug: 'jpmorgan-chase', displayName: 'JPMorgan Chase', apiHost: 'jpmc.fa.oraclecloud.com', siteNumber: 'CX_1001', uiBaseUrl: 'https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001' },
@@ -1541,6 +1549,11 @@ const COMPANIES = [
   { source: 'workday', slug: 'wexinc-wexinc', tenant: 'wexinc', wd: '5', site: 'WEXInc', displayName: 'WEX' },  // 25 approvals
 ];
 
+// What the regular collect (collect.yml, /admin/collect) runs: everything
+// except `cadence: 'daily'` entries. Those sit on metered free plans and run
+// only from their own daily workflow, via `npm run collect -- --source <name>`.
+const SCHEDULED_COMPANIES = COMPANIES.filter((c) => c.cadence !== 'daily');
+
 const CONFIG = {
   port: Number(process.env.PORT || 3000),
   dbPath: process.env.DB_PATH || './data/jobs.db',
@@ -1588,4 +1601,4 @@ const CONFIG = {
   cacheTtlMs: 30_000,
 };
 
-module.exports = { COMPANIES, CONFIG };
+module.exports = { COMPANIES, SCHEDULED_COMPANIES, CONFIG };
