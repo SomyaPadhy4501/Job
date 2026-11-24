@@ -607,12 +607,14 @@ Migrations in `src/db/index.js::migrate()` are additive-only (ALTER TABLE ADD CO
 
 Sort order on `GET /jobs`:
 ```
-ORDER BY CASE WHEN date_posted IS NULL THEN 1 ELSE 0 END,
-         date_posted DESC,
+ORDER BY COALESCE(date_posted, first_seen_at) DESC,
          first_seen_at DESC,
          id DESC
 ```
-i.e. dated rows first, newest first, "no-date" rows sink to the bottom.
+i.e. newest first, with an undated row (Tesla, most extension captures) placed
+by when the board first saw it, the date the page shows as "Seen …". Until
+2026-11-24 undated rows sank below every dated one, so 139 Tesla jobs found
+that morning sat at the end of the list.
 
 ---
 

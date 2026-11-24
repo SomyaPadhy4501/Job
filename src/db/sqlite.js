@@ -585,8 +585,7 @@ function queryJobs(filters) {
        FROM jobs
        ${where}
        ORDER BY
-         CASE WHEN date_posted IS NULL THEN 1 ELSE 0 END,
-         date_posted DESC,
+         COALESCE(date_posted, first_seen_at) DESC,
          first_seen_at DESC,
          id DESC
        LIMIT @limit OFFSET @offset`
@@ -658,7 +657,7 @@ function queryCompanies(filters) {
          FROM jobs
          ${where}
         GROUP BY company_name
-        ORDER BY MAX(date_posted) IS NULL, MAX(date_posted) DESC, MAX(first_seen_at) DESC, company_name
+        ORDER BY MAX(COALESCE(date_posted, first_seen_at)) DESC, MAX(first_seen_at) DESC, company_name
         LIMIT @limit OFFSET @offset`
     )
     .all({ ...params, limit, offset })
@@ -679,7 +678,7 @@ function queryNewestJobs(filters, companies) {
                 is_entry_level, is_mid_level, first_seen_at, last_seen_at,
                 ROW_NUMBER() OVER (
                   PARTITION BY company_name
-                  ORDER BY date_posted IS NULL, date_posted DESC, first_seen_at DESC, id DESC
+                  ORDER BY COALESCE(date_posted, first_seen_at) DESC, first_seen_at DESC, id DESC
                 ) AS rn
            FROM jobs ${where}
        ) WHERE rn = 1`
