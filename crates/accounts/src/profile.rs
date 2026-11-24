@@ -257,6 +257,20 @@ fn month(field: &str, value: &mut String) -> Check {
     }
 }
 
+/// "", "YYYY", "YYYY-MM" or a real calendar date "YYYY-MM-DD". Education and
+/// job dates: the day is optional, and lets forms with day pickers be filled.
+fn month_or_day(field: &str, value: &mut String) -> Check {
+    *value = clean_line(value);
+    if value.len() == 10 {
+        let format = time::macros::format_description!("[year]-[month]-[day]");
+        return match time::Date::parse(value, &format) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(ProfileError::BadDate(field.to_owned(), "2026-05")),
+        };
+    }
+    month(field, value)
+}
+
 /// "" or a real calendar date "YYYY-MM-DD".
 fn day(field: &str, value: &mut String) -> Check {
     *value = clean_line(value);
@@ -379,8 +393,8 @@ impl Profile {
             line("Degree", &mut e.degree, 120)?;
             line("Field of study", &mut e.field, 120)?;
             line("GPA", &mut e.gpa, 20)?;
-            month("Education start date", &mut e.start_date)?;
-            month("Education end date", &mut e.end_date)?;
+            month_or_day("Education start date", &mut e.start_date)?;
+            month_or_day("Education end date", &mut e.end_date)?;
         }
         self.education
             .retain(|e| !(e.school.is_empty() && e.degree.is_empty() && e.field.is_empty()));
@@ -392,8 +406,8 @@ impl Profile {
             line("Company", &mut e.company, 200)?;
             line("Job title", &mut e.title, 200)?;
             line("Job location", &mut e.location, 200)?;
-            month("Job start date", &mut e.start_date)?;
-            month("Job end date", &mut e.end_date)?;
+            month_or_day("Job start date", &mut e.start_date)?;
+            month_or_day("Job end date", &mut e.end_date)?;
             paragraph("Job description", &mut e.description, 2000)?;
         }
         self.experience
@@ -650,6 +664,18 @@ mod tests {
             bad(json!({"preferences": {"earliestStart": "2026-02-30"}})),
             ProfileError::BadDate(..)
         ));
+        // Education and job dates may carry a day, but it must be real.
+        assert!(matches!(
+            bad(json!({"education": [{"school": "MIT", "endDate": "2026-02-30"}]})),
+            ProfileError::BadDate(..)
+        ));
+        let mut ok: Profile = serde_json::from_value(json!({
+            "education": [{"school": "MIT", "startDate": "2022", "endDate": "2026-05-15"}],
+            "experience": [{"company": "Acme", "startDate": "2024-01"}]
+        }))
+        .unwrap();
+        ok.validate().unwrap();
+        assert_eq!(ok.education[0].end_date, "2026-05-15");
         assert!(matches!(
             bad(json!({"identity": {"firstName": "x".repeat(101)}})),
             ProfileError::TooLong(..)

@@ -193,8 +193,8 @@ function ProfilePage() {
             <TextField label="Degree" value={row.degree} onChange={(v) => update('degree', v)} placeholder="Master of Science" />
             <TextField label="Field of study" value={row.field} onChange={(v) => update('field', v)} />
             <TextField label="GPA" value={row.gpa} onChange={(v) => update('gpa', v)} placeholder="3.8/4.0" />
-            <TextField label="Start (YYYY-MM)" value={row.startDate} onChange={(v) => update('startDate', v)} />
-            <TextField label="End or expected (YYYY-MM)" value={row.endDate} onChange={(v) => update('endDate', v)} />
+            <TextField label="Start (YYYY-MM, day optional)" value={row.startDate} onChange={(v) => update('startDate', v)} />
+            <TextField label="End or expected (YYYY-MM, day optional)" value={row.endDate} onChange={(v) => update('endDate', v)} />
           </>
         )}
       />
@@ -210,8 +210,8 @@ function ProfilePage() {
             <TextField label="Company" value={row.company} onChange={(v) => update('company', v)} />
             <TextField label="Title" value={row.title} onChange={(v) => update('title', v)} />
             <TextField label="Location" value={row.location} onChange={(v) => update('location', v)} />
-            <TextField label="Start (YYYY-MM)" value={row.startDate} onChange={(v) => update('startDate', v)} />
-            <TextField label="End (YYYY-MM)" value={row.endDate} onChange={(v) => update('endDate', v)} disabled={row.current === true} />
+            <TextField label="Start (YYYY-MM, day optional)" value={row.startDate} onChange={(v) => update('startDate', v)} />
+            <TextField label="End (YYYY-MM, day optional)" value={row.endDate} onChange={(v) => update('endDate', v)} disabled={row.current === true} />
             <label className="field check">
               <input type="checkbox" checked={row.current === true} onChange={(e) => update('current', e.target.checked)} />
               <span>I work here now</span>

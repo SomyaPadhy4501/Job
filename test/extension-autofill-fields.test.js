@@ -330,3 +330,115 @@ test('date pickers get US-order text; start-date questions read the profile', ()
     path: 'location',
   });
 });
+
+// ─── Education and experience from the profile ─────────────────────────────
+const eduProfile = {
+  education: [
+    { school: 'University of California, Berkeley', degree: 'Bachelor of Science', field: 'Electrical Engineering and Computer Sciences', gpa: '3.6', startDate: '2018-08', endDate: '2022-05' },
+    { school: 'Northeastern University', degree: 'M.S.', field: 'CS', gpa: '3.8/4.0', startDate: '2024-09', endDate: '2026-05' },
+  ],
+  experience: [
+    { company: 'Old Co', title: 'Analyst', startDate: '2022-06', endDate: '2023-12', current: false },
+    { company: 'Acme', title: 'Software Engineer', startDate: '2024-01', endDate: '', current: true },
+  ],
+};
+const plain = (v) => [...v];
+
+test('standalone education questions read the latest education entry, never the answer bank', () => {
+  const answers = [{ question: 'School', answer: 'Stale saved answer' }];
+  const r = (label, extra = {}) => plain(F.resolve({ label, type: 'text', ...extra }, eduProfile, answers));
+  assert.deepEqual(r('School'), ['Northeastern University']);
+  assert.deepEqual(r('What school do you attend?'), ['Northeastern University']);
+  assert.deepEqual(r('Major'), ['CS', 'Computer Science']);
+  assert.deepEqual(r('GPA'), ['3.8/4.0']);
+  assert.deepEqual(r('GPA (out of 4.0)'), ['3.8']);
+  assert.deepEqual(r('Cumulative GPA', { type: 'number' }), ['3.8']);
+  assert.deepEqual(r('Expected graduation date'), ['05/2026']);
+  assert.deepEqual(r('Graduation year'), ['2026']);
+  assert.deepEqual(r('Expected graduation date', { placeholder: 'MM/YY' }), ['05/26']);
+  assert.deepEqual(r('Current job title'), ['Software Engineer']);
+  assert.deepEqual(r('Most recent employer'), ['Acme']);
+  assert.equal(F.classify({ label: 'Degree', type: 'select' }).kind, 'education');
+});
+
+test('nothing in the profile leaves education questions empty', () => {
+  for (const label of ['School', 'Degree', 'Major', 'GPA', 'Graduation date', 'Highest level of education', 'Current job title'])
+    assert.deepEqual(plain(F.resolve({ label, type: 'text' }, {})), [], label);
+  // A year-only end date doesn't invent a month.
+  const yearOnly = { education: [{ school: 'X', endDate: '2026' }] };
+  assert.deepEqual(plain(F.resolve({ label: 'Graduation date', type: 'text' }, yearOnly)), []);
+  assert.deepEqual(plain(F.resolve({ label: 'Graduation year', type: 'text' }, yearOnly)), ['2026']);
+  // A day picker needs a day.
+  assert.deepEqual(plain(F.resolve({ label: 'Expected graduation date', type: 'text', datePicker: true }, eduProfile)), []);
+  const withDay = { education: [{ school: 'X', endDate: '2026-05-15' }] };
+  assert.deepEqual(plain(F.resolve({ label: 'Expected graduation date', type: 'text', datePicker: true }, withDay)), ['2026-05-15']);
+});
+
+test('degree levels and option wordings: own text, then abbreviations, then the level', () => {
+  assert.equal(F.degreeLevel('B.S.'), 'bachelor');
+  assert.equal(F.degreeLevel('BTech in CSE'), 'bachelor');
+  assert.equal(F.degreeLevel('Master of Science'), 'master');
+  assert.equal(F.degreeLevel('MBA'), 'mba');
+  assert.equal(F.degreeLevel('Ph.D'), 'doctorate');
+  assert.equal(F.degreeLevel('Associate’s'), 'associate');
+  assert.equal(F.degreeLevel('Basket weaving'), null);
+  const greenhouse = ["Associate's Degree", "Bachelor's Degree", 'Doctor of Philosophy (Ph.D.)', 'High School', "Master's Degree", 'Master of Business Administration (M.B.A.)', 'Other (Bootcamp, etc)'];
+  const degree = (text) => F.resolve({ label: 'Degree', type: 'select' }, { education: [{ school: 'X', degree: text }] });
+  assert.equal(greenhouse[F.pick(greenhouse, degree('M.S.'))], "Master's Degree");
+  assert.equal(greenhouse[F.pick(greenhouse, degree('B.S.'))], "Bachelor's Degree");
+  assert.equal(greenhouse[F.pick(greenhouse, degree('MBA'))], 'Master of Business Administration (M.B.A.)');
+  assert.equal(greenhouse[F.pick(greenhouse, degree('PhD'))], 'Doctor of Philosophy (Ph.D.)');
+  // The profile's own wording wins over a generic option.
+  assert.equal(F.pick(['Bachelor of Science', 'Bachelor of Arts', "Bachelor's Degree"], degree('B.S.')), 0);
+  // Two options for the same level and no closer wording: ambiguous, empty.
+  assert.equal(F.pick(["Bachelor's", 'Bachelors Degree'], degree('B.A. Something')), -1);
+  assert.equal(F.pick(greenhouse, degree('Certificate in Cooking')), -1);
+  // Highest level across entries.
+  const highest = F.resolve({ label: 'Highest level of education', type: 'select' }, eduProfile);
+  assert.equal(greenhouse[F.pick(greenhouse, highest)], "Master's Degree");
+});
+
+test('schools and majors match only the same name', () => {
+  const school = (s) => F.resolve({ label: 'School', type: 'combo' }, { education: [{ school: s }] });
+  assert.equal(F.pick(['University of California - Berkeley', 'University of California - Davis'], school('University of California, Berkeley')), 0);
+  assert.equal(F.pick(['The University of Texas at Austin'], school('University of Texas at Austin')), 0);
+  assert.equal(F.pick(['Texas A&M University'], school('Texas A and M University')), 0);
+  assert.equal(F.pick(['UC Berkeley'], school('University of California, Berkeley')), -1);
+  const major = (s) => F.resolve({ label: 'Major', type: 'select' }, { education: [{ school: 'X', field: s }] });
+  assert.equal(F.pick(['Computer Science', 'Engineering'], major('CS')), 0);
+  assert.equal(F.pick(['Computer Science', 'Engineering'], major('Electrical Engineering and Computer Sciences')), -1);
+});
+
+test('which education entry and job answer a standalone question', () => {
+  assert.equal(F.primaryEducation(eduProfile.education).school, 'Northeastern University');
+  const inProgress = [{ school: 'Done', endDate: '2027-05' }, { school: 'Now', startDate: '2025-09', endDate: '' }];
+  assert.equal(F.primaryEducation(inProgress).school, 'Now');
+  assert.equal(F.highestEducation([{ school: 'A', degree: 'PhD', endDate: '2020' }, { school: 'B', degree: 'BS', endDate: '2024' }]).school, 'A');
+  assert.equal(F.primaryEducation([]), undefined);
+});
+
+test('row dates: start/end labels and Month/Year boxes inside a dated group', () => {
+  const row = { section: 'education', index: 1 };
+  const month = { label: 'Month', type: 'select', row, safetyText: 'From', members: [] };
+  assert.deepEqual(F.classify(month), { kind: 'row', field: 'startDate' });
+  assert.equal(F.pick(['January', 'September', 'December'], F.resolve(month, eduProfile)), 1);
+  const year = { label: 'Year', type: 'text', row, safetyText: 'To (Actual or Expected)' };
+  assert.deepEqual(plain(F.resolve(year, eduProfile)), ['2026']);
+  const wdMonth = { label: '', type: 'text', row, automationId: 'dateSectionMonth-input', boxId: 'formField-endDate' };
+  assert.deepEqual(F.classify(wdMonth), { kind: 'row', field: 'endDate' });
+  assert.equal(F.pick(['05'], F.resolve(wdMonth, eduProfile)), 0);
+  const monthInput = { label: 'End date', type: 'month', row };
+  assert.deepEqual(plain(F.resolve(monthInput, eduProfile)), ['2026-05']);
+  // Labels that used to be manual inside a row.
+  for (const [label, field] of [['Degree Type', 'degree'], ['Overall Result (GPA)', 'gpa'], ['Field of Study', 'field'], ['Graduation Date', 'endDate']])
+    assert.deepEqual(F.classify({ label, type: 'text', row }), { kind: 'row', field }, label);
+});
+
+test('"I currently work here" is ticked only for the current job; other checkboxes stay protected', () => {
+  const box = (index) => ({ label: 'I currently work here', type: 'checkbox', row: { section: 'experience', index } });
+  assert.deepEqual(F.classify(box(1)), { kind: 'row', field: 'current' });
+  assert.deepEqual(plain(F.resolve(box(1), eduProfile)), ['Checked']);
+  assert.deepEqual(plain(F.resolve(box(0), eduProfile)), []);
+  assert.equal(F.classify({ label: 'I agree to the terms', type: 'checkbox', row: { section: 'experience', index: 0 } }).kind, 'protected');
+  assert.equal(F.classify({ label: 'I currently work here', type: 'checkbox' }).kind, 'protected', 'outside an experience row');
+});

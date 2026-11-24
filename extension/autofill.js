@@ -312,7 +312,7 @@
       const fields = adapter.collect().filter((d) => F.classify(d).kind !== 'resume');
       const mixed = new Set(
         fields
-          .filter((d) => d.row && adapter.read(d) && !F.resolve(d, data.profile).includes(adapter.read(d)))
+          .filter((d) => d.row && adapter.read(d) && F.pick([adapter.read(d)], F.resolve(d, data.profile)) !== 0)
           .map((d) => d.rowElement)
       );
       for (const d of fields) {
@@ -345,7 +345,12 @@
             reason = 'Could not fill this control';
           }
         } else {
-          reason = kind === 'question' ? 'No saved response' : 'No unambiguous profile answer';
+          reason =
+            kind === 'question'
+              ? 'No saved response'
+              : ['education', 'experience', 'row'].includes(kind)
+                ? 'Not in your profile (add it there to fill this)'
+                : 'No unambiguous profile answer';
           saveable = kind === 'question' && d.type !== 'file';
         }
         records.push({ d, group, reason, saveable, values });

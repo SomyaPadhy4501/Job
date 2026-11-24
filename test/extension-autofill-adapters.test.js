@@ -132,7 +132,7 @@ for (const ats of ['greenhouse', 'lever', 'ashby', 'workday']) {
     await adapter.expand(profile);
     assert.equal(clicks, 1);
     assert.deepEqual(
-      adapter.collect().map((d) => F.resolve(d, profile)),
+      adapter.collect().map((d) => [...F.resolve(d, profile)]),
       [['One'], ['Two']]
     );
   });
@@ -172,7 +172,7 @@ test('experience rows with opaque IDs are scoped by section heading and employer
   button.onclick = () => button.before(document.querySelector('fieldset').cloneNode(true));
   await adapter.expand(profile);
   assert.deepEqual(
-    adapter.collect().map((d) => F.resolve(d, profile)),
+    adapter.collect().map((d) => [...F.resolve(d, profile)]),
     [['Example'], ['Intern'], ['Demo'], ['Engineer']]
   );
 });
@@ -392,4 +392,129 @@ test('company-built forms keep what the user typed and never press submit', asyn
   assert.equal(email.el.value, 'pat@example.invalid');
   assert.equal(submits, 0);
   assert.ok(!fields.some((d) => d.el.type === 'submit'), 'the submit button is never a field');
+});
+
+// ─── Education and experience from the profile ─────────────────────────────
+const eduProfile = {
+  education: [
+    { school: 'Northeastern University', degree: 'M.S.', field: 'Computer Science', gpa: '3.8', startDate: '2024-09', endDate: '2026-05' },
+  ],
+  experience: [
+    { company: 'Old Co', title: 'Analyst', startDate: '2022-06', endDate: '2023-12', current: false },
+    { company: 'Acme', title: 'Software Engineer', startDate: '2024-01', endDate: '', current: true },
+  ],
+};
+
+// linkedom has no select.value setter and no checkbox state: just enough of both.
+function formPolyfill(window) {
+  const Select = Object.getPrototypeOf(window.document.createElement('select'));
+  Object.defineProperty(Select, 'value', {
+    configurable: true,
+    get() {
+      return this.querySelector('option[selected]')?.getAttribute('value') || '';
+    },
+    set(v) {
+      for (const o of this.querySelectorAll('option')) o.toggleAttribute('selected', o.getAttribute('value') === v);
+    },
+  });
+  const Input = Object.getPrototypeOf(window.document.createElement('input'));
+  Object.defineProperty(Input, 'checked', {
+    configurable: true,
+    get() {
+      return this.hasAttribute('checked');
+    },
+    set(v) {
+      this.toggleAttribute('checked', !!v);
+    },
+  });
+  Input.click = function () {
+    if (this.getAttribute('type') === 'checkbox') this.checked = !this.checked;
+    this.dispatchEvent(new window.Event('click', { bubbles: true }));
+  };
+}
+const selected = (sel) => sel.querySelector('option[selected]')?.textContent;
+
+async function fillAll(adapter, profile) {
+  const out = {};
+  for (const d of adapter.collect()) {
+    const values = F.resolve(d, profile);
+    out[d.label || d.automationId] = values.length ? await adapter.write(d, values) : null;
+  }
+  return out;
+}
+
+test('Greenhouse education: degree and discipline selects, month and year selects, school typed', async () => {
+  const opts = (list) => '<option value="">Select...</option>' + list.map((o, i) => `<option value="${i + 1}">${o}</option>`).join('');
+  const { adapter, document, window } = fixture(
+    'greenhouse',
+    '<form id="application-form"><div class="education--container"><div class="education--form">' +
+      '<div class="field-wrapper"><label for="school">School</label><input id="school"></div>' +
+      `<div class="field-wrapper"><label for="degree">Degree</label><select id="degree">${opts(["Associate's Degree", "Bachelor's Degree", "Master's Degree", 'Other'])}</select></div>` +
+      `<div class="field-wrapper"><label for="discipline">Discipline</label><select id="discipline">${opts(['Computer Science', 'Engineering'])}</select></div>` +
+      `<fieldset><legend>Start date</legend><label for="sm">Month</label><select id="sm">${opts(['January', 'September'])}</select><label>Year<input></label></fieldset>` +
+      `<fieldset><legend>End date</legend><label for="em">Month</label><select id="em">${opts(['May', 'June'])}</select><label>Year<input></label></fieldset>` +
+      '</div></div><button>Submit Application</button></form>'
+  );
+  formPolyfill(window);
+  await fillAll(adapter, eduProfile);
+  const value = (sel) => document.querySelector(sel);
+  assert.equal(value('#school').value, 'Northeastern University');
+  assert.equal(selected(value('#degree')), "Master's Degree");
+  assert.equal(selected(value('#discipline')), 'Computer Science');
+  const [startM, endM] = document.querySelectorAll('fieldset select');
+  const [startY, endY] = document.querySelectorAll('fieldset input');
+  assert.equal(selected(startM), 'September');
+  assert.equal(startY.value, '2024');
+  assert.equal(selected(endM), 'May');
+  assert.equal(endY.value, '2026');
+});
+
+test('an empty profile fills no education or experience field', async () => {
+  const { adapter, document } = fixture(
+    'greenhouse',
+    '<form id="application-form"><div class="field-wrapper"><label for="s">School</label><input id="s"></div>' +
+      '<div class="field-wrapper"><label for="g">GPA</label><input id="g"></div>' +
+      '<div class="field-wrapper"><label for="m">Major</label><input id="m"></div></form>'
+  );
+  const result = await fillAll(adapter, {});
+  assert.deepEqual(Object.values(result), [null, null, null]);
+  assert.deepEqual([...document.querySelectorAll('input')].map((i) => i.value), ['', '', '']);
+});
+
+test('Workday My Experience: two jobs, Add, Workday month/year boxes, "I currently work here"', async () => {
+  const job = (n) =>
+    `<div data-automation-id="workExperience-${n}"><div data-automation-id="formField-jobTitle"><label for="t${n}">Job Title</label><input id="t${n}"></div>` +
+    `<div data-automation-id="formField-companyName"><label for="c${n}">Company</label><input id="c${n}"></div>` +
+    `<div data-automation-id="formField-currentlyWorkHere"><label for="w${n}">I currently work here</label><input type="checkbox" id="w${n}"></div>` +
+    `<div data-automation-id="formField-startDate"><label>From</label><input aria-label="Month" data-automation-id="dateSectionMonth-input"><input aria-label="Year" data-automation-id="dateSectionYear-input"></div></div>`;
+  const { adapter, document, window } = fixture(
+    'workday',
+    '<div data-automation-id="applyFlowPage"><div data-automation-id="workExperienceSection"><h3>Work Experience</h3>' +
+      job(1) +
+      '<button type="button" data-automation-id="Add">Add Another</button></div>' +
+      '<button data-automation-id="bottom-navigation-next-button">Save and Continue</button></div>'
+  );
+  const add = document.querySelector('[data-automation-id="Add"]');
+  add.onclick = () => add.insertAdjacentHTML('beforebegin', job(2));
+  formPolyfill(window);
+  await adapter.expand(eduProfile);
+  assert.equal(document.querySelectorAll('[data-automation-id^="workExperience-"]').length, 2, 'one Add click');
+  await fillAll(adapter, eduProfile);
+  const v = (sel) => document.querySelector(sel);
+  assert.equal(v('#t1').value, 'Analyst');
+  assert.equal(v('#c2').value, 'Acme');
+  assert.equal(v('#w1').checked, false);
+  assert.equal(v('#w2').checked, true);
+  const months = document.querySelectorAll('[data-automation-id="dateSectionMonth-input"]');
+  const years = document.querySelectorAll('[data-automation-id="dateSectionYear-input"]');
+  assert.deepEqual([months[0].value, years[0].value, months[1].value, years[1].value], ['06', '2022', '01', '2024']);
+});
+
+test('honeypot fields are never collected or filled', () => {
+  const { adapter } = fixture(
+    'workday',
+    '<div data-automation-id="applyFlowPage"><div data-automation-id="formField-email"><label for="e">Email Address</label><input id="e"></div>' +
+      '<label for="b">Enter website. This input is for robots only, do not enter if you\'re human.</label><input id="b" data-automation-id="beecatcher"></div>'
+  );
+  assert.deepEqual(adapter.collect().map((d) => d.el.id), ['e']);
 });

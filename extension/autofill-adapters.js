@@ -75,17 +75,33 @@
     return '';
   }
   const rowSelectors = {
-    education:
-      '.education--form,[data-education-row],[data-automation-id^="education-"],[data-automation-id="educationSection"]',
-    experience:
-      '.employment--form,.experience--form,[data-experience-row],[data-automation-id^="workExperience-"],[data-automation-id="workExperienceSection"]',
+    education: '.education--form,[data-education-row],[data-automation-id^="education-"]',
+    experience: '.employment--form,.experience--form,[data-experience-row],[data-automation-id^="workExperience-"]',
   };
   const sections = {
     education:
-      '.education--container,[data-section="education"],[data-automation-id="educationSectionContainer"],[data-automation-id="education"]',
+      '.education--container,[data-section="education"],[data-automation-id="educationSectionContainer"],[data-automation-id="educationSection"],[data-automation-id="education"]',
     experience:
-      '.employment--container,.experience--container,[data-section="experience"],[data-automation-id="workExperienceSectionContainer"],[data-automation-id="workExperience"]',
+      '.employment--container,.experience--container,[data-section="experience"],[data-automation-id="workExperienceSectionContainer"],[data-automation-id="workExperienceSection"],[data-automation-id="workExperience"]',
   };
+  // Bot traps ("Enter website. This input is for robots only"): never filled.
+  function honeypot(el) {
+    const id = [attr(el, 'data-automation-id'), el.id, attr(el, 'name')].join(' ');
+    if (/beecatcher|honeypot|hp_?field/i.test(id)) return true;
+    const label = [attr(el, 'aria-label'), text(el.closest('label')), text(el.labels?.[0])].join(' ');
+    if (/for robots only|leave (?:this )?(?:field )?(?:blank|empty)|do not (?:fill|enter)|if you(?:'re| are) (?:a )?human/i.test(label))
+      return true;
+    // Styled radios and checkboxes hide the real input on purpose; only
+    // text-like fields are judged by how they're hidden.
+    if (!/^(?:text|email|tel|url|number|search|textarea)$/.test(typeOf(el))) return false;
+    const style = el.ownerDocument.defaultView?.getComputedStyle?.(el);
+    if (style && (style.opacity === '0' || style.clipPath === 'inset(100%)' || style.clip === 'rect(0px, 0px, 0px, 0px)'))
+      return true;
+    const box = el.getBoundingClientRect?.();
+    if (box && box.width && box.height && (box.width <= 1 || box.height <= 1 || box.right < -500 || box.bottom < -500))
+      return true;
+    return attr(el, 'tabindex') === '-1' && attr(el, 'autocomplete') === 'off';
+  }
   const placeholder = (s) =>
     /^(?:select(?: one| an option)?|please select|choose(?: one| an option)?|--)?[.\s…-]*$/i.test(s);
   function visible(el) {
@@ -209,7 +225,12 @@
       for (const section of Object.keys(rowSelectors))
         rows(section).forEach((el, index) => rowMap.set(el, { section, index }));
       for (const el of all(doc, controls)) {
-        if (!inScope(el) || el.closest(captcha) || el.closest('form')?.querySelector('input[type=password]'))
+        if (
+          !inScope(el) ||
+          el.closest(captcha) ||
+          el.closest('form')?.querySelector('input[type=password]') ||
+          honeypot(el)
+        )
           continue;
         let type = typeOf(el);
         const buttons = el.matches('.ashby-application-form-input-yesno');
@@ -292,6 +313,9 @@
             meta.required
           ),
           autocomplete: attr(el, 'autocomplete'),
+          placeholder: attr(el, 'placeholder'),
+          boxId: attr(box, 'data-automation-id'),
+          datePicker: datePicker(el),
           safetyText: [text(legend), text(boxLabel), labelledBy].join(' '),
           eeo: !!el.closest(
             '.eeoc__container,.eeoc__question__wrapper,[class*="demographic"],[data-qa*="eeo"]'
@@ -395,6 +419,7 @@
       }
       if (!d.el.isConnected) return false;
       if (placeSearch(d)) return F.pickPlace([read(d)], values[0]) === 0;
+      if (d.type === 'checkbox') return read(d) === values[0];
       if (datePicker(d.el)) return !!values[0] && read(d) === F.usDate(values[0]);
       const value = read(d);
       if (d.members || d.type === 'combo') return F.pick([value], values) === 0;
@@ -409,6 +434,7 @@
         !d.el.closest(captcha) &&
         (!d.el.readOnly || d.type === 'combo') &&
         !['password', 'hidden', 'submit'].includes(typeOf(d.el)) &&
+        !honeypot(d.el) &&
         !read(d)
       );
     }
@@ -470,11 +496,14 @@
         }
       }
     }
-    async function search(d, values, active) {
+    // Type into a search box, then pick the one suggestion the matcher
+    // accepts. Places by default; school and major lists pass their own.
+    async function search(d, values, active, how = {}) {
       const el = d.el,
         win = doc.defaultView,
         value = values[0],
-        query = F.placeQuery(value);
+        query = how.query ?? F.placeQuery(value),
+        match = how.match || ((labels) => F.pickPlace(labels, value));
       if (!query || !available(d)) return false;
       const type = (v) => {
         nativeSet(el, 'value', v);
@@ -487,6 +516,8 @@
       }
       el.focus();
       type(query);
+      // Workday prompts search on Enter.
+      if (ats === 'workday') el.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
       let picked = false;
       try {
         // Suggestions come from the ATS's server: allow ~3 s, and let a list
@@ -496,11 +527,11 @@
           if (!active() || !el.isConnected) return false;
           const menu = menuFor(el);
           const options = menu ? all(menu, '[role="option"]').filter((o) => visible(o) && safeButton(o)) : [];
-          const index = F.pickPlace(options.map(text), value);
+          const index = match(options.map(text));
           if (index < 0) continue;
           options[index].click();
           await pause(50);
-          picked = F.pickPlace([read(d)], value) === 0;
+          picked = match([read(d)]) === 0;
           return picked;
         }
         return false;
@@ -527,7 +558,20 @@
         return true;
       }
       if (!values.length) return false;
+      if (d.type === 'checkbox') {
+        if (values[0] !== 'Checked' || !safeButton(d.el)) return false;
+        if (!d.el.checked) d.el.click();
+        await pause(0);
+        return d.el.checked;
+      }
       if (placeSearch(d)) return search(d, values, active);
+      // School and major lists are too long to open: type the name up to the
+      // first comma or dash and take the one option that is the same name.
+      if (values.match === 'name' && d.el.localName === 'input' && d.el.matches('[aria-autocomplete="list"],[role="combobox"],[data-automation-id="searchBox"]'))
+        return search(d, values, active, {
+          query: F.clean(values[0]).split(/,| - | – /)[0],
+          match: (labels) => F.pick(labels, values),
+        });
       if (d.type === 'combo') return combo(d, values, active);
       if (d.members) {
         const i = F.pick(d.options, values),

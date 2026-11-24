@@ -100,6 +100,11 @@ function AutofillPage() {
         </ul>
       </section>
 
+      <p className="notice">
+        <strong>Updating from version 1.11 or older?</strong> Version 1.12 has a new extension ID, so Chrome treats it as a
+        new extension: remove the old one on the extensions page, load the new folder, then connect again with a new
+        token (step 4). Your profile, resumes and saved answers stay in your account.
+      </p>
       <ol className="steps">
         <li className="card">
           <h3>Download the extension</h3>
@@ -169,8 +174,7 @@ function AutofillPage() {
           <h3>Connect it to your account</h3>
           <ol className="substeps">
             <li>
-              Click the extension's icon. In <strong>Portal URL</strong>, put this site's address and click{' '}
-              <strong>Save</strong>:
+              Click the extension's icon. In <strong>Job board address</strong>, put this site's address:
               <div className="copy-row">
                 <code>{origin}</code>
                 <Copy value={origin} />
@@ -178,7 +182,7 @@ function AutofillPage() {
             </li>
             <li>Create a token below and copy it.</li>
             <li>
-              Back in the extension, paste it into <strong>Personal autofill token</strong> (under “Autofill”) and click{' '}
+              Back in the extension, paste it into <strong>Autofill token</strong> and click{' '}
               <strong>Connect</strong>. It should say “Connected as” and your email.
             </li>
           </ol>
