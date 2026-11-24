@@ -1,5 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { cpSync, existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// pdf.js loads character maps and the standard 14 fonts at run time. Copy
+// them into public/pdfjs/ (git-ignored) so they're served from this origin,
+// which the CSP's connect-src 'self' allows.
+function pdfjsAssets() {
+  const copy = () => {
+    for (const dir of ['cmaps', 'standard_fonts']) {
+      const from = fileURLToPath(new URL(`./node_modules/pdfjs-dist/${dir}`, import.meta.url));
+      const to = fileURLToPath(new URL(`./public/pdfjs/${dir}`, import.meta.url));
+      if (existsSync(from)) cpSync(from, to, { recursive: true });
+    }
+  };
+  return { name: 'pdfjs-assets', buildStart: copy, configureServer: copy };
+}
 
 // Dev server runs on 5173 and proxies API calls to the Express backend on
 // whichever port run-all.sh picked (default 4000). Production build is pure
@@ -16,10 +32,33 @@ import react from '@vitejs/plugin-react';
 // /admin always stays on the local backend.
 const BOARD = process.env.BOARD_API || 'http://localhost:4000';
 
+// `vite preview` sends the same headers as production (vercel.json), so a
+// CSP problem shows up locally instead of only after a deploy. Header rule
+// sources are regex-style paths ("/(.*)", "/((?!x/).*)").
+function vercelHeaders() {
+  const rules = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')).headers || [];
+  const compiled = rules.map((r) => ({ re: new RegExp(`^${r.source}$`), headers: r.headers }));
+  return {
+    name: 'vercel-headers',
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url || '/').split('?')[0];
+        for (const rule of compiled) {
+          if (rule.re.test(path)) for (const h of rule.headers) res.setHeader(h.key, h.value);
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pdfjsAssets(), vercelHeaders()],
   // Which Vercel environment built this ('production', 'preview', or '' locally).
   define: { __VERCEL_ENV__: JSON.stringify(process.env.VERCEL_ENV || '') },
+  optimizeDeps: { esbuildOptions: { target: 'es2022' } },
+  // Same /api proxy for `vite preview` (production build + production CSP).
+  preview: { port: 4173, proxy: { '/api': { target: 'http://localhost:4100', changeOrigin: false } } },
   server: {
     port: 5173,
     proxy: {
@@ -32,6 +71,8 @@ export default defineConfig({
     },
   },
   build: {
+    // pdf.js uses top-level await.
+    target: 'es2022',
     outDir: 'dist',
     emptyOutDir: true,
   },

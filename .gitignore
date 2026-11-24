@@ -9,3 +9,4 @@ node_modules/
 /web/dist/
 .claude/worktrees/
 .claude/settings.local.json
+/web/public/pdfjs/

@@ -45,6 +45,22 @@ export async function api(path, { method = 'GET', body, form } = {}) {
   return data;
 }
 
+// A file from a private route (a resume to preview), as a Blob. Errors are
+// read the same way as api(): JSON {error} when the server sent it.
+export async function apiBlob(path) {
+  let res;
+  try {
+    res = await fetch(path, { credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    throw new ApiError("Couldn't reach the server. Check your connection.", 0, 'network');
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new ApiError(data?.error || `Request failed (${res.status}).`, res.status, data?.code);
+  }
+  return res.blob();
+}
+
 // The server sets `jb_li=1` (readable, not a secret) at sign-in. Without it
 // nobody is signed in, so the app doesn't call /api/auth/me at all, and an
 // anonymous visit never wakes the database.

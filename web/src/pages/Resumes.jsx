@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, formatBytes, formatDate, usePrivateQuery } from '../account.js';
+import { api, apiBlob, formatBytes, formatDate, usePrivateQuery } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
 import TagInput from '../components/TagInput.jsx';
 import { Link } from '../router.jsx';
 
 const KEY = ['resumes'];
+// Loaded only when someone opens a preview, so the board stays small.
+const PdfViewer = lazy(() => import('../components/PdfViewer.jsx'));
+const DocxViewer = lazy(() => import('../components/DocxViewer.jsx'));
 
 const PARSE_LABEL = {
   parsed: 'Read',
@@ -144,6 +147,7 @@ function ResumeCard({ resume, suggestedTags }) {
   const [title, setTitle] = useState(resume.title);
   const [tags, setTags] = useState(resume.tags);
   const [review, setReview] = useState(false);
+  const [preview, setPreview] = useState(false);
   const done = () => qc.invalidateQueries({ queryKey: KEY });
 
   const save = useMutation({
@@ -200,6 +204,9 @@ function ResumeCard({ resume, suggestedTags }) {
                 Make default
               </button>
             )}
+            <button className="btn btn-small btn-ghost" onClick={() => setPreview((p) => !p)} aria-expanded={preview}>
+              {preview ? 'Hide preview' : 'Preview'}
+            </button>
             <a className="btn btn-small btn-ghost" href={`/api/me/resumes/${resume.id}/file`}>Download</a>
             <button className="btn btn-small btn-ghost" onClick={() => setReview((r) => !r)} aria-expanded={review}>
               {review ? 'Hide details' : 'Review details'}
@@ -214,7 +221,28 @@ function ResumeCard({ resume, suggestedTags }) {
           </>
         )}
       </div>
+      {preview && <Preview resume={resume} />}
       {review && <ParsedDetails id={resume.id} />}
+    </div>
+  );
+}
+
+function Preview({ resume }) {
+  // Keyed by the row's last change, so a replaced file is fetched again.
+  const { data, isLoading, error } = usePrivateQuery(['resume-file', resume.id, resume.updatedAt || resume.sizeBytes], `/api/me/resumes/${resume.id}/file`, {
+    queryFn: () => apiBlob(`/api/me/resumes/${resume.id}/file`),
+    staleTime: 5 * 60_000,
+  });
+  const isPdf = resume.mimeType === 'application/pdf';
+  return (
+    <div className="resume-preview">
+      {isLoading && <div className="skeleton skeleton-row" />}
+      {error && <p className="error">{error.message}</p>}
+      {data && (
+        <Suspense fallback={<div className="skeleton skeleton-row" />}>
+          {isPdf ? <PdfViewer data={data} label={`Preview of ${resume.title}`} /> : <DocxViewer data={data} />}
+        </Suspense>
+      )}
     </div>
   );
 }

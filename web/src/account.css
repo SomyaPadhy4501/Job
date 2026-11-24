@@ -204,3 +204,12 @@ fieldset.section legend { font-weight: 600; font-size: 15px; padding: 0 6px; }
   .landing-body { grid-template-columns: 1fr; gap: 24px; padding: 24px 0; }
   .landing-pitch h1 { font-size: 26px; }
 }
+
+/* Resume preview (Resumes page; the LaTeX editor reuses .pdf-viewer). */
+.resume-preview { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.pdf-viewer, .docx-viewer { background: #f3f4f6; border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 80vh; overflow: auto; }
+.pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.pdf-page { display: block; max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15); }
+@media (max-width: 720px) {
+  .pdf-viewer, .docx-viewer { padding: 6px; max-height: 70vh; }
+}
