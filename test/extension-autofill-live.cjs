@@ -266,7 +266,7 @@ async function live() {
           await page.keyboard.press('Space');
           assert.equal(
             await inPanel(function () {
-              return this.querySelectorAll('input[type=checkbox]:checked').length;
+              return this.querySelectorAll('input:checked').length;
             }),
             1
           );

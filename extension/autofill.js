@@ -65,91 +65,19 @@
       'li br{display:none}' +
       'li label,.check{display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;color:#1a1d26}' +
       'input[type=checkbox]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#7c3aed;border:1px solid #a5a9b8}' +
-      '.row{display:flex;gap:8px;flex-wrap:wrap}.ok{color:#047857}' +
-      '.resumes{display:flex;flex-direction:column;gap:4px}' +
-      '.resume-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e6e8ee;border-radius:8px;' +
-      'font-size:13px;font-weight:500;color:#1a1d26;cursor:pointer;margin:0}' +
-      '.resume-row.on{border-color:#7c3aed;background:#f5f3ff}' +
-      '.resume-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      'input[type=radio]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#7c3aed;margin:0}' +
-      'button.small{padding:3px 9px;font-size:12px;font-weight:600;color:#5b21b6;border-color:#ddd6fe}'
+      '.row{display:flex;gap:8px;flex-wrap:wrap}.ok{color:#047857}'
   );
   const open = element('button', 'Autofill'),
     panel = element('section');
   open.className = 'main';
   panel.hidden = true;
   panel.setAttribute('aria-label', 'Job application autofill');
-  const close = element('button', 'Close');
+  const close = element('button', 'Close'),
+    picker = element('select');
   close.className = 'close';
-  // The resume list: one row per resume, each with a Preview button that
-  // opens the file in a new tab. Same interface the code used for the
-  // <select> it replaces (value, disabled, add, replaceChildren).
-  const picker = (() => {
-    const box = element('div');
-    box.className = 'resumes';
-    box.setAttribute('role', 'radiogroup');
-    box.setAttribute('aria-label', 'Resume');
-    const rows = [];
-    let value = '',
-      disabled = false;
-    const sync = () => {
-      for (const r of rows) {
-        r.radio.checked = r.id === value;
-        r.radio.disabled = disabled;
-        r.row.classList.toggle('on', r.id === value);
-      }
-    };
-    return {
-      box,
-      get value() {
-        return value;
-      },
-      set value(v) {
-        value = v;
-        sync();
-      },
-      get disabled() {
-        return disabled;
-      },
-      set disabled(d) {
-        disabled = d;
-        sync();
-      },
-      replaceChildren() {
-        rows.length = 0;
-        box.replaceChildren();
-      },
-      add(option) {
-        const id = option.value;
-        const row = element('label');
-        row.className = 'resume-row';
-        const radio = element('input');
-        radio.type = 'radio';
-        radio.name = 'job-autofill-resume';
-        radio.onchange = () => {
-          if (radio.checked) {
-            value = id;
-            sync();
-          }
-        };
-        row.append(radio, element('span', option.text));
-        if (id) {
-          const preview = element('button', 'Preview');
-          preview.type = 'button';
-          preview.className = 'small';
-          preview.onclick = (e) => {
-            e.preventDefault();
-            if (e.isTrusted) chrome.runtime.sendMessage({ type: 'autofill:previewResume', id }).catch(() => {});
-          };
-          row.append(preview);
-        }
-        rows.push({ id, radio, row });
-        box.append(row);
-        sync();
-      },
-    };
-  })();
+  picker.id = 'resume';
   const label = element('label', 'Resume');
+  label.htmlFor = picker.id;
   const fill = element('button', ats === 'workday' ? 'Fill this step' : 'Fill this page');
   fill.className = 'main';
   const status = element('p'),
@@ -159,7 +87,7 @@
   const head = element('div');
   head.className = 'head';
   head.append(element('h2', 'Application autofill'), close);
-  panel.append(head, status, label, picker.box, fill, results, save);
+  panel.append(head, status, label, picker, fill, results, save);
   shadow.append(style, panel, open);
   function mount() {
     if (host.isConnected || !document.body) return;
