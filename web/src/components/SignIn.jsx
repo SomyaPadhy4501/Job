@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, useSignedIn } from '../account.js';
 import { Link } from '../router.jsx';
+import { SITE_HOST, signInWorksHere } from '../site.js';
 
 // Google Identity Services: the server hands out a nonce (also set in an
 // HttpOnly cookie); Google puts it in the ID token; the server checks both
@@ -44,7 +45,7 @@ export default function SignIn({ title = 'Sign in', reason, onDone }) {
   }, []);
 
   useEffect(() => {
-    if (!config?.clientId || !button.current) return;
+    if (!config?.clientId || !button.current || !signInWorksHere()) return;
     let alive = true;
     loadGsi()
       .then(() => {
@@ -97,7 +98,14 @@ export default function SignIn({ title = 'Sign in', reason, onDone }) {
       {config && !config.clientId && !config.devLogin && (
         <p className="notice">Sign-in isn't set up on this server yet.</p>
       )}
-      <div ref={button} className="gsi-button" />
+      {config?.clientId && !signInWorksHere() ? (
+        <p className="notice">
+          Google sign-in works on the main site only.{' '}
+          <a href={`https://${SITE_HOST}${window.location.pathname}`}>Sign in at {SITE_HOST}</a>
+        </p>
+      ) : (
+        <div ref={button} className="gsi-button" />
+      )}
       {config?.devLogin && (
         <form className="dev-login" onSubmit={devLogin}>
           <label className="field">

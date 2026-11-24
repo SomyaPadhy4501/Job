@@ -5,6 +5,13 @@ import App from './App.jsx';
 import { ME } from './account.js';
 import './styles.css';
 import './account.css';
+import { SITE_HOST } from './site.js';
+
+// Every Vercel deploy also gets its own one-off address. Google sign-in only
+// works on the real one, so production builds send visitors there.
+if (__VERCEL_ENV__ === 'production' && location.hostname !== SITE_HOST && location.hostname.endsWith('.vercel.app')) {
+  location.replace(`https://${SITE_HOST}${location.pathname}${location.search}${location.hash}`);
+}
 
 // A 401 from any private call means the session ended: show the sign-in card
 // (pages keep what the user typed) and drop the cached private data.

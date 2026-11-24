@@ -18,6 +18,8 @@ const BOARD = process.env.BOARD_API || 'http://localhost:4000';
 
 export default defineConfig({
   plugins: [react()],
+  // Which Vercel environment built this ('production', 'preview', or '' locally).
+  define: { __VERCEL_ENV__: JSON.stringify(process.env.VERCEL_ENV || '') },
   server: {
     port: 5173,
     proxy: {
