@@ -12,6 +12,7 @@ const goldmanSachs = require('./goldman_sachs');
 const amazon = require('./amazon');
 const apple = require('./apple');
 const microsoft = require('./microsoft');
+const bytedance = require('./bytedance');
 const uber = require('./uber');
 const netflix = require('./netflix');
 const ghlistings = require('./ghlistings');
@@ -44,6 +45,7 @@ const REGISTRY = {
   [amazon.source]: amazon,
   [apple.source]: apple,
   [microsoft.source]: microsoft,
+  [bytedance.source]: bytedance,
   [uber.source]: uber,
   [netflix.source]: netflix,
   [ghlistings.source]: ghlistings,
