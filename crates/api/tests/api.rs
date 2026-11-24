@@ -1540,6 +1540,14 @@ async fn every_per_user_route_refuses_another_users_data() {
         .as_str()
         .unwrap()
         .to_owned();
+    let saved = alice
+        .json(
+            Method::PUT,
+            "/api/me/workday-login",
+            json!({"email": "alice-workday@example.com", "password": "Alice-Secret-Pass-1"}),
+        )
+        .await;
+    assert_eq!(saved.status, StatusCode::OK);
     let job = insert_job(&app.pool, &unique("Alice Co"), "Engineer").await;
     let item = alice
         .json(Method::POST, "/api/me/queue", json!({ "jobId": job }))
@@ -1685,11 +1693,13 @@ async fn every_per_user_route_refuses_another_users_data() {
         assert_eq!(bob.get(path).await.json()[key], json!([]), "{path}");
     }
     assert_eq!(bob.get("/api/me/profile").await.json()["version"], 0);
+    assert_eq!(bob.get("/api/me/workday-login").await.json()["set"], false);
     let export = bob.get("/api/me/export").await;
     assert_eq!(export.status, StatusCode::OK);
     let text = String::from_utf8_lossy(&export.body);
     assert!(!text.contains(&id) && !text.contains("alice-secret-answer"));
     assert!(!text.contains("alice-secret-alert") && !text.contains(&item));
+    assert!(!text.contains("alice-workday") && !text.contains("Alice-Secret-Pass-1"));
 
     // Bob's extension token sees only Bob.
     let bob_token = bob
@@ -1721,6 +1731,8 @@ async fn every_per_user_route_refuses_another_users_data() {
         bob_ext.get("/api/autofill/queue").await.json()["items"],
         json!([])
     );
+    let login = bob_ext.get("/api/autofill/workday-login").await.json();
+    assert!(login["email"].is_null() && login["password"].is_null());
     // Answers saved with Bob's token land in Bob's bank only.
     let saved = bob_ext
         .json(
@@ -1750,6 +1762,10 @@ async fn every_per_user_route_refuses_another_users_data() {
     assert_eq!(alerts["alerts"][0]["name"], "alice-secret-alert");
     let queue = alice.get("/api/me/queue").await.json();
     assert_eq!(queue["items"][0]["status"], "queued");
+    assert_eq!(
+        alice.get("/api/me/workday-login").await.json()["email"],
+        "alice-workday@example.com"
+    );
     alice
         .send(
             Method::DELETE,
@@ -3165,4 +3181,204 @@ async fn gmail_routes_answer_503_when_not_configured() {
         .await;
     assert_eq!(res.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(callback(&mut web, "state=x&code=y").await, "unavailable");
+}
+
+#[tokio::test]
+async fn workday_login_is_set_on_the_web_and_read_only_by_the_extension() {
+    let Some(app) = app() else { return };
+    let mut web = Browser::new(&app);
+    let sub = web.sign_in().await;
+    let token = web
+        .json(Method::POST, "/api/me/tokens", json!({}))
+        .await
+        .json()["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut ext = Browser::new(&app);
+    ext.bearer = Some(token);
+    ext.csrf = false;
+    const PASSWORD: &str = "Workday-Secret-42!";
+
+    // Nothing saved yet.
+    let res = web.get("/api/me/workday-login").await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(
+        res.json(),
+        json!({"email": null, "set": false, "updatedAt": null})
+    );
+    let res = ext.get("/api/autofill/workday-login").await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert!(res.json()["email"].is_null() && res.json()["password"].is_null());
+    // The extension's token doesn't reach the web route, nor the session the
+    // extension's.
+    assert_eq!(
+        ext.get("/api/me/workday-login").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        web.get("/api/autofill/workday-login").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+
+    // No password yet: one is required.
+    let res = web
+        .json(
+            Method::PUT,
+            "/api/me/workday-login",
+            json!({"email": "pat@example.com"}),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::BAD_REQUEST);
+
+    // Weak passwords and bad emails are refused.
+    for (body, message) in [
+        (
+            json!({"email": "pat@example.com", "password": "Short-1a"}),
+            "Use at least 12 characters.",
+        ),
+        (
+            json!({"email": "pat@example.com", "password": format!("Aa1!{}", "x".repeat(125))}),
+            "Use at most 128 characters.",
+        ),
+        (
+            json!({"email": "pat@example.com", "password": "nouppercase-123"}),
+            "Use upper and lower case letters, a number and a symbol.",
+        ),
+        (
+            json!({"email": "pat@example.com", "password": "NoSymbolsHere123"}),
+            "Use upper and lower case letters, a number and a symbol.",
+        ),
+        (
+            json!({"email": "not-an-email", "password": PASSWORD}),
+            "Enter a valid email address.",
+        ),
+    ] {
+        let res = web.json(Method::PUT, "/api/me/workday-login", body).await;
+        assert_eq!(res.status, StatusCode::BAD_REQUEST);
+        assert_eq!(res.json()["error"], message);
+    }
+    assert_eq!(web.get("/api/me/workday-login").await.json()["set"], false);
+
+    // Writes need the CSRF header like every cookie route.
+    web.csrf = false;
+    let res = web
+        .json(
+            Method::PUT,
+            "/api/me/workday-login",
+            json!({"email": "pat@example.com", "password": PASSWORD}),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::FORBIDDEN);
+    web.csrf = true;
+
+    // Set: the website never sees the password again.
+    let res = web
+        .json(
+            Method::PUT,
+            "/api/me/workday-login",
+            json!({"email": " pat@example.com ", "password": PASSWORD}),
+        )
+        .await;
+    assert_eq!(
+        res.status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&res.body)
+    );
+    assert_eq!(res.json()["email"], "pat@example.com");
+    assert_eq!(res.json()["set"], true);
+    assert!(!String::from_utf8_lossy(&res.body).contains(PASSWORD));
+    let shown = web.get("/api/me/workday-login").await;
+    assert_eq!(shown.json()["email"], "pat@example.com");
+    assert_eq!(shown.json()["set"], true);
+    assert!(shown.json()["updatedAt"].is_string());
+    assert!(shown.json().get("password").is_none());
+    assert!(!String::from_utf8_lossy(&shown.body).contains(PASSWORD));
+
+    // Stored encrypted: the password isn't in the row.
+    let (data,): (Vec<u8>,) = sqlx::query_as(
+        "SELECT w.login_data FROM workday_logins w JOIN users u ON u.id = w.user_id WHERE u.email = $1",
+    )
+    .bind(format!("{sub}@example.com"))
+    .fetch_one(&app.pool)
+    .await
+    .unwrap();
+    assert!(
+        !data
+            .windows(PASSWORD.len())
+            .any(|w| w == PASSWORD.as_bytes())
+    );
+    assert!(!data.windows(15).any(|w| w == b"pat@example.com"));
+
+    // The extension gets both.
+    let res = ext.get("/api/autofill/workday-login").await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(res.json()["email"], "pat@example.com");
+    assert_eq!(res.json()["password"], PASSWORD);
+    assert!(res.json()["updatedAt"].is_string());
+
+    // Email only: the saved password stays.
+    let res = web
+        .json(
+            Method::PUT,
+            "/api/me/workday-login",
+            json!({"email": "jobs@example.org"}),
+        )
+        .await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(res.json()["email"], "jobs@example.org");
+    let got = ext.get("/api/autofill/workday-login").await.json();
+    assert_eq!(got["email"], "jobs@example.org");
+    assert_eq!(got["password"], PASSWORD);
+
+    // A new password replaces it.
+    web.json(
+        Method::PUT,
+        "/api/me/workday-login",
+        json!({"email": "jobs@example.org", "password": "Another-Pass-77"}),
+    )
+    .await;
+    assert_eq!(
+        ext.get("/api/autofill/workday-login").await.json()["password"],
+        "Another-Pass-77"
+    );
+
+    // Another user sees none of it, on the web or with their own token.
+    let mut bob = Browser::new(&app);
+    bob.sign_in().await;
+    assert_eq!(
+        bob.get("/api/me/workday-login").await.json(),
+        json!({"email": null, "set": false, "updatedAt": null})
+    );
+    let bob_token = bob
+        .json(Method::POST, "/api/me/tokens", json!({}))
+        .await
+        .json()["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut bob_ext = Browser::new(&app);
+    bob_ext.bearer = Some(bob_token);
+    bob_ext.csrf = false;
+    let got = bob_ext.get("/api/autofill/workday-login").await.json();
+    assert!(got["email"].is_null() && got["password"].is_null());
+    // Bob deleting his (absent) login leaves Alice's alone.
+    let res = bob
+        .send(Method::DELETE, "/api/me/workday-login", None, vec![])
+        .await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(
+        ext.get("/api/autofill/workday-login").await.json()["email"],
+        "jobs@example.org"
+    );
+
+    // Delete.
+    let res = web
+        .send(Method::DELETE, "/api/me/workday-login", None, vec![])
+        .await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(web.get("/api/me/workday-login").await.json()["set"], false);
+    let got = ext.get("/api/autofill/workday-login").await.json();
+    assert!(got["email"].is_null() && got["password"].is_null());
 }

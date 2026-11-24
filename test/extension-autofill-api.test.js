@@ -299,25 +299,41 @@ const WORKDAY = (extra = {}) => ({
   ...extra,
 });
 
-test('job site password: set from the popup only, with real rules', async () => {
-  const api = load();
-  assert.match((await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, WORKDAY())).error, /popup/);
-  assert.match((await api.send({ type: 'autofill:setSitePassword', password: 'short' }, FROM_POPUP)).error, /12 characters/);
-  assert.match((await api.send({ type: 'autofill:setSitePassword', password: 'alllowercase1234!' }, FROM_POPUP)).error, /upper and lower/);
-  assert.equal((await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP)).ok, true);
-  const status = await api.send({ type: 'autofill:sitePasswordStatus' }, FROM_POPUP);
-  assert.equal(status.data.set, true);
-  assert.match((await api.send({ type: 'autofill:sitePasswordStatus' }, WORKDAY())).error, /popup/);
-  // Nothing about it is in storage content scripts can read.
+// The Workday email and password are set on the job board; the worker reads
+// them from the account (GET /api/autofill/workday-login) for Workday pages.
+function workdayLogin(login) {
+  return { 'GET /api/autofill/workday-login': (init) => json(typeof login === 'function' ? login(init) : login)() };
+}
+
+test('Workday sign-in: read from the account, with the bearer token, never kept locally', async () => {
+  let auth;
+  const api = load({
+    routes: workdayLogin((init) => ((auth = init.headers.Authorization), { email: 'wd@example.invalid', password: 'Str0ng!Password', updatedAt: 't1' })),
+  });
+  await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
+  const ok = await api.send({ type: 'autofill:sitePassword' }, WORKDAY());
+  assert.deepEqual(ok, { ok: true, data: { email: 'wd@example.invalid', password: 'Str0ng!Password', autoSignIn: true } });
+  assert.equal(auth, 'Bearer tok');
   assert.ok(!JSON.stringify(api.local.data).includes('Str0ng'));
   assert.ok(!JSON.stringify(api.session.data).includes('Str0ng'));
+  // The popup has nothing to set any more.
+  assert.equal((await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP)).ok, false);
 });
 
-test('job site password: only the top frame of a Workday page gets it', async () => {
-  const api = load({ granted: ['https://careers.example/*'] });
-  await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP);
-  const ok = await api.send({ type: 'autofill:sitePassword' }, WORKDAY());
-  assert.deepEqual(ok, { ok: true, data: { password: 'Str0ng!Password', autoSignIn: true } });
+test('Workday sign-in: nothing set on the site, or an older site, gives no password', async () => {
+  const unset = load({ routes: workdayLogin({ email: null, password: null }) });
+  await unset.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
+  assert.deepEqual((await unset.send({ type: 'autofill:sitePassword' }, WORKDAY())).data, { password: null });
+  const older = load();
+  await older.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
+  assert.deepEqual((await older.send({ type: 'autofill:sitePassword' }, WORKDAY())).data, { password: null });
+  // Not connected: asks to connect.
+  assert.match((await load().send({ type: 'autofill:sitePassword' }, WORKDAY())).error, /Connect/);
+});
+
+test('Workday sign-in: only the top frame of a Workday page gets it', async () => {
+  const api = load({ granted: ['https://careers.example/*'], routes: workdayLogin({ email: 'wd@example.invalid', password: 'Str0ng!Password', updatedAt: 't1' }) });
+  await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
   for (const sender of [
     ATS_TAB, // Lever
     { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, // a site allowed with "Autofill this page"
@@ -330,9 +346,10 @@ test('job site password: only the top frame of a Workday page gets it', async ()
   }
 });
 
-test('job site password: a failed sign-in stops automatic attempts; a new password resets it', async () => {
-  const api = load();
-  await api.send({ type: 'autofill:setSitePassword', password: 'Str0ng!Password' }, FROM_POPUP);
+test('Workday sign-in: a failed sign-in stops automatic attempts; a password changed on the site resets it', async () => {
+  let login = { email: 'wd@example.invalid', password: 'Str0ng!Password', updatedAt: 't1' };
+  const api = load({ routes: workdayLogin(() => login) });
+  await api.send({ type: 'autofill:configure', token: 'tok' }, FROM_POPUP);
   assert.equal((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data.autoSignIn, true);
   await api.send({ type: 'autofill:loginResult', result: 'failed' }, WORKDAY());
   assert.equal((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data.autoSignIn, false);
@@ -342,8 +359,11 @@ test('job site password: a failed sign-in stops automatic attempts; a new passwo
   // Three fills per company per 10 minutes.
   assert.equal((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).ok, true);
   assert.match((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).error, /Too many/);
-  await api.send({ type: 'autofill:setSitePassword', password: 'An0ther!Password' }, FROM_POPUP);
-  assert.deepEqual((await api.send({ type: 'autofill:sitePassword' }, WORKDAY())).data, { password: 'An0ther!Password', autoSignIn: true });
+  // Changed on the site: a fresh company may try again automatically.
+  login = { email: 'wd@example.invalid', password: 'An0ther!Password', updatedAt: 't2' };
+  const third = WORKDAY({ url: 'https://third.wd1.myworkdayjobs.com/x/job/1' });
+  await api.send({ type: 'autofill:loginResult', result: 'failed' }, third);
+  assert.equal((await api.send({ type: 'autofill:sitePassword' }, third)).data.autoSignIn, true);
 });
 
 test('Greenhouse boards come from the page address, embedded forms included', () => {

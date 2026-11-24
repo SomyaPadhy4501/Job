@@ -1,6 +1,6 @@
 'use strict';
 
-// Workday's sign-in and create-account step, with the one job site password
+// Workday's sign-in and create-account step, with the one Workday password saved on the job board
 // the user set in the extension popup. Runs only on Workday hosts, in the top
 // frame (its own manifest entry; never injected on other sites).
 //
@@ -111,7 +111,6 @@
       say('Connect the extension to your job board account (extension popup) to sign in here automatically.');
       return null;
     }
-    const email = account.profile?.contact?.email || account.user?.email;
     let secret;
     try {
       secret = await ask('sitePassword');
@@ -120,9 +119,10 @@
       return null;
     }
     if (!secret?.password) {
-      say('Set your job site password in the extension popup ("Job site password") to sign in to Workday automatically.');
+      say('Set your Workday email and password on the job board (Autofill page → Workday accounts) to sign in to Workday automatically.');
       return null;
     }
+    const email = secret.email || account.profile?.contact?.email || account.user?.email;
     return { email, password: secret.password, auto: secret.autoSignIn };
   }
 
@@ -212,7 +212,7 @@
       say(
         captcha(panel)
           ? 'Email and password are filled in. Solve the check on the page, tick “I agree”, then click Create Account.'
-          : 'Email and password are filled in. Create the account with your job site password?',
+          : 'Email and password are filled in. Create the account with your Workday password?',
         captcha(panel) || !button ? [] : [['Create account', () => { hide(); create(); }, true]]
       );
       return;
@@ -230,7 +230,7 @@
       const verify = panel.querySelector('input[type="password"][data-automation-id="verifyPassword"]');
       if (!visible(panel) || !document.contains(panel) || !visible(verify)) {
         clearInterval(timer);
-        say('Account created with your job site password. If Workday asks you to verify your email, the link is opened from Gmail for you.');
+        say('Account created with your Workday password. If Workday asks you to verify your email, the link is opened from Gmail for you.');
         return;
       }
       if (Date.now() - started < 10000) return;

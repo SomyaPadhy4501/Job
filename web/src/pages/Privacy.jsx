@@ -31,8 +31,10 @@ export default function Privacy() {
       <h3>Optional features in the extension and editor</h3>
       <ul>
         <li>
-          <strong>Job site password.</strong> If you set one in the extension, it's kept only in that browser's extension
-          storage and used only on Workday sign-in pages. This site never receives it.
+          <strong>Workday login.</strong> If you set a Workday email and password on the Autofill page, they're stored
+          encrypted on this site and sent only to your connected extension, which uses them on Workday sign-in and
+          create-account pages. This site's pages never show the password again; Remove (or deleting your account)
+          deletes it.
         </li>
         <li>
           <strong>Codes from Gmail.</strong> If you connect Gmail in Alerts & Connectors, Google's own consent screen

@@ -39,16 +39,33 @@
     'style',
     (framed
       ? ':host{all:initial;display:block;position:relative;width:max-content;max-width:100%;margin:0 0 12px auto;'
-      : ':host{all:initial;position:fixed;right:20px;bottom:20px;') +
+      : ':host{all:initial;position:fixed;top:0;right:0;') +
       'z-index:2147483647}' +
       '*{box-sizing:border-box;margin:0;padding:0;position:static;float:none;height:auto;min-height:0;max-width:100%;' +
       'font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;line-height:1.45;' +
       'letter-spacing:normal;text-transform:none;text-align:left;color:#1a1d26;background:none;border:0}' +
       '[hidden]{display:none!important}' +
-      'section,.card{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid #e6e8ee;border-radius:14px;' +
-      'padding:16px;width:min(380px,92vw);max-height:75vh;overflow:auto;box-shadow:0 12px 32px rgba(15,23,42,.14)}' +
-      '.head{display:flex;justify-content:space-between;align-items:center;gap:8px}' +
-      'h2{display:block;font-size:15px;font-weight:700}' +
+      'section,.card{display:flex;flex-direction:column;gap:12px;background:#fff;border:1px solid #e6e8ee;border-radius:16px;' +
+      'padding:16px;width:min(360px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 16px 40px rgba(15,23,42,.18)}' +
+      (framed ? '' : 'section{position:fixed;top:16px;right:16px}.card{position:fixed;right:20px;bottom:20px}') +
+      '.head{display:flex;align-items:center;gap:10px}.head h2{flex:1}' +
+      'h2{display:block;font-size:16px;font-weight:700;letter-spacing:-.01em}' +
+      '.mark{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:7px;' +
+      'background:linear-gradient(135deg,#0a65cc,#3b9be6)}.mark svg{display:block;width:14px;height:14px}' +
+      // The edge tab: a small handle on the right edge; framed forms get an inline pill instead.
+      (framed
+        ? '.tab{display:inline-flex;align-items:center;gap:8px;padding:9px 16px 9px 10px;border-radius:999px;color:#fff;' +
+          'background:linear-gradient(90deg,#0a65cc,#3b9be6);font-weight:700;box-shadow:0 6px 18px rgba(10,101,204,.3);cursor:pointer}' +
+          '.tab span{color:#fff}.tab .mark{background:rgba(255,255,255,.18)}'
+        : '.tab{position:fixed;right:0;top:42%;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px 10px 10px;' +
+          'background:#fff;border:1px solid #e6e8ee;border-right:0;border-radius:12px 0 0 12px;box-shadow:0 6px 20px rgba(15,23,42,.18);' +
+          'cursor:pointer;transition:padding .15s}.tab:hover{padding-right:14px}.tab .mark{width:28px;height:28px;border-radius:8px}.tab .mark svg{width:16px;height:16px}' +
+          '.tab .chev{display:block;color:#6b7280;font-size:18px;font-weight:600;line-height:14px}') +
+      '.collapse{padding:4px 9px;border-color:transparent;color:#6b7280;font-size:18px;line-height:18px}.collapse:hover{background:#f6f8fb}' +
+      'p.banner{padding:10px 12px;border-radius:12px;background:#f6f8fb;color:#1a1d26;font-size:13px}' +
+      'button.pill{display:flex;width:100%;padding:12px 18px;border:0;border-radius:999px;font-size:15px;font-weight:700;color:#fff;' +
+      'background:linear-gradient(90deg,#0a65cc,#3b9be6);box-shadow:0 8px 20px rgba(10,101,204,.28)}button.pill:hover{filter:brightness(1.05)}' +
+      'button.pill:disabled{box-shadow:none}' +
       'p{display:block;color:#6b7280;font-size:12.5px}' +
       'label{display:block;font-size:12px;font-weight:600;color:#6b7280}' +
       'select{display:block;width:100%;padding:8px 10px;border:1px solid #d4d7e0;border-radius:8px;background:#fff;cursor:pointer}' +
@@ -58,7 +75,6 @@
       'button.main{background:#0a65cc;border-color:#0a65cc;color:#fff}button.main:hover{background:#0851a3}' +
       'button.ghost{background:#fff;color:#0851a3;border-color:#cfe0f5}' +
       '.close{padding:4px 10px;font-weight:500;color:#6b7280}' +
-      ':host>button.main{border-radius:999px;padding:10px 18px;box-shadow:0 6px 18px rgba(10,101,204,.35)}' +
       'strong{display:block;margin-top:4px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#0851a3}' +
       'ul{display:flex;flex-direction:column;gap:6px;list-style:none}' +
       'li{display:block;padding:8px 10px;border:1px solid #eef0f4;border-radius:8px;background:#fafbfd;overflow-wrap:anywhere}' +
@@ -67,20 +83,39 @@
       'input[type=checkbox]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#0a65cc;border:1px solid #a5a9b8}' +
       '.row{display:flex;gap:8px;flex-wrap:wrap}.ok{color:#047857}' +
       '.resumes{display:flex;flex-direction:column;gap:4px}' +
-      '.resume-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e6e8ee;border-radius:8px;' +
+      '.resume-row{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #e6e8ee;border-radius:10px;' +
       'font-size:13px;font-weight:500;color:#1a1d26;cursor:pointer;margin:0}' +
       '.resume-row.on{border-color:#0a65cc;background:#f3f8fd}' +
       '.resume-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
       'input[type=radio]{display:inline-block;width:14px;height:14px;flex:none;accent-color:#0a65cc;margin:0}' +
       'button.small{padding:3px 9px;font-size:12px;font-weight:600;color:#0851a3;border-color:#cfe0f5}'
   );
-  const open = element('button', 'Autofill'),
+  // Static markup only (a pencil): nothing from the page goes in here.
+  const mark = () => {
+    const box = element('span');
+    box.className = 'mark';
+    box.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    return box;
+  };
+  const open = element('button'),
     panel = element('section');
-  open.className = 'main';
+  open.className = 'tab';
+  open.setAttribute('aria-label', 'Open application autofill');
+  open.title = 'Autofill (US SWE Jobs)';
+  if (framed) open.append(mark(), element('span', 'Autofill'));
+  else {
+    const chev = element('span', '‹');
+    chev.className = 'chev';
+    chev.setAttribute('aria-hidden', 'true');
+    open.append(mark(), chev);
+  }
   panel.hidden = true;
   panel.setAttribute('aria-label', 'Job application autofill');
-  const close = element('button', 'Close');
-  close.className = 'close';
+  const close = element('button', framed ? 'Close' : '›');
+  close.className = framed ? 'close' : 'collapse';
+  close.setAttribute('aria-label', 'Close autofill');
   // The resume list: one row per resume, each with a Preview button that
   // opens the file in a new tab. Same interface the code used for the
   // <select> it replaces (value, disabled, add, replaceChildren).
@@ -151,14 +186,15 @@
   })();
   const label = element('label', 'Resume');
   const fill = element('button', ats === 'workday' ? 'Fill this step' : 'Fill this page');
-  fill.className = 'main';
+  fill.className = 'pill';
   const status = element('p'),
     results = element('div');
   status.setAttribute('role', 'status');
+  status.className = 'banner';
   const head = element('div');
   head.className = 'head';
-  head.append(element('h2', 'Application autofill'), close);
-  panel.append(head, status, label, picker.box, fill, results);
+  head.append(mark(), element('h2', 'US SWE Jobs'), close);
+  panel.append(head, status, fill, label, picker.box, results);
   shadow.append(style, panel, open);
   function mount() {
     if (host.isConnected || !document.body) return;

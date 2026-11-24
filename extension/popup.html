@@ -4,45 +4,76 @@
 <meta charset="utf-8">
 <style>
   :root {
-    --bg: #f4f5f8; --panel: #fff; --line: #e6e8ee; --line-strong: #d4d7e0;
-    --fg: #1a1d26; --muted: #6b7280; --accent: #0a65cc; --accent-soft: #e7f0fa; --accent-fg: #0851a3;
-    --ok: #047857; --ok-bg: #d1fae5; --bad: #b91c1c;
+    --bg: #fff; --soft: #f6f8fb; --line: #e7eaf0; --line-strong: #d6dae3;
+    --fg: #1a1d26; --muted: #6b7280; --accent: #0a65cc; --accent-2: #3b9be6; --accent-soft: #eef5fd; --accent-fg: #0851a3;
+    --ok: #0f9d58; --bad: #d93025;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); width: 360px; margin: 0; }
-  header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #0a65cc, #3b8de6); }
-  header strong { font-size: 14px; }
-  main { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-  h2 { font-size: 13px; margin: 0 0 4px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+  header img { width: 26px; height: 26px; border-radius: 7px; }
+  header strong { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+  .icon-btn { margin-left: auto; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--muted); cursor: pointer; }
+  .icon-btn:hover { background: var(--soft); color: var(--fg); }
+  main { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: #fff; }
+  h2 { font-size: 14px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); font-size: 12px; }
   label { display: block; color: var(--muted); font-size: 12px; font-weight: 500; margin: 10px 0 4px; }
-  label.check { display: flex; align-items: flex-start; gap: 8px; color: var(--fg); font-weight: 400; }
+  label.check { display: flex; align-items: flex-start; gap: 8px; color: var(--fg); font-weight: 400; margin: 8px 0 0; }
   label.check input { margin-top: 2px; accent-color: var(--accent); }
   input[type=text], input[type=password], input[type=number], textarea, select {
-    width: 100%; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 8px;
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 10px;
     background: #fff; color: var(--fg); font: inherit;
   }
   input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
   textarea { height: 64px; resize: vertical; }
-  button { padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--fg); cursor: pointer; font: inherit; font-weight: 600; }
+  button { padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fff; color: var(--fg); cursor: pointer; font: inherit; font-weight: 600; }
   button:hover { border-color: #a5a9b8; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; padding: 9px 12px; }
-  button.primary:hover { background: #0851a3; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; padding: 10px 12px; margin-top: 12px; }
+  button.link { border: 0; padding: 0; background: none; color: var(--accent); font-weight: 600; }
   .row { display: flex; gap: 8px; margin-top: 10px; }
-  .muted { color: var(--muted); font-size: 12px; }
-  #account { margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-fg); font-weight: 500; }
-  #account:empty { display: none; }
-  #fillStatus { margin: 8px 0 0; }
-  details { margin-top: 0; }
-  summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 2px 0; }
-  details[open] summary { margin-bottom: 4px; }
+
+  /* Status banner: is autofill ready on the open page? */
+  .banner { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--soft); }
+  .banner .mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #fff; background: var(--muted); }
+  .banner.ready .mark { background: var(--ok); }
+  .banner.setup .mark { background: var(--bad); }
+  .banner b { display: block; font-size: 14px; }
+  .banner span { color: var(--muted); font-size: 12.5px; }
+
+  /* The one big action. */
+  .hero { text-align: center; padding: 22px 16px 18px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 13px 26px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 700; color: #fff;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 8px 20px rgba(10,101,204,.28); }
+  .pill:hover { filter: brightness(1.05); }
+  .pill svg { width: 18px; height: 18px; }
+  #fillStatus { margin-top: 12px; color: var(--fg); font-size: 13px; }
+  #allowFrames { width: 100%; margin-top: 10px; }
+
+  /* Resume */
+  .resume { display: flex; margin-top: 10px; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
+  .resume select { border: 0; border-radius: 0; font-weight: 600; padding: 10px 12px; }
+  .resume select:focus { outline: none; }
+  .resume button { flex: none; width: 48px; border: 0; border-left: 1px solid var(--line-strong); border-radius: 0; color: var(--accent); display: grid; place-items: center; }
+  .resume button svg { width: 18px; height: 18px; }
+
+  .connected { display: flex; align-items: center; gap: 6px; justify-content: center; color: var(--muted); font-size: 12px; }
+  .connected #account { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  footer { border-top: 1px solid var(--line); }
+  footer a { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; color: var(--fg); font-weight: 600; font-size: 14px; text-decoration: none; }
+  footer a:hover { background: var(--soft); }
+  footer svg { width: 17px; height: 17px; }
+
+  /* Settings view */
+  .back { display: flex; align-items: center; gap: 6px; }
   #sites .row { align-items: center; justify-content: space-between; margin-top: 6px; }
+  details summary { cursor: pointer; font-weight: 600; }
   .log { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 160px; overflow: auto; font-size: 12px; }
   .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
-  .queue { margin: 0 0 6px; padding-left: 18px; font-size: 12.5px; }
-  .queue li { margin: 3px 0; }
-  .queue a { color: var(--accent); }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
   .update { border-color: #9ec2ec; background: #f3f8fd; }
   .cmd { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
@@ -50,67 +81,84 @@
 </style>
 </head>
 <body>
-  <header><span class="dot"></span><strong>US SWE Jobs</strong><span class="muted" style="margin-left:auto">Autofill</span></header>
-  <main>
+  <header>
+    <img src="icons/icon48.png" alt="">
+    <strong>US SWE Jobs</strong>
+    <button class="icon-btn" id="openSettings" title="Settings" aria-label="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <!-- Home: only what's needed to fill an application. -->
+  <main id="home">
     <section class="card update" id="updateCard" hidden aria-labelledby="update-title">
       <h2 id="update-title">Version <span id="updateVersion"></span> is available</h2>
       <p class="muted" id="updateHow"></p>
       <div class="cmd"><code id="updateCmd"></code><button id="updateCopy">Copy</button></div>
-      <p class="muted">The extension updates and reloads itself within a minute; your settings and connection stay.</p>
-    </section>
-    <section class="card" aria-labelledby="autofill-title">
-      <h2 id="autofill-title">Fill an application</h2>
-      <button id="fillPage" class="primary">Autofill this page</button>
-      <button id="allowFrames" hidden style="width:100%;margin-top:8px"></button>
-      <p id="fillStatus" class="muted">Greenhouse, Lever, Ashby and Workday forms show an Autofill button by themselves. On any other site, open the application and press this once.</p>
+      <p class="muted">The extension updates and reloads itself within a minute.</p>
     </section>
 
-    <section class="card" aria-labelledby="account-title">
-      <h2 id="account-title">Your account</h2>
-      <p id="account" role="status"></p>
-      <label for="portalUrl">Job board address</label>
-      <input type="text" id="portalUrl" placeholder="https://job-two-xi.vercel.app">
-      <label for="autofillToken">Autofill token (from the site's Autofill page)</label>
+    <section class="card" id="connectCard" hidden aria-labelledby="connect-title">
+      <h2 id="connect-title">Connect your account</h2>
+      <p class="muted" style="margin-top:4px">Paste the token from the job board's Autofill page.</p>
+      <label for="autofillToken">Autofill token</label>
       <input type="password" autocomplete="off" id="autofillToken" placeholder="jbt_…">
-      <div class="row"><button id="connect">Connect</button><button id="disconnect">Disconnect</button></div>
-      <label for="defaultResume">Default resume when jobs match equally</label>
-      <select id="defaultResume" disabled></select>
-      <label class="check" title="When you browse a careers page (Tesla, company sites), the job listings it loads are added to the job board for everyone. Only public listings: never application forms, sign-in pages or LinkedIn/Indeed/Glassdoor.">
+      <details style="margin-top:8px">
+        <summary class="muted">Job board address</summary>
+        <input type="text" id="portalUrl" placeholder="https://job-two-xi.vercel.app" style="margin-top:6px">
+      </details>
+      <button id="connect" class="primary">Connect</button>
+      <p id="connectError" class="bad" role="alert" style="margin-top:8px"></p>
+    </section>
+
+    <div id="ready" hidden>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="banner" id="siteBanner" role="status"><span class="mark" id="siteMark">·</span><div><b id="siteTitle">Checking this page…</b><span id="siteSub"></span></div></div>
+
+        <section class="card hero" aria-label="Autofill">
+          <button id="fillPage" class="pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            Autofill this page
+          </button>
+          <button id="allowFrames" hidden></button>
+          <p id="fillStatus">Nothing is ever submitted for you.</p>
+        </section>
+
+        <section class="card" aria-labelledby="resume-title">
+          <h2 id="resume-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            Resume
+          </h2>
+          <div class="resume">
+            <select id="defaultResume" aria-label="Resume used when jobs match equally" disabled></select>
+            <button id="previewResume" title="Preview" aria-label="Preview resume" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="muted" style="margin-top:8px">The best match for each job is picked first; this one breaks ties.</p>
+        </section>
+
+        <p class="connected"><span id="account"></span>·<button class="link" id="disconnect">Disconnect</button></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Settings (gear): sharing, allowed sites, and the owner's collection tools. -->
+  <main id="settings" hidden>
+    <button class="link back" id="closeSettings">‹ Back</button>
+    <section class="card" aria-labelledby="sharing-title">
+      <h2 id="sharing-title">Settings</h2>
+      <label class="check" title="When you browse a careers page, the public job listings it loads are added to the job board. Never application forms, sign-in pages or LinkedIn/Indeed/Glassdoor.">
         <input type="checkbox" id="shareListings"> Share job listings I browse with the job board
       </label>
-      <details id="sitesBox" hidden>
-        <summary>Sites you allowed</summary>
+      <div id="sitesBox" hidden>
+        <label>Sites you allowed autofill on</label>
         <div id="sites"></div>
-      </details>
-    </section>
-
-    <section class="card" aria-labelledby="sitepw-title">
-      <h2 id="sitepw-title">Job site password</h2>
-      <p class="muted">One password for every company's Workday site. The extension signs you in with it and fills it when you create an account (you still tick “I agree” and click Create Account). It stays in this browser only.</p>
-      <p id="sitePasswordState" role="status" class="muted"></p>
-      <label for="sitePassword">Password</label>
-      <input type="password" id="sitePassword" autocomplete="new-password" minlength="12">
-      <label for="sitePassword2">Same password again</label>
-      <input type="password" id="sitePassword2" autocomplete="new-password">
-      <div class="row"><button id="saveSitePassword">Save</button><button id="generateSitePassword">Generate one</button><button id="clearSitePassword">Remove</button></div>
-      <p class="muted">12+ characters with upper and lower case, a number and a symbol. Don't reuse a password from another site.</p>
-    </section>
-
-    <section class="card" id="queueCard" hidden aria-labelledby="queue-title">
-      <h2 id="queue-title">Your apply queue</h2>
-      <ul id="queueList" class="queue"></ul>
-      <p class="muted">Open a job, fill it with Autofill, and submit it yourself. Mark it applied on the site's Queue page.</p>
-    </section>
-
-    <section class="card" id="gmailCard" hidden aria-labelledby="gmail-title">
-      <h2 id="gmail-title">Codes from Gmail</h2>
-      <p class="muted">When Greenhouse or Workday emails you a code or a verify link mid-application, the extension fills it in (it never presses submit). Gmail is connected on the job board, in Alerts & Connectors (read-only; only mail from those sites, from the last 15 minutes).</p>
-      <p id="gmailState" role="status" class="muted"></p>
-      <div class="row"><button id="gmailManage">Open Connectors</button></div>
+      </div>
     </section>
 
     <details class="card">
-      <summary>Advanced: job collection (site owner)</summary>
+      <summary>Job collection (site owner)</summary>
       <label class="check"><input type="checkbox" id="enabled"> Capture listings on careers pages</label>
       <label for="boards">My boards (one careers URL per line)</label>
       <textarea id="boards" placeholder="https://www.tesla.com/careers/search/?country=US"></textarea>
@@ -129,6 +177,14 @@
       <div class="log" id="log"><span class="muted">No captures yet.</span></div>
     </details>
   </main>
+
+  <footer>
+    <a id="moreJobs" href="#" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Find more jobs on US SWE Jobs
+    </a>
+  </footer>
+  <script src="application-pages.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

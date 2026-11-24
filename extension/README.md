@@ -40,7 +40,8 @@ source.
 Autofill works by itself on Workday, Greenhouse, Lever and Ashby application
 forms, including ones embedded in an employer's own site (Stripe, for one,
 shows Greenhouse inside its careers page; the button then sits just above the
-form). On any other site (Tesla, Amazon, company-built career sites), open
+form). On those pages a small tab with an arrow sits on the right edge; click
+it to open the Autofill panel, and › to tuck it back. On any other site (Tesla, Amazon, company-built career sites), open
 the application form and click **Autofill this page** in the popup; see
 "Other sites" below.
 
@@ -48,15 +49,17 @@ the application form and click **Autofill this page** in the popup; see
 
 1. Sign in to the portal, open **Settings** and create an extension token.
    Copy it.
-2. In the extension popup, set **Portal URL** to the same portal and click
-   **Save**. The token is bound to that exact origin; changing the portal URL
-   later disconnects it.
-3. Under **Autofill**, paste the token into **Personal autofill token** and
-   click **Connect**. The popup should say "Connected as" and your email. If
-   it says "Token rejected", the token was revoked or mistyped: create a new
-   one in Settings and connect again.
-4. Optionally pick a **Default resume**. A collect token is not needed for
-   autofill; it is only for listing capture.
+2. Open the extension popup, paste the token into **Autofill token** (the job
+   board address is under **Job board address** if yours isn't the default)
+   and click **Connect**. The token is bound to that exact origin. The popup
+   then shows your email at the bottom. If it says "Token rejected", the token
+   was revoked or mistyped: create a new one and connect again.
+3. Optionally pick the **Resume** that breaks ties (the eye previews it).
+
+The popup keeps only what filling needs: whether autofill is ready on the open
+page, **Autofill this page**, and the resume. Sharing listings, the sites you
+allowed and the owner's collection tools are behind the gear icon; Gmail
+codes, the apply queue and the Workday login are managed on the job board.
 
 The portal must be HTTPS (plain HTTP only on `localhost` / `127.0.0.1` for
 development) and on a host listed in `host_permissions` (`*.vercel.app` and
@@ -110,7 +113,7 @@ The same safety rules apply. Company-built forms vary a lot, so expect more
 under **Needs you** than on the four ATSs, especially custom dropdowns and
 multi-step flows (fill each step after it appears).
 
-**Sites you allowed** in the popup lists them; **Remove** takes the permission
+**Sites you allowed autofill on** (popup, gear icon) lists them; **Remove** takes the permission
 back (so does removing it in Chrome's extension settings).
 
 ### Education and jobs
@@ -124,13 +127,17 @@ and year boxes, MM/YYYY fields and month inputs are filled in their own format;
 day pickers only if your profile date has a day. Nothing in the profile means
 the field is left for you.
 
-### Workday sign-in (job site password)
+### Workday sign-in (Workday accounts)
 
-Set one **Job site password** in the popup (kept only in this browser's
-extension storage). On a Workday sign-in page the extension chooses "Sign in
-with email", fills your profile email and the password, and presses Sign In
+Set one **Workday email and password** on the job board (Autofill page →
+Workday accounts; stored encrypted on the server, never shown back). The
+worker reads them with the autofill token (`GET /api/autofill/workday-login`)
+only for the top frame of a Workday page; nothing is kept in the browser
+(1.21.0 deletes the password older versions kept in the popup). On a Workday
+sign-in page the extension chooses "Sign in with email", fills that email (or
+your profile email if none is set) and the password, and presses Sign In
 once you've interacted with the page. If that fails it offers Create account
-or Forgot password and stops trying until you change the password. On
+or Forgot password and stops trying until you change the password on the job board. On
 **Create Account** it fills email and both password boxes, ticks "I agree" and
 presses Create Account; Workday's "verify your email" link is then opened from
 Gmail (Alerts & Connectors). With a CAPTCHA on the form it fills the boxes and
@@ -169,7 +176,7 @@ HANDOFF.md).
 - **Only on your click**, and only into empty, visible, enabled fields. A
   value already on the form, typed by you or by the ATS, is never replaced.
   Password fields, and any form containing one, are never filled by the form
-  filler; only the Workday sign-in module fills your job site password there.
+  filler; only the Workday sign-in module fills your Workday password there.
   Bot-trap (honeypot) fields are never filled.
 - **No guessing on immigration questions.** Sponsorship is filled only from
   your explicit "need sponsorship now" / "in the future" answers, matched to

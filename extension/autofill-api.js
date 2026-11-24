@@ -24,15 +24,6 @@
 
   // Per-company sign-in attempts (session storage: content scripts can't read it).
   const LEDGER = 'workdayLogins';
-  // Workday's usual rules, plus length: one password opens many accounts.
-  function sitePasswordProblem(p) {
-    if (p.length < 12) return 'Use at least 12 characters.';
-    if (p.length > 128) return 'Use at most 128 characters.';
-    if (!/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/\d/.test(p) || !/[^A-Za-z0-9]/.test(p))
-      return 'Use upper and lower case letters, a number and a symbol.';
-    return '';
-  }
-
   // Extension-origin IndexedDB is separate from the content script's origin:
   // no page or content script can read what's kept here.
   function credentials(update, key = 'account') {
@@ -93,26 +84,10 @@
       });
       return {};
     }
-    // ─── The job site password (one, chosen by the user) ─────────────────
-    // Kept only here, in this worker's IndexedDB. Set from the popup; given
-    // only to the top frame of a Workday page, never to other sites.
-    if (msg.type === 'autofill:sitePasswordStatus') {
-      if (!isPopup) throw new Error('Use the extension popup.');
-      const saved = await credentials(undefined, 'sitePassword');
-      return { set: !!saved?.password, updatedAt: saved?.updatedAt || null };
-    }
-    if (msg.type === 'autofill:setSitePassword') {
-      if (!isPopup) throw new Error('Use the extension popup.');
-      const password = String(msg.password ?? '');
-      if (password) {
-        const problem = sitePasswordProblem(password);
-        if (problem) throw new Error(problem);
-      }
-      await credentials(password ? { password, updatedAt: new Date().toISOString() } : { password: '' }, 'sitePassword');
-      // A new password may work where the old one failed.
-      await chrome.storage.session.remove(LEDGER);
-      return {};
-    }
+    let workdayAsk = null;
+    // ─── Workday sign-in (one email and password, set on the job board) ──
+    // Saved on the site (Autofill page → Workday accounts), read from the
+    // account here, and given only to the top frame of a Workday page.
     if (msg.type === 'autofill:sitePassword' || msg.type === 'autofill:loginResult') {
       const tenant = JobApplicationPages.workdayTenant(sender.url);
       if (
@@ -122,7 +97,7 @@
         sender.frameId !== 0 ||
         (sender.documentLifecycle && sender.documentLifecycle !== 'active')
       )
-        throw new Error('The job site password is only for Workday sign-in pages.');
+        throw new Error('The Workday password is only for Workday sign-in pages.');
       const ledger = (await chrome.storage.session.get(LEDGER))[LEDGER] || {};
       const entry = ledger[tenant] || { grants: [], failed: false };
       const now = Date.now();
@@ -132,16 +107,8 @@
         await chrome.storage.session.set({ [LEDGER]: ledger });
         return {};
       }
-      const saved = await credentials(undefined, 'sitePassword');
-      if (!saved?.password) return { password: null };
-      // At most 3 fills per company per 10 minutes; after a failed sign-in,
-      // no automatic attempt until the password changes.
-      entry.grants = entry.grants.filter((t) => now - t < 10 * 60_000);
-      if (entry.grants.length >= 3) throw new Error('Too many sign-in attempts here. Sign in yourself.');
-      entry.grants.push(now);
-      ledger[tenant] = entry;
-      await chrome.storage.session.set({ [LEDGER]: ledger });
-      return { password: saved.password, autoSignIn: !entry.failed };
+      // Read from the account once `request` exists, below.
+      workdayAsk = { tenant, ledger, entry, now };
     }
     // ─── Gmail: codes and verify links (gmail.js) ───────────────────────
     // Gmail is connected on the portal (Alerts & Connectors); here only the
@@ -232,6 +199,23 @@
         throw new Error('Portal request failed (HTTP ' + res.status + ').');
       }
       return res;
+    }
+    if (workdayAsk) {
+      const { tenant, ledger, entry, now } = workdayAsk;
+      const res = await request('workday-login', undefined, true);
+      const saved = res ? await res.json() : null;
+      if (typeof saved?.password !== 'string' || !saved.password) return { password: null };
+      // A password changed on the site may work where the old one failed.
+      if (entry.changedAt !== saved.updatedAt) Object.assign(entry, { failed: false, changedAt: saved.updatedAt });
+      // At most 3 fills per company per 10 minutes; after a failed sign-in,
+      // no automatic attempt until the password changes.
+      entry.grants = entry.grants.filter((t) => now - t < 10 * 60_000);
+      if (entry.grants.length >= 3) throw new Error('Too many sign-in attempts here. Sign in yourself.');
+      entry.grants.push(now);
+      ledger[tenant] = entry;
+      await chrome.storage.session.set({ [LEDGER]: ledger });
+      const email = typeof saved.email === 'string' && saved.email.includes('@') ? saved.email.slice(0, 254) : null;
+      return { email, password: saved.password, autoSignIn: !entry.failed };
     }
     if (gmailAsk?.kind === 'status') return AutofillGmail.status(request);
     if (gmailAsk?.kind === 'link') return { opened: await AutofillGmail.openVerifyLink(request, gmailAsk.tenant) };
@@ -387,6 +371,10 @@
     }
     return total;
   };
+
+  // Before 1.21 the Workday password was kept here; it now lives on the job
+  // board. Forget the old copy.
+  chrome.runtime.onInstalled?.addListener(() => credentials({}, 'sitePassword').catch(() => {}));
 
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (typeof msg?.type !== 'string' || !msg.type.startsWith('autofill:')) return;

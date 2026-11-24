@@ -5,6 +5,12 @@ this codebase. It exists so you don't have to re-derive context.
 
 ---
 
+### Done 2026-11-24 (Workday login on the server) — needs migration 010 before deploy
+- One Workday email + password per user, set on the Autofill page ("Workday accounts" card, `web/src/components/WorkdayLogin.jsx`: generate, save, remove; the password is never shown again). Stored as encrypted `{email, password}` JSON (`Field::WorkdayLogin`, bound to the user id) in `workday_logins` (`migrations/010_workday_login.sql`). Routes in `crates/api/src/workday_login.rs`:
+  - `GET /api/me/workday-login` → `{ email, set, updatedAt }` (no password); `PUT` `{ email, password? }` (password 12–128 chars with upper, lower, digit and symbol; left out = keep the saved one, required when none is saved); `DELETE` → `{ ok: true }`. Session + CSRF like every `/api/me/*` route.
+  - `GET /api/autofill/workday-login` (bearer) → `{ email, password, updatedAt }`, all null when none is saved.
+- While the table is missing these answer 503. Export lists the email and date only. Privacy page updated (the password is no longer extension-only). Tests: `workday_login_is_set_on_the_web_and_read_only_by_the_extension`, plus the routes in `every_per_user_route_refuses_another_users_data`.
+
 ### Done 2026-11-24 (extension needs no collect token)
 - Workday collection and the boards' captures go through the connected account (`/api/capture/jobs`); the server forwards with COLLECT_TOKEN, which no browser holds any more. The popup's Collect token box is gone (an older install's saved token still works).
 - Rows from a Workday page must link to Workday, are stored as source `workday`, and count against `WORKDAY_SHARES_PER_USER_PER_DAY` (default 20,000), apart from the 3,000 general share cap. `OWNER_SUBS` accounts aren't counted.

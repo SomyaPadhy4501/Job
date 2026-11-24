@@ -40,7 +40,11 @@ async function live() {
       res.writeHead(401).end();
       return;
     }
-    if (req.url === '/api/autofill/profile')
+    if (req.url === '/api/autofill/workday-login')
+      res
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ email: 'pat@example.invalid', password: 'Str0ng!Password-x', updatedAt: '2026-01-01T00:00:00Z' }));
+    else if (req.url === '/api/autofill/profile')
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(profile));
     else if (req.url === '/api/autofill/resumes/sample/file')
       res
@@ -75,10 +79,11 @@ async function live() {
     const worker = context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker'));
     const popup = await context.newPage();
     await popup.goto(new URL('/popup.html', worker.url()).href);
+    await popup.locator('#connectCard summary').click();
     await popup.locator('#portalUrl').fill('http://127.0.0.1:' + server.address().port);
     await popup.locator('#autofillToken').fill('test-only');
     await popup.locator('#connect').click();
-    await popup.getByText('Connected as pat@example.invalid').waitFor();
+    await popup.locator('#account', { hasText: 'pat@example.invalid' }).waitFor();
     for (const [site, url, ready] of [
       ['Greenhouse', 'https://job-boards.greenhouse.io/cloudflare/jobs/8097321', '#first_name'],
       [
@@ -173,17 +178,17 @@ async function live() {
           );
           await page.mouse.click(...point);
         };
-        await click('button.main:last-child');
+        await click('button.tab');
         for (
           let i = 0;
           i < 50 &&
           (await inPanel(function () {
-            return this.querySelector('section button.main').disabled;
+            return this.querySelector('section button.pill').disabled;
           }));
           i++
         )
           await page.waitForTimeout(100);
-        await click('section button.main');
+        await click('section button.pill');
         for (
           let i = 0;
           i < 120 &&
@@ -250,7 +255,7 @@ async function live() {
             }),
             /New application step/
           );
-          await click('section button.main');
+          await click('section button.pill');
           await page.waitForFunction(() => document.querySelector('#last').value === 'Example');
         }
         if (site === 'Ashby') {
@@ -356,15 +361,10 @@ async function live() {
         await page.close();
       }
     }
-    // Workday sign-in with the job site password (fixture with Workday's
+    // Workday sign-in with the password saved on the job board (fixture with Workday's
     // markup: "Sign in with email", a click_filter overlay over Sign In, and
     // the create-account form). Nothing leaves the machine.
     {
-      await popup.reload();
-      await popup.locator('#sitePassword').fill('Str0ng!Password-x');
-      await popup.locator('#sitePassword2').fill('Str0ng!Password-x');
-      await popup.locator('#saveSitePassword').click();
-      await popup.getByText('Saved. Workday sign-in pages will use it.').waitFor();
       const page = await context.newPage();
       try {
         await page.route('https://login.myworkdayjobs.com/**', (r) =>
@@ -471,6 +471,7 @@ async function live() {
         await page.close();
       }
     }
+    await popup.locator('#disconnect').click();
     await popup.locator('#autofillToken').fill('invalid-test-token');
     await popup.locator('#connect').click();
     await popup.getByText('Token rejected.', { exact: false }).waitFor();

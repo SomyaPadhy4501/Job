@@ -37,6 +37,7 @@ pub mod queue;
 pub mod resumes;
 pub mod roles;
 pub mod telegram;
+pub mod workday_login;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -372,6 +373,12 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/me/queue/{id}/events", get(queue::events))
         .route("/api/me/agent-tokens", post(queue::create_agent_token))
+        .route(
+            "/api/me/workday-login",
+            get(workday_login::show)
+                .put(workday_login::save)
+                .delete(workday_login::remove),
+        )
         .route("/api/me/connectors", get(connectors::list))
         .route(
             "/api/me/connectors/gmail/start",
@@ -403,6 +410,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/autofill/form-schema", get(form_schema::form_schema))
         .route("/api/capture/jobs", post(capture::share))
         .route("/api/autofill/queue", get(queue::for_extension))
+        .route(
+            "/api/autofill/workday-login",
+            get(workday_login::for_extension),
+        )
         .route("/api/autofill/gmail", get(connectors::ext_status))
         .route("/api/autofill/gmail/code", post(connectors::ext_code))
         .route(

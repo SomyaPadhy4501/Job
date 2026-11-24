@@ -130,6 +130,7 @@ pub async fn export(State(state): State<AppState>, signed: Signed) -> ApiResult<
         "applyQueue": crate::queue::items_json(&state, user_id, &queue)?,
         "telegramLinked": db::chat::chat_link(pool, user_id, "telegram").await?.is_some(),
         "gmailConnection": crate::connectors::export_json(&state, user_id).await?,
+        "workdayLogin": crate::workday_login::export_json(&state, user_id).await?,
     });
     db::audit(pool, Some(user_id), "export").await?;
     let headers = [(

@@ -41,7 +41,7 @@ async function showReach() {
   const { token, shareListings } = await chrome.storage.local.get({ token: '', shareListings: false });
   if (token) return;
   const connected = await autofill('getProfile').then(() => true, () => false);
-  const missing = [!connected && 'connect your account above', !shareListings && 'turn on “Share job listings I browse”'].filter(Boolean);
+  const missing = [!connected && 'connect your account', !shareListings && 'turn on “Share job listings I browse”'].filter(Boolean);
   $('lastRun').style.color = missing.length ? '#cf222e' : '';
   if (missing.length) $('lastRun').textContent = 'Captured jobs can’t reach the board yet: ' + missing.join(' and ') + '.';
 }
@@ -53,7 +53,6 @@ $('save').addEventListener('click', async () => {
   const boards = $('boards').value.split('\n').map((x) => x.trim())
     .filter((x) => /^https?:\/\//.test(x) && !/(linkedin|indeed|glassdoor)\.com/i.test(x));
   await chrome.storage.local.set({
-    portalUrl: $('portalUrl').value.trim().replace(/\/+$/, ''),
     boards,
     autoOpen: $('autoOpen').checked,
     autoEveryHours: Math.min(24, Math.max(1, Number($('autoEveryHours').value) || 3)),
@@ -61,7 +60,6 @@ $('save').addEventListener('click', async () => {
     allowSensitive: $('allowSensitive').checked,
   });
   $('save').textContent = 'Saved';
-  showConnection();
   setTimeout(() => ($('save').textContent = 'Save'), 1200);
 });
 
@@ -101,7 +99,7 @@ $('workdayNow').addEventListener('click', async () => {
   // "starting…" when it isn't connected.
   const { token } = await chrome.storage.local.get({ token: '' });
   if (!token && !(await autofill('getProfile').then(() => true, () => false))) {
-    $('workdayStatus').textContent = 'Connect your account above first (paste the token from the job board’s Extension page, then Connect).';
+    $('workdayStatus').textContent = 'Connect your account first (Back, then paste the token from the job board’s Autofill page).';
     return;
   }
   if (!(await chrome.permissions.request({ origins: WORKDAY_ORIGINS }))) {
@@ -119,24 +117,42 @@ async function autofill(type, params) {
   if (!response?.ok) throw new Error(response?.error || 'Could not reach the service worker.');
   return response.data;
 }
+let resumes = [];
 async function showConnection() {
   const picker = $('defaultResume');
-  picker.replaceChildren(new Option('Account default',''));
-  picker.disabled = true;
+  picker.replaceChildren();
+  picker.disabled = $('previewResume').disabled = true;
+  let data;
   try {
-    const data = await autofill('getProfile');
-    const {autofillDefault} = await chrome.storage.local.get('autofillDefault');
-    for (const resume of data.resumes) picker.add(new Option(resume.title || resume.fileName,resume.id));
-    picker.value = data.resumes.some(r => r.id === autofillDefault) ? autofillDefault : '';
-    picker.disabled = false;
-    $('account').textContent = 'Connected as ' + data.user.email;
-  } catch (err) { $('account').textContent = err.message; }
+    data = await autofill('getProfile');
+  } catch (err) {
+    // Not connected (or the token was rejected): only the connect card shows.
+    $('ready').hidden = true;
+    $('connectCard').hidden = false;
+    const { portalUrl } = await chrome.storage.local.get({ portalUrl: defaults.portalUrl });
+    $('portalUrl').value = portalUrl;
+    if (!/^Connect the autofill token/.test(err.message)) $('connectError').textContent = err.message;
+    showReach();
+    return;
+  }
+  $('connectCard').hidden = true;
+  $('ready').hidden = false;
+  $('account').textContent = data.user.email;
+  resumes = data.resumes;
+  const { autofillDefault } = await chrome.storage.local.get('autofillDefault');
+  if (!resumes.length) picker.add(new Option('No resumes yet: add one on the job board', ''));
+  for (const resume of resumes)
+    picker.add(new Option((resume.title || resume.fileName) + (resume.isDefault ? ' (default)' : ''), resume.id));
+  const chosen = resumes.find((r) => r.id === autofillDefault) || resumes.find((r) => r.isDefault) || resumes[0];
+  picker.value = chosen?.id || '';
+  picker.disabled = $('previewResume').disabled = !resumes.length;
   showReach();
 }
 async function configure(token) {
+  $('connectError').textContent = '';
   try {
     // Connecting saves the job board address too: one button, no separate Save.
-    const portal = $('portalUrl').value.trim().replace(/\/+$/, '');
+    const portal = ($('portalUrl').value.trim() || defaults.portalUrl).replace(/\/+$/, '');
     if (token) {
       if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(portal)) throw new Error('Enter the job board address (https://…).');
       await chrome.storage.local.set({ portalUrl: portal });
@@ -145,15 +161,24 @@ async function configure(token) {
     await chrome.storage.local.remove('autofillDefault');
     $('autofillToken').value = '';
     await showConnection();
-    showGmail();
-  } catch (err) { $('account').textContent = err.message; }
+    showMoreJobs();
+  } catch (err) { $('connectError').textContent = err.message; }
 }
 $('connect').onclick = () => {
   const token = $('autofillToken').value.trim();
   if (token) configure(token);
 };
 $('disconnect').onclick = () => configure('');
-$('defaultResume').onchange = () => chrome.storage.local.set({autofillDefault:$('defaultResume').value});
+// The account's default resume is stored as '' so changing it on the site still applies.
+$('defaultResume').onchange = () => {
+  const r = resumes.find((x) => x.id === $('defaultResume').value);
+  chrome.storage.local.set({ autofillDefault: r && !r.isDefault ? r.id : '' });
+};
+$('previewResume').onclick = () => {
+  const id = $('defaultResume').value;
+  if (id) chrome.runtime.sendMessage({ type: 'autofill:previewResume', id }).catch(() => {});
+};
+$('autofillToken').addEventListener('keydown', (e) => e.key === 'Enter' && $('connect').click());
 showConnection();
 
 // ─── Autofill on any site ──────────────────────────────────────────────────
@@ -290,102 +315,6 @@ $('shareListings').onchange = async () => {
   showReach();
 };
 
-// "Job site password": kept in the service worker's storage only.
-async function showSitePassword(message) {
-  try {
-    const { set, updatedAt } = await autofill('sitePasswordStatus');
-    $('sitePasswordState').textContent =
-      message || (set ? 'Saved' + (updatedAt ? ' on ' + new Date(updatedAt).toLocaleDateString() : '') + '.' : 'Not set: Workday sign-in is left to you.');
-  } catch (err) {
-    $('sitePasswordState').textContent = err.message;
-  }
-}
-$('saveSitePassword').onclick = async () => {
-  const a = $('sitePassword').value,
-    b = $('sitePassword2').value;
-  if (!a) return showSitePassword('Type a password first.');
-  if (a !== b) return showSitePassword("The two passwords don't match.");
-  try {
-    await autofill('setSitePassword', { password: a });
-    $('sitePassword').value = $('sitePassword2').value = '';
-    $('sitePassword').type = $('sitePassword2').type = 'password';
-    showSitePassword('Saved. Workday sign-in pages will use it.');
-  } catch (err) {
-    showSitePassword(err.message);
-  }
-};
-$('generateSitePassword').onclick = () => {
-  // 20 characters from each class, shuffled; shown so it can be saved elsewhere too.
-  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%^&*-_=+?'];
-  const all = sets.join('');
-  const pick = (chars) => chars[crypto.getRandomValues(new Uint32Array(1))[0] % chars.length];
-  const chars = [...sets.map(pick), ...Array.from({ length: 16 }, () => pick(all))];
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  $('sitePassword').value = $('sitePassword2').value = chars.join('');
-  $('sitePassword').type = 'text';
-  showSitePassword('Generated. Copy it somewhere safe (a password manager), then click Save.');
-};
-$('clearSitePassword').onclick = async () => {
-  await autofill('setSitePassword', { password: '' }).catch(() => {});
-  showSitePassword('Removed.');
-};
-showSitePassword();
-
-// "Codes from Gmail": shown when the connected portal offers the Gmail
-// connector. Connecting and disconnecting happen on the portal.
-async function showGmail() {
-  try {
-    const { available, connected, email } = await autofill('gmailStatus');
-    $('gmailCard').hidden = !available;
-    $('gmailState').textContent = connected ? 'Connected: ' + email : 'Not connected. Connect Gmail on the job board.';
-    $('gmailManage').textContent = connected ? 'Manage in Connectors' : 'Connect in Connectors';
-  } catch {
-    // No account connected here yet, or an older portal: nothing to show.
-    $('gmailCard').hidden = true;
-  }
-}
-$('gmailManage').onclick = async () => {
-  const { portalUrl } = await chrome.storage.local.get({ portalUrl: defaults.portalUrl });
-  const base = new URL(portalUrl);
-  if (base.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(base.hostname)) return;
-  chrome.tabs.create({ url: base.origin + '/alerts#connectors' });
-};
-showGmail();
-
-// "Your apply queue": the next few jobs to apply to, read only. Hidden when
-// the account isn't connected, the queue is empty, or the portal is older.
-async function showQueue() {
-  try {
-    const { items } = await autofill('applyQueue');
-    const list = $('queueList');
-    list.replaceChildren();
-    for (const item of (items || []).slice(0, 5)) {
-      const li = document.createElement('li');
-      const text = item.company + ' — ' + item.title;
-      if (item.applyUrl) {
-        const a = document.createElement('a');
-        a.href = item.applyUrl;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.textContent = text;
-        li.append(a);
-      } else {
-        li.textContent = text;
-      }
-      if (item.status === 'prepared') li.append(' (ready for you)');
-      if (item.status === 'needs_you') li.append(' (needs you)');
-      list.append(li);
-    }
-    $('queueCard').hidden = !list.children.length;
-  } catch {
-    $('queueCard').hidden = true;
-  }
-}
-showQueue();
-
 // "Version X is available": the one-line command for this computer.
 async function showUpdate() {
   const r = await chrome.runtime.sendMessage({ type: 'checkUpdate' }).catch(() => null);
@@ -409,3 +338,46 @@ $('updateCopy').onclick = async () => {
   setTimeout(() => ($('updateCopy').textContent = 'Copy'), 1500);
 };
 showUpdate();
+
+// ─── Views: home (autofill) and settings (gear) ────────────────────────────
+function view(settings) {
+  $('home').hidden = settings;
+  $('settings').hidden = !settings;
+  $('openSettings').setAttribute('aria-pressed', String(settings));
+}
+$('openSettings').onclick = () => view($('settings').hidden);
+$('closeSettings').onclick = () => view(false);
+
+// ─── Is autofill ready on the open page? ───────────────────────────────────
+async function showSite() {
+  const banner = (kind, mark, title, sub) => {
+    $('siteBanner').className = 'banner ' + kind;
+    $('siteMark').textContent = mark;
+    $('siteTitle').textContent = title;
+    $('siteSub').textContent = sub;
+  };
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  let url;
+  try {
+    url = new URL(tab?.url || '');
+  } catch {}
+  if (url?.protocol !== 'https:') {
+    $('fillPage').disabled = true;
+    return banner('', 'i', 'Open a job application', 'Autofill works on application forms.');
+  }
+  const ready = JobApplicationPages.ats(url.hostname) || (await chrome.permissions.contains({ origins: [url.origin + '/*'] }));
+  if (ready) banner('ready', '✓', 'Autofill is ready on this site', 'Use the tab on the right edge of the page, or the button below.');
+  else banner('setup', '!', 'Autofill isn’t set up on this site', 'Press Autofill once to allow it here.');
+}
+showSite();
+$('fillPage').addEventListener('click', () => setTimeout(showSite, 300));
+
+// "Find more jobs": the connected job board.
+async function showMoreJobs() {
+  const { portalUrl } = await chrome.storage.local.get({ portalUrl: defaults.portalUrl });
+  try {
+    const u = new URL(portalUrl);
+    if (u.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(u.hostname)) $('moreJobs').href = u.origin + '/';
+  } catch {}
+}
+showMoreJobs();

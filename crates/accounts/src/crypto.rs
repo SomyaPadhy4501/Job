@@ -56,6 +56,8 @@ pub enum Field {
     /// A Gmail connect in progress (PKCE verifier, state, nonce), kept in a
     /// browser cookie rather than a table.
     GmailFlow,
+    /// The Workday email and password the extension signs in with.
+    WorkdayLogin,
 }
 
 impl Field {
@@ -71,6 +73,7 @@ impl Field {
             Field::GmailGrant => "gmail_connections.grant_data",
             Field::GmailAccess => "gmail_connections.access_data",
             Field::GmailFlow => "cookie.gmail_flow",
+            Field::WorkdayLogin => "workday_logins.login_data",
         }
     }
 }

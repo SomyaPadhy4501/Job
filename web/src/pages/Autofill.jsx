@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatBytes, usePrivateQuery } from '../account.js';
 import RequireAuth from '../components/RequireAuth.jsx';
+import WorkdayLogin from '../components/WorkdayLogin.jsx';
 import { Link } from '../router.jsx';
 import { Tokens } from './Settings.jsx';
 
@@ -155,6 +156,8 @@ function AutofillPage() {
       </ol>
 
       <Tokens />
+
+      <WorkdayLogin />
 
       <section className="card section">
         <h3>How to use it</h3>

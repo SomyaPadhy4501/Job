@@ -19,6 +19,7 @@ pub mod alerts;
 pub mod chat;
 pub mod connectors;
 pub mod queue;
+pub mod workday;
 
 pub type Tx<'a> = Transaction<'a, Postgres>;
 
