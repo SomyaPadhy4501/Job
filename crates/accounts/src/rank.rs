@@ -6,7 +6,7 @@
 use uuid::Uuid;
 
 /// Role families. A term matches whole words, so "ml" doesn't match "html".
-const FAMILIES: &[(&str, &[&str])] = &[
+pub(crate) const FAMILIES: &[(&str, &[&str])] = &[
     (
         "ai",
         &[
@@ -173,7 +173,7 @@ fn padded(s: &str) -> String {
     format!(" {} ", words.join(" "))
 }
 
-fn families(text: &str) -> Vec<&'static str> {
+pub(crate) fn families(text: &str) -> Vec<&'static str> {
     let text = padded(text);
     FAMILIES
         .iter()

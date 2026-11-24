@@ -1,0 +1,307 @@
+# Skills the resume matcher recognises, one per line:
+#
+#   Canonical name | more aliases | group | role families
+#
+# - The canonical name is matched too, ignoring case. Aliases are separated by
+#   commas and also ignore case.
+# - An alias written `=Go` is matched with exact case and counts only when
+#   another skill is mentioned nearby (a list or "Go or Java"), because the
+#   word is common in plain English. When the canonical name itself is in the
+#   aliases as `=Name`, it is not added again ignoring case.
+# - Skills in the same group earn partial credit for each other (a job asks
+#   for AWS, the resume shows GCP). Leave the group empty when they shouldn't.
+# - Role families are the ones in rank.rs: ai, data, platform, backend,
+#   frontend, fullstack, mobile, security, embedded, qa, swe.
+
+# Languages
+Python | python3 | | backend, data, ai
+Java | | | backend
+JavaScript | js, ecmascript | | frontend
+TypeScript | | | frontend
+Go | =Go, golang | | backend, platform
+Rust | =Rust, rustlang | | backend, embedded
+C++ | cpp | | embedded, backend
+C | =C | | embedded
+C# | csharp, c-sharp | | backend
+Kotlin | | | mobile, backend
+Swift | =Swift | | mobile
+Objective-C | objective c, objc | | mobile
+Scala | | | data, backend
+Ruby | | | backend
+PHP | | | backend
+Elixir | | | backend
+Erlang | | | backend
+Haskell | | |
+Clojure | | | backend
+OCaml | | |
+F# | fsharp | |
+Dart | =Dart | | mobile
+Lua | | |
+Perl | | |
+R | =R | | data
+Julia | =Julia | | data
+MATLAB | | | data
+SQL | | | data, backend
+Bash | shell scripting, shell script, bash scripting, zsh | | platform
+PowerShell | | | platform
+Solidity | | |
+Verilog | systemverilog | hdl | embedded
+VHDL | | hdl | embedded
+Assembly language | x86 assembly, arm assembly | | embedded
+CUDA | | gpu | ai, embedded
+OpenCL | | gpu | ai
+
+# Web and frontend
+React | react.js, reactjs | js-framework | frontend
+Angular | angularjs, angular.js | js-framework | frontend
+Vue.js | vue, vuejs | js-framework | frontend
+Svelte | sveltekit | js-framework | frontend
+Next.js | nextjs | js-meta | frontend, fullstack
+Nuxt | nuxt.js | js-meta | frontend
+Redux | | | frontend
+HTML | html5 | | frontend
+CSS | css3 | | frontend
+Sass | scss | | frontend
+Tailwind CSS | tailwind, tailwindcss | | frontend
+jQuery | | | frontend
+Webpack | | bundler | frontend
+Vite | | bundler | frontend
+WebAssembly | wasm | | frontend
+GraphQL | | api-style | backend, frontend
+REST APIs | =REST, restful, rest api, restful api, restful apis, rest apis | api-style | backend
+gRPC | | api-style | backend
+WebSockets | websocket | | backend
+Node.js | node, nodejs | | backend, fullstack
+Express | express.js, expressjs | node-web | backend
+NestJS | nest.js | node-web | backend
+Deno | | |
+Bun | =Bun | |
+React Native | | mobile-xp | mobile
+Flutter | | mobile-xp | mobile
+SwiftUI | | apple-ui | mobile
+UIKit | | apple-ui | mobile
+Jetpack Compose | | | mobile
+Android SDK | android development, android | | mobile
+iOS SDK | ios development, ios | | mobile
+Xcode | | | mobile
+Electron | | | frontend
+Three.js | threejs | | frontend
+D3.js | d3 | | frontend, data
+
+# Backend frameworks
+Django | | python-web | backend
+Flask | | python-web | backend
+FastAPI | | python-web | backend
+Spring | spring boot, springboot, spring framework | | backend
+Hibernate | | | backend
+Ruby on Rails | rails, =Rails, ror | | backend
+Laravel | | | backend
+ASP.NET | .net core, asp.net core, dotnet | dotnet | backend
+.NET | | dotnet | backend
+Gin | =Gin | | backend
+Microservices | microservice, micro-services, microservice architecture | | backend, platform
+Distributed systems | distributed system, distributed computing | | backend, platform
+System design | systems design | | backend
+Event-driven architecture | event driven, event-driven | | backend
+Concurrency | multithreading, multi-threading, multithreaded, concurrent programming | | backend, embedded
+Object-oriented programming | oop, object oriented, object-oriented, object-oriented design, ood | |
+Data structures | data structures and algorithms, dsa | |
+Algorithms | | |
+Design patterns | | |
+Functional programming | | |
+API design | | | backend
+Caching | | | backend
+Low latency | low-latency | | backend
+High availability | | | platform
+Scalability | scalable systems | | backend, platform
+
+# Data stores
+PostgreSQL | postgres, psql | sql-db | backend, data
+MySQL | | sql-db | backend, data
+SQLite | | sql-db | backend
+Microsoft SQL Server | sql server, mssql, t-sql | sql-db | backend, data
+Oracle Database | oracle db, pl/sql | sql-db | backend
+MongoDB | mongo | nosql | backend
+DynamoDB | | nosql | backend
+Cassandra | | nosql | backend, data
+Redis | | cache | backend
+Memcached | | cache | backend
+Elasticsearch | elastic search, elk | search | backend, data
+OpenSearch | | search | backend
+Solr | | search | backend
+Neo4j | | | data
+CockroachDB | | sql-db | backend
+Firebase | firestore | nosql | mobile, backend
+Supabase | | | backend
+Pinecone | | vector-db | ai
+pgvector | | vector-db | ai
+Vector databases | vector database, vector db, vector store | vector-db | ai
+Snowflake | | warehouse | data
+BigQuery | big query | warehouse | data
+Redshift | | warehouse | data
+Databricks | | warehouse | data
+ClickHouse | | warehouse | data
+Data warehousing | data warehouse, data warehouses | warehouse | data
+Data modeling | data modelling | | data
+Database design | schema design | | backend, data
+
+# Data processing
+Apache Spark | pyspark, spark sql, =Spark | big-data | data
+Hadoop | hdfs, mapreduce | big-data | data
+Apache Flink | flink | stream | data
+Apache Beam | | big-data | data
+Apache Kafka | kafka | queue | backend, data
+RabbitMQ | | queue | backend
+Amazon SQS | sqs | queue | backend
+Google Pub/Sub | pubsub, pub/sub | queue | backend
+Amazon Kinesis | kinesis | stream | data
+Apache Airflow | airflow | workflow | data
+Dagster | | workflow | data
+Prefect | | workflow | data
+dbt | | | data
+ETL | elt, etl pipelines, data pipelines, data pipeline | | data
+Pandas | | py-data | data, ai
+NumPy | | py-data | data, ai
+Polars | | py-data | data
+Jupyter | jupyter notebook, jupyter notebooks | | data, ai
+Tableau | | bi | data
+Power BI | powerbi | bi | data
+Looker | | bi | data
+Microsoft Excel | =Excel | | data
+Statistics | statistical analysis, statistical modeling | | data, ai
+A/B testing | ab testing, experimentation | | data
+Data analysis | data analytics | | data
+Data visualization | data visualisation | | data
+
+# Machine learning
+Machine learning | ml | | ai
+Deep learning | | | ai
+PyTorch | torch | dl-framework | ai
+TensorFlow | tf2 | dl-framework | ai
+Keras | | dl-framework | ai
+JAX | | dl-framework | ai
+scikit-learn | sklearn, scikit learn | ml-lib | ai, data
+XGBoost | lightgbm, catboost | ml-lib | ai, data
+Hugging Face | huggingface, transformers library | | ai
+Natural language processing | nlp | | ai
+Computer vision | | | ai
+OpenCV | | | ai
+Large language models | llm, llms, large language model | | ai
+Generative AI | genai, gen ai | | ai
+Retrieval-augmented generation | rag | | ai
+Prompt engineering | | | ai
+LangChain | | llm-framework | ai
+LlamaIndex | | llm-framework | ai
+Fine-tuning | finetuning, fine tuning | | ai
+Reinforcement learning | | | ai
+Recommender systems | recommendation systems, recommendation system, recommender system | | ai
+Transformers | transformer models, transformer architecture | | ai
+MLOps | | | ai, platform
+MLflow | | ml-ops | ai
+Kubeflow | | ml-ops | ai
+Model serving | model deployment, model inference, inference | | ai, platform
+Feature engineering | | | ai, data
+Time series | time-series, forecasting | | data, ai
+Embeddings | | | ai
+Speech recognition | asr | | ai
+
+# Cloud and infrastructure
+AWS | amazon web services | cloud | platform
+Google Cloud | gcp, google cloud platform | cloud | platform
+Microsoft Azure | azure | cloud | platform
+AWS Lambda | lambda functions, =Lambda | serverless | platform, backend
+Serverless | | serverless | platform
+Amazon EC2 | ec2 | | platform
+Amazon S3 | s3 | | platform
+Amazon ECS | ecs, fargate | orchestration | platform
+Amazon EKS | eks | orchestration | platform
+Docker | containers, containerization | | platform
+Kubernetes | k8s | orchestration | platform
+Helm | | | platform
+Terraform | | iac | platform
+Pulumi | | iac | platform
+CloudFormation | aws cdk, cdk | iac | platform
+Ansible | | config-mgmt | platform
+Chef | =Chef | config-mgmt | platform
+Puppet | =Puppet | config-mgmt | platform
+Linux | unix | | platform
+Nginx | | | platform
+Networking | tcp/ip, tcp, dns | | platform
+Load balancing | load balancer, load balancers | | platform
+CI/CD | ci, cd, continuous integration, continuous delivery, continuous deployment | ci | platform
+Jenkins | | ci | platform
+GitHub Actions | | ci | platform
+GitLab CI | | ci | platform
+CircleCI | | ci | platform
+Argo CD | argocd, argo | ci | platform
+Git | | |
+Prometheus | | observability | platform
+Grafana | | observability | platform
+Datadog | | observability | platform
+Splunk | | observability | platform, security
+OpenTelemetry | | observability | platform
+Observability | monitoring | observability | platform
+Site reliability engineering | sre | | platform
+Incident response | on-call, on call, incident management | | platform, security
+Infrastructure as code | iac | iac | platform
+Service mesh | istio, envoy | | platform
+Bazel | | build | platform
+CMake | | build | embedded
+
+# Security
+Application security | appsec | | security
+Penetration testing | pentesting, pen testing | | security
+Threat modeling | threat modelling | | security
+Cryptography | encryption | | security
+OAuth | oauth2, oauth 2.0, openid connect, oidc | | security, backend
+Identity and access management | iam | | security, platform
+Vulnerability management | vulnerability assessment | | security
+SIEM | | | security
+Network security | firewalls | | security
+OWASP | | | security
+Zero trust | | | security
+Malware analysis | reverse engineering | | security
+SOC 2 | soc2 | | security
+
+# Embedded and systems
+Embedded systems | embedded software, embedded c | | embedded
+Firmware | | | embedded
+RTOS | freertos, zephyr | | embedded
+Microcontrollers | microcontroller, mcu, arm cortex | | embedded
+FPGA | | | embedded
+Robotics | ros, ros2 | | embedded, ai
+Operating systems | os internals, kernel, linux kernel | | embedded, platform
+Compilers | compiler, llvm | | embedded
+Device drivers | device driver | | embedded
+Computer architecture | | | embedded
+Signal processing | dsp | | embedded
+
+# Testing and quality
+Unit testing | unit tests | | qa
+Test automation | automated testing, automation testing | | qa
+Integration testing | integration tests, end-to-end testing, e2e testing | | qa
+Selenium | | test-framework | qa
+Cypress | | test-framework | qa, frontend
+Playwright | | test-framework | qa, frontend
+Jest | | test-framework | frontend
+pytest | | test-framework | qa
+JUnit | | test-framework | qa
+Test-driven development | tdd | | qa
+Performance testing | load testing | | qa
+
+# Practices and tools
+Agile | scrum, kanban | |
+Code review | code reviews | |
+Technical documentation | documentation | |
+Linux systems programming | systems programming | | embedded, platform
+Performance optimization | performance tuning, profiling | | backend
+Web development | | | frontend, fullstack
+Full-stack development | full stack, full-stack, fullstack | | fullstack
+Backend development | backend, back-end, back end | | backend
+Frontend development | frontend, front-end, front end | | frontend
+Mobile development | mobile app development | | mobile
+Payments | payment systems, payment processing | | backend
+Blockchain | web3, ethereum | |
+Figma | | | frontend
+Jira | | |
+Postman | | |

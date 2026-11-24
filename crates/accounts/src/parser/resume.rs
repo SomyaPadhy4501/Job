@@ -460,28 +460,8 @@ pub fn parse_resume(text: &str) -> ParsedResume {
         ..Default::default()
     };
 
-    // Split into sections.
-    let mut header: Vec<&str> = Vec::new();
-    let mut sections: Vec<(Section, Vec<&str>)> = Vec::new();
-    for line in &lines {
-        if let Some((kind, label)) = heading(line) {
-            let inside_skills = sections.last().is_some_and(|(k, _)| *k == Skills);
-            if inside_skills && SKILL_SUBHEADINGS.contains(&label.as_str()) {
-                sections.last_mut().unwrap().1.push(line);
-                continue;
-            }
-            out.sections.push(clean_line(line.trim_end_matches(':')));
-            sections.push((kind, Vec::new()));
-        } else if let Some((_, body)) = sections.last_mut() {
-            body.push(line);
-        } else if header.len() < 12 {
-            header.push(line);
-        }
-    }
-    // No headings at all: treat the top of the text as the header.
-    if sections.is_empty() && header.is_empty() {
-        header = lines.iter().take(12).copied().collect();
-    }
+    let (header, sections) = split_sections(&lines);
+    out.sections = sections.iter().map(|s| s.heading.clone()).collect();
 
     read_contact(&header, &lines, &mut out);
     if let Some((first, middle, last)) = header.iter().take(5).find_map(|l| find_name(l)) {
@@ -491,7 +471,7 @@ pub fn parse_resume(text: &str) -> ParsedResume {
     }
     read_location(&header, &mut out);
 
-    for (kind, body) in &sections {
+    for SectionText { kind, body, .. } in &sections {
         match kind {
             Education if out.education.is_empty() => out.education = parse_education(body),
             Experience => {
@@ -525,6 +505,123 @@ pub fn parse_resume(text: &str) -> ParsedResume {
         }
     }
     out
+}
+
+/// One section of a resume: its kind, normalized label, heading as written,
+/// and the lines under it.
+struct SectionText<'a> {
+    kind: Section,
+    label: String,
+    heading: String,
+    body: Vec<&'a str>,
+}
+
+/// Splits trimmed, non-empty lines into the header (the lines above the first
+/// heading, at most 12) and the sections. A skills sub-heading ("Languages")
+/// stays inside its skills section.
+fn split_sections<'a>(lines: &[&'a str]) -> (Vec<&'a str>, Vec<SectionText<'a>>) {
+    let mut header: Vec<&str> = Vec::new();
+    let mut sections: Vec<SectionText<'a>> = Vec::new();
+    for line in lines {
+        if let Some((kind, label)) = heading(line) {
+            if let Some(last) = sections.last_mut()
+                && last.kind == Skills
+                && SKILL_SUBHEADINGS.contains(&label.as_str())
+            {
+                last.body.push(line);
+                continue;
+            }
+            sections.push(SectionText {
+                kind,
+                label,
+                heading: clean_line(line.trim_end_matches(':')),
+                body: Vec::new(),
+            });
+        } else if let Some(last) = sections.last_mut() {
+            last.body.push(line);
+        } else if header.len() < 12 {
+            header.push(line);
+        }
+    }
+    // No headings at all: treat the top of the text as the header.
+    if sections.is_empty() && header.is_empty() {
+        header = lines.iter().take(12).copied().collect();
+    }
+    (header, sections)
+}
+
+/// Everything a resume says, by section, for matching it against job
+/// postings. Unlike [`ParsedResume`] it keeps projects, the summary and
+/// coursework, and the skills section's lines as written.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ResumeDocument {
+    /// Entries with their dates; `description` holds the bullets, one per line.
+    pub experience: Vec<Experience>,
+    /// Project lines (names and bullets), bullet marks removed.
+    pub projects: Vec<String>,
+    /// Summary, objective or profile lines.
+    pub summary: Vec<String>,
+    /// The skills sections' lines, bullet marks removed.
+    pub skills: Vec<String>,
+    /// Education and coursework lines.
+    pub education: Vec<String>,
+    /// Every other section's lines (awards, leadership, activities…).
+    pub other: Vec<String>,
+    /// The resume had no section headings at all; everything is in `other`.
+    pub unsectioned: bool,
+}
+
+const SUMMARY_LABELS: &[&str] = &[
+    "summary",
+    "professional summary",
+    "objective",
+    "career objective",
+    "profile",
+    "about",
+    "about me",
+];
+const COURSEWORK_LABELS: &[&str] = &["coursework", "relevant coursework"];
+
+/// Reads a resume's text into sections, for matching.
+pub fn parse_document(text: &str) -> ResumeDocument {
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    let (_, sections) = split_sections(&lines);
+    let mut doc = ResumeDocument::default();
+    if sections.is_empty() {
+        doc.unsectioned = true;
+        doc.other = lines.iter().map(|l| clean_line(strip_bullet(l))).collect();
+        return doc;
+    }
+    let cleaned = |body: &[&str]| -> Vec<String> {
+        body.iter()
+            .map(|l| clean_line(strip_bullet(l)))
+            .filter(|l| !l.is_empty())
+            .collect()
+    };
+    for s in &sections {
+        match s.kind {
+            Experience => {
+                let room = profile::MAX_EXPERIENCE.saturating_sub(doc.experience.len());
+                doc.experience
+                    .extend(parse_experience(&s.body).into_iter().take(room));
+            }
+            Projects => doc.projects.extend(cleaned(&s.body)),
+            Skills => doc.skills.extend(cleaned(&s.body)),
+            Education => doc.education.extend(cleaned(&s.body)),
+            Other if SUMMARY_LABELS.contains(&s.label.as_str()) => {
+                doc.summary.extend(cleaned(&s.body))
+            }
+            Other if COURSEWORK_LABELS.contains(&s.label.as_str()) => {
+                doc.education.extend(cleaned(&s.body))
+            }
+            Other => doc.other.extend(cleaned(&s.body)),
+        }
+    }
+    doc
 }
 
 /// A section heading's kind and its normalized label.

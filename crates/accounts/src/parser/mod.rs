@@ -6,7 +6,7 @@ pub mod extract;
 pub mod resume;
 
 pub use extract::{ExtractError, extract_text};
-pub use resume::{ParsedResume, parse_resume};
+pub use resume::{ParsedResume, ResumeDocument, parse_document, parse_resume};
 
 /// Stored with each parse, so resumes can be re-parsed when the rules improve.
 pub const PARSER_VERSION: i16 = 1;
