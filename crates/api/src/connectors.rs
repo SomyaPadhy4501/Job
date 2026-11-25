@@ -50,9 +50,13 @@ use crate::http::{CookieSpec, JsonBody, cookie, set_cookie};
 pub const FLOW_SECONDS: i64 = 600;
 /// Connect attempts per user per day.
 pub const STARTS_PER_DAY: i64 = 20;
-/// Gmail lookups per user per day. The extension asks every 5 s for up to
-/// 3 minutes while a code box is open: 36 per code.
-pub const READS_PER_DAY: i64 = 600;
+/// Gmail lookups per user per day. The extension asks every 1.5 s for the
+/// first 45 s and every 4 s after that, for up to 3 minutes, while a code box
+/// is open: at most about 65 per code, usually a handful (mail arrives in
+/// seconds), and each lookup stops at the first fitting message.
+pub const READS_PER_DAY: i64 = 2000;
+/// Domains (and link hosts) one lookup may name for a page.
+pub const MAX_DOMAINS: usize = 6;
 /// Message ids the extension may say it already used.
 pub const MAX_SKIP: usize = 50;
 const CONNECTORS_PAGE: &str = "/alerts";
@@ -467,21 +471,32 @@ async fn access_token(state: &AppState, user_id: Uuid, force: bool) -> ApiResult
 /// mail only from this company (`<tenant>@myworkday.com`).
 /// Which company's mail: the Workday tenant, or the Greenhouse board slug
 /// and the company name on the page.
+/// Other sites: the domains its mail may come from (and the company, when
+/// that domain sends for many employers).
 struct For<'a> {
     tenant: &'a str,
     company: &'a str,
+    domains: &'a [String],
 }
 
-async fn recent(
+/// The first of this site's unused mail from the last 15 minutes, newest
+/// first, that `pick` finds something in. Stops there: a code is usually in
+/// the newest message, so most lookups fetch one.
+async fn first<T>(
     state: &AppState,
     user_id: Uuid,
     site: Site,
     who: For<'_>,
     skip: &[String],
-) -> ApiResult<Vec<Message>> {
+    pick: impl Fn(&Message) -> Option<T>,
+) -> ApiResult<Option<(T, String)>> {
     let gmail = client(state)?;
     let mut access = access_token(state, user_id, false).await?;
-    let query = site.query(now() - MAX_AGE_MINUTES * 60);
+    let since = now() - MAX_AGE_MINUTES * 60;
+    let query = match site {
+        Site::Other => gmail::domain_query(who.domains, since),
+        _ => site.query(since),
+    };
     let ids = match gmail.search(&access, &query).await {
         Err(GmailError::Unauthorized) => {
             access = access_token(state, user_id, true).await?;
@@ -491,7 +506,6 @@ async fn recent(
     }
     .map_err(gmail_error)?;
     let cutoff = (now() - MAX_AGE_MINUTES * 60) * 1000;
-    let mut out = Vec::new();
     for id in ids.iter().filter(|id| !skip.contains(id)) {
         let m = gmail.message(&access, id).await.map_err(gmail_error)?;
         if m.received_ms < cutoff {
@@ -501,13 +515,34 @@ async fn recent(
             Site::Workday => gmail::workday_sender(&m.from).as_deref() == Some(who.tenant),
             // One sender for every Greenhouse company: the mail must name ours.
             Site::Greenhouse => gmail::greenhouse_company_matches(&m, who.tenant, who.company),
+            // Only the page's own domains; a shared system's mail must name the company.
+            Site::Other => {
+                gmail::from_domains(&m.from, who.domains) && gmail::company_named(&m, who.company)
+            }
         };
         if !ours {
             continue;
         }
-        out.push(m);
+        if let Some(found) = pick(&m) {
+            return Ok(Some((found, m.id)));
+        }
     }
-    Ok(out)
+    Ok(None)
+}
+
+/// The page's mail domains (or link hosts), checked: plain domains, no free
+/// mail, at most `MAX_DOMAINS`.
+fn parse_domains(raw: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for d in raw.iter().filter_map(|d| gmail::mail_domain(d)) {
+        if !out.contains(&d) {
+            out.push(d);
+        }
+        if out.len() == MAX_DOMAINS {
+            break;
+        }
+    }
+    out
 }
 
 fn parse_tenant(site: Site, tenant: Option<&str>) -> ApiResult<String> {
@@ -580,9 +615,13 @@ pub struct CodeBody {
     /// The Workday tenant, or the Greenhouse board slug.
     #[serde(default)]
     tenant: Option<String>,
-    /// The company name on the page (Greenhouse).
+    /// The company name on the page (Greenhouse, and other systems that
+    /// send for many employers).
     #[serde(default)]
     company: Option<String>,
+    /// `site: "other"`: the domains the page's mail may come from.
+    #[serde(default)]
+    domains: Vec<String>,
     #[serde(default)]
     length: Option<usize>,
     #[serde(default)]
@@ -599,10 +638,13 @@ pub async fn ext_code(
     who: TokenUser,
     JsonBody(body): JsonBody<CodeBody>,
 ) -> ApiResult<Json<Value>> {
-    let site = Site::parse(&body.site)
-        .ok_or_else(|| ApiError::bad("Codes are read only for Workday and Greenhouse."))?;
+    let site = Site::parse(&body.site).ok_or_else(|| ApiError::bad("Unknown job site."))?;
     let tenant = parse_tenant(site, body.tenant.as_deref())?;
     let company = parse_company(body.company.as_deref());
+    let domains = parse_domains(&body.domains);
+    if site == Site::Other && domains.is_empty() {
+        return Err(ApiError::bad("Unknown job site."));
+    }
     let shape = CodeShape {
         length: body.length.filter(|l| (4..=10).contains(l)),
         digits_only: body.charset.as_deref() == Some("digits"),
@@ -612,18 +654,38 @@ pub async fn ext_code(
     let mail_for = For {
         tenant: &tenant,
         company: &company,
+        domains: &domains,
     };
-    for m in recent(&state, who.user.id, site, mail_for, &parse_skip(&body.skip)).await? {
-        if let Some(code) = gmail::pick_code(&m.text, shape) {
-            return Ok(Json(json!({ "code": code, "messageId": m.id })));
-        }
-    }
-    Ok(Json(json!({ "code": null, "messageId": null })))
+    let found = first(
+        &state,
+        who.user.id,
+        site,
+        mail_for,
+        &parse_skip(&body.skip),
+        |m| gmail::pick_code(&m.text, shape),
+    )
+    .await?;
+    Ok(Json(match found {
+        Some((code, id)) => json!({ "code": code, "messageId": id }),
+        None => json!({ "code": null, "messageId": null }),
+    }))
 }
 
 #[derive(Deserialize)]
 pub struct LinkBody {
+    /// Workday: the company. Absent with `site: "other"`.
+    #[serde(default)]
     tenant: String,
+    #[serde(default)]
+    site: Option<String>,
+    /// `site: "other"`: where the mail may come from, where the link may go,
+    /// and the company when the sender is a shared system.
+    #[serde(default)]
+    domains: Vec<String>,
+    #[serde(default)]
+    hosts: Vec<String>,
+    #[serde(default)]
+    company: Option<String>,
     #[serde(default)]
     skip: Vec<String>,
 }
@@ -636,24 +698,41 @@ pub async fn ext_verify_link(
     who: TokenUser,
     JsonBody(body): JsonBody<LinkBody>,
 ) -> ApiResult<Json<Value>> {
-    let tenant = parse_tenant(Site::Workday, Some(&body.tenant))?;
-    client(&state)?;
-    count_read(&state, who.user.id).await?;
-    for m in recent(
-        &state,
-        who.user.id,
-        Site::Workday,
-        For {
+    let skip = parse_skip(&body.skip);
+    let found = if body.site.as_deref() == Some("other") {
+        let domains = parse_domains(&body.domains);
+        let hosts = parse_domains(&body.hosts);
+        if domains.is_empty() || hosts.is_empty() {
+            return Err(ApiError::bad("Unknown job site."));
+        }
+        let company = parse_company(body.company.as_deref());
+        client(&state)?;
+        count_read(&state, who.user.id).await?;
+        let mail_for = For {
+            tenant: "",
+            company: &company,
+            domains: &domains,
+        };
+        first(&state, who.user.id, Site::Other, mail_for, &skip, |m| {
+            gmail::verify_link_on(&m.hrefs, &hosts)
+        })
+        .await?
+    } else {
+        let tenant = parse_tenant(Site::Workday, Some(&body.tenant))?;
+        client(&state)?;
+        count_read(&state, who.user.id).await?;
+        let mail_for = For {
             tenant: &tenant,
             company: "",
-        },
-        &parse_skip(&body.skip),
-    )
-    .await?
-    {
-        if let Some(link) = gmail::verify_link(&m.hrefs, &tenant) {
-            return Ok(Json(json!({ "link": link, "messageId": m.id })));
-        }
-    }
-    Ok(Json(json!({ "link": null, "messageId": null })))
+            domains: &[],
+        };
+        first(&state, who.user.id, Site::Workday, mail_for, &skip, |m| {
+            gmail::verify_link(&m.hrefs, &tenant)
+        })
+        .await?
+    };
+    Ok(Json(match found {
+        Some((link, id)) => json!({ "link": link, "messageId": id }),
+        None => json!({ "link": null, "messageId": null }),
+    }))
 }

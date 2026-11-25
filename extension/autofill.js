@@ -4,7 +4,7 @@
   // Runs once per frame: from the manifest on the four ATS hosts, and on any
   // other site after you allow it from the popup ("Autofill this page").
   if (globalThis.__jobAutofill) {
-    if (globalThis.__jobAutofillOpen) globalThis.__jobAutofill.show();
+    if (globalThis.__jobAutofillOpen) globalThis.__jobAutofill.openFromPanel();
     return;
   }
   const F = globalThis.AutofillFields;
@@ -202,9 +202,6 @@
     if (form?.parentNode) form.parentNode.insertBefore(host, form);
     else document.body.append(host);
   }
-  mount();
-  // Full-document React hydration can replace the initial body after idle.
-  new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
   let generation = 0,
     busy = false,
     account,
@@ -289,9 +286,97 @@
       if (version === generation) status.textContent = err.message;
     }
   }
-  globalThis.__jobAutofill = { show };
-  // Started from the popup: only the frame holding the form opens its panel.
-  if (globalThis.__jobAutofillOpen && adapter.collect().length) show();
+  // ─── Where the tab appears ──────────────────────────────────────────────
+  // On the four ATSs at once. Anywhere else (company career sites, iCIMS,
+  // Taleo, SuccessFactors, …) only once the page holds what looks like a job
+  // application: a resume upload, or several of your profile's fields together
+  // with job words, or a work-authorization / EEO question. Until then the
+  // script only counts form controls now and then, and shows nothing.
+  let active = false;
+  const JOB_WORDS =
+    /\b(?:apply|applying|application|applicant|resume|r[ée]sum[ée]|cv|cover letter|candidate|careers?|jobs?|positions?|role|hiring|recruit\w*|talent|employment|work experience|linkedin|requisition|vacanc\w+|opening)\b/i;
+  function looksLikeApplication() {
+    if (ats !== 'generic') return true;
+    const controls = document.querySelectorAll(
+      'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=search]):not([type=password]),textarea,select'
+    );
+    if (controls.length < 3) return false;
+    const fields = adapter.collect();
+    if (fields.length < 3) return false;
+    const kinds = fields.map((d) => [d, F.classify(d)]);
+    if (kinds.some(([, c]) => c.kind === 'resume')) return true;
+    if (kinds.some(([, c]) => ['sponsorship', 'authorizedUS', 'visa', 'eeo'].includes(c.kind))) return true;
+    const profileHits = new Set(kinds.filter(([, c]) => c.kind === 'profile').map(([, c]) => c.path));
+    const known = !!globalThis.JobApplicationPages?.applySystem?.(hostName);
+    const words = JOB_WORDS.test(
+      [location.pathname, location.search, document.title, F.clean(document.querySelector('h1,h2')?.textContent)].join(' ')
+    );
+    const contact = profileHits.has('contact.email') || profileHits.has('contact.phone');
+    const name = ['identity.firstName', 'identity.lastName', 'fullName'].some((p) => profileHits.has(p));
+    // A checkout or newsletter form has a name and an email too: it also
+    // needs something only a job application asks for.
+    const jobFields =
+      ['links.linkedin', 'links.github', 'links.portfolio', 'preferences.salaryExpectation', 'preferences.earliestStart'].some((p) =>
+        profileHits.has(p)
+      ) || kinds.some(([, c]) => ['education', 'experience', 'row'].includes(c.kind));
+    return contact && name && (known || words || jobFields);
+  }
+  function activate() {
+    if (active) return;
+    active = true;
+    mount();
+    // Full-document React hydration can replace the initial body after idle.
+    new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
+    window.addEventListener('submit', onSubmitLike, true);
+    document.addEventListener('click', onSubmitLike, true);
+    // A page that follows a submit (Greenhouse's confirmation page) offers too.
+    if (window === window.top) setTimeout(offerHeld, 1500);
+  }
+  function watchForApplication() {
+    let last = 0,
+      timer = 0;
+    const check = () => {
+      timer = 0;
+      last = Date.now();
+      if (active) return observer.disconnect();
+      try {
+        if (looksLikeApplication()) {
+          observer.disconnect();
+          activate();
+        }
+      } catch {}
+    };
+    // Single-page sites build the form after load (and after "Apply"):
+    // look again when the page changes, at most every 1.5 s for the first
+    // two minutes, then every 10 s (a busy web app that isn't a job site).
+    const started = Date.now();
+    const observer = new MutationObserver(() => {
+      if (timer) return;
+      const gap = Date.now() - started < 120_000 ? 1500 : 10_000;
+      timer = setTimeout(check, Math.max(0, gap - (Date.now() - last)));
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    check();
+  }
+  // "Autofill this page" in the side panel: open here if this frame has a form.
+  function openFromPanel() {
+    if (!adapter.collect().length) return false;
+    activate();
+    show();
+    return true;
+  }
+  globalThis.__jobAutofill = { show, openFromPanel };
+  // Only a frame that opened answers, so the side panel hears from the frame
+  // holding the form (any frame) or from none.
+  chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+    if (sender.id !== chrome.runtime.id) return;
+    if (msg?.type === 'autofill:ping' && window === window.top) reply({ form: active });
+    else if (msg?.type === 'autofill:openHere' && openFromPanel()) reply({ opened: true });
+  });
+  // Started from the popup (older path, scripts injected on demand): only
+  // the frame holding the form opens its panel.
+  if (globalThis.__jobAutofillOpen) openFromPanel();
+  else watchForApplication();
 
   // The portal ranks resumes for the job title when it supports it; otherwise
   // (404, or an older portal) the tags are matched here against the page.
@@ -423,7 +508,7 @@
       for (const d of fields) {
         if (!active()) return;
         const kind = F.classify(d).kind;
-        const values = F.resolve(d, profile, data.answers);
+        const values = F.resolve(d, profile, data.answers, companyName());
         let group = 'Needs you',
           reason = '';
         if (!d.el.isConnected) {
@@ -561,8 +646,6 @@
     hold(true);
     watchForConfirmation();
   }
-  window.addEventListener('submit', onSubmitLike, true);
-  document.addEventListener('click', onSubmitLike, true);
 
   let offered = false;
   async function offerHeld() {
@@ -580,7 +663,7 @@
     } catch {
       return;
     }
-    pending.answers = pending.answers.filter((a) => F.savedAnswer(a.question, bank.answers || []) !== a.answer);
+    pending.answers = pending.answers.filter((a) => F.savedAnswer(a.question, bank.answers || [], pending.company || '') !== a.answer);
     if (!pending.answers.length || offered) return;
     offered = true;
     const card = element('div');
@@ -642,8 +725,6 @@
     open.hidden = true;
     panel.hidden = true;
   }
-  // A page that follows a submit (Greenhouse's confirmation page) offers too.
-  if (window === window.top) setTimeout(offerHeld, 1500);
 
   if (ats === 'workday') {
     const observer = new MutationObserver(() => {

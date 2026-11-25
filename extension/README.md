@@ -6,9 +6,12 @@ wired a collector for yet. Generic: no per-company code. It recognizes job
 lists by shape in the JSON the page fetches, plus schema.org `JobPosting`
 data embedded in the page.
 
-The extension can also fill the current application step on Workday, Greenhouse,
-Lever and Ashby from your private profile, tagged resumes and saved answers
-(see [Fill an application](#fill-an-application)). It never submits.
+The extension can also fill the current application step on any job site
+(Workday, Greenhouse, Lever, Ashby, iCIMS, Taleo, SuccessFactors, company
+career sites, …) from your private profile, tagged resumes and saved answers,
+sign you in or create the account with your one job-site login, and fill the
+codes those sites email (see [Fill an application](#fill-an-application)). It
+never submits an application.
 
 **It only captures pages you open.** There is no background crawling by
 design: the sites this exists for block automated traffic, and quietly
@@ -37,13 +40,15 @@ source.
 
 ## Fill an application
 
-Autofill works by itself on Workday, Greenhouse, Lever and Ashby application
-forms, including ones embedded in an employer's own site (Stripe, for one,
-shows Greenhouse inside its careers page; the button then sits just above the
-form). On those pages a small tab with an arrow sits on the right edge; click
-it to open the Autofill panel, and › to tuck it back. On any other site (Tesla, Amazon, company-built career sites), open
-the application form and click **Autofill this page** in the popup; see
-"Other sites" below.
+Autofill works by itself on every job application (1.22.0). On Workday,
+Greenhouse, Lever and Ashby, including forms embedded in an employer's own site
+(Stripe, for one, shows Greenhouse inside its careers page; the button then
+sits just above the form), it is there as soon as the page loads. Anywhere
+else (iCIMS, Taleo, SuccessFactors, Oracle, SmartRecruiters, Tesla, Amazon,
+company-built career sites) it appears once the page holds what looks like an
+application: see "Other sites" below. A small tab with an arrow sits on the
+right edge; click it to open the Autofill panel, and › to tuck it back.
+**Autofill this page** in the side panel opens it on a form the tab missed.
 
 ### Set up
 
@@ -88,33 +93,49 @@ loopback today; add a custom domain there if the portal moves).
    Answer them on the form. After you submit, a small card lists the new
    answers (ticked by default) and asks whether to save them; only the ones
    you keep are sent (`POST /api/autofill/answers`). The next form asking the
-   same question (same wording) fills it from your answer bank.
+   same question fills it from your answer bank, in the same wording or another
+   ("Why are you interested in this role?" also answers "…this position?"), as
+   long as every number, negation, technology and employer named is the same.
+   An answer saved "only for" a company is used only there.
 
 Employer-specific widgets, conditional legal names and location searches
 without an exact selection can still need manual entry.
 
-### Other sites (Tesla, Amazon, company-built forms)
+### Other sites (iCIMS, Taleo, SuccessFactors, Tesla, Amazon, company-built forms)
 
-1. Open the application form itself (sign in to the employer's site first if
-   it asks).
-2. Click the extension icon, then **Autofill this page**. Chrome asks once
-   whether the extension may use that site; allow it. The Autofill panel opens
-   on the form with the resume picker, and from then on the **Autofill** button
-   appears on that site by itself.
-3. If part of the page comes from another site (an embedded form), the popup
-   offers **Also allow the embedded form (…)**.
-4. Pick the resume, click **Fill this page**, and review, exactly as above.
+The tab shows up by itself once the page holds an application: a resume
+upload, a work-authorization or EEO question, or your name and email together
+with something only a job application has (job words in the address, title or
+heading, a known application system's host, or LinkedIn, GitHub, salary,
+education or work-history fields). A checkout or newsletter form with a name
+and an email gets no tab. Until then the script only counts form controls
+every 1.5 s at most, and shows nothing. Single-page sites that build the form
+after you press Apply are noticed when it appears.
+
+Pick the resume, click **Fill this page**, and review, exactly as above. If the
+tab doesn't appear on an application, click **Autofill this page** in the side
+panel. On a page opened before the 1.22.0 update, reload it (or the side panel
+falls back to asking Chrome for that site, as before).
 
 On these forms the extension finds the application form by itself (the form
 with the most fields, preferring one with a resume upload) and ignores
 newsletter, search and sign-in forms and the page header and footer. Fields
 are matched by their label, then the `autocomplete` hint, then the placeholder.
+Labels are read past wording around the field name ("Please enter your first
+name", "What is your phone number?", "Mobile phone (include country code)",
+"LinkedIn profile URL"), but never for someone else's details (a referrer, a
+reference, an emergency contact, a previous employer) or a second value
+("if different than above", "alternate email"). States and the US are matched
+in either spelling (MA ↔ Massachusetts, United States ↔ USA), and a plain Yes
+or No picks the one option that only restates it ("Yes, I am authorized to
+work in the US"), never one that qualifies it ("Yes, but only for 12 months").
 The same safety rules apply. Company-built forms vary a lot, so expect more
 under **Needs you** than on the four ATSs, especially custom dropdowns and
 multi-step flows (fill each step after it appears).
 
-**Sites you allowed autofill on** (popup, gear icon) lists them; **Remove** takes the permission
-back (so does removing it in Chrome's extension settings).
+Autofill is not loaded on Gmail, Google Docs/Drive/Calendar, Google Search,
+YouTube, GitHub, LinkedIn, Indeed, Glassdoor and `*.vercel.app` (the job board
+itself).
 
 ### Education and jobs
 
@@ -143,20 +164,62 @@ presses Create Account; Workday's "verify your email" link is then opened from
 Gmail (Alerts & Connectors). With a CAPTCHA on the form it fills the boxes and
 leaves the rest to you.
 
+### Sign-in and sign-up on other job sites
+
+The same job-site email and password (the "Workday accounts" login above) also
+signs in and creates accounts elsewhere (`autofill-account.js`, top frame
+only):
+
+- **Known application systems** (iCIMS, Taleo, SuccessFactors, Oracle,
+  SmartRecruiters, Jobvite, Workable, Phenom, Avature, Eightfold, UKG, ADP,
+  Dayforce and others listed in `application-pages.js`): on a sign-in form the
+  email and password are filled and **Sign in** is pressed once, after you've
+  interacted with the page; a failed sign-in stops automatic attempts there
+  until the password changes. On a create-account form (two password boxes,
+  or "create account" / "register" wording) the email, both passwords and your
+  first and last name are filled, and a notice offers **Create account**,
+  which presses the site's button when you click it.
+- **Any other job site** (a company's own career site): a notice asks first;
+  nothing is filled until you press **Fill** on it.
+- It never ticks a terms or privacy box (a required one is outlined for you),
+  never touches a CAPTCHA, never fills a field you already typed in, and asks
+  the worker for the password at most 3 times per site per 10 minutes.
+
 ### Codes from Gmail
 
 **Connect Gmail** on the job board, in Alerts & Connectors (read-only,
 Google's consent screen; authorization-code flow with PKCE and OpenID Connect,
 run by the server). The extension then fills the security / verification codes
-Greenhouse and Workday email mid-application, and opens Workday's "verify your
-account" link. The worker asks the portal (`POST /api/autofill/gmail/code`,
-`/verify-link`, with the autofill token); the portal reads only mail from that
-site from the last 15 minutes and answers one code or one link. The extension
-holds no Google token and needs no `identity` permission (removed in 1.20.0).
-It still checks the answer: a code must have the shape the page asked for, a
-link must be https, this company's own Workday and a verify path. Never presses
-submit. The portal needs `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` (see
-HANDOFF.md).
+job sites email at sign-up or mid-application, on any job site (1.22.0:
+Workday, Greenhouse, iCIMS, Taleo, SuccessFactors, company career sites, …),
+and opens a site's "verify your email" link. It finds a code box by its label,
+`autocomplete="one-time-code"`, one box per digit (4–8 side by side), or a
+single short box under "Enter the 6-digit code we sent you". It asks Gmail at
+once, then every 1.5 s for 45 s and every 4 s after that, for up to 3 minutes,
+and the portal stops at the first fitting email, so a code usually fills within
+seconds of arriving. Only on job pages (a known application system, or an
+address or title about jobs).
+
+The worker asks the portal (`POST /api/autofill/gmail/code`, `/verify-link`,
+with the autofill token); the portal reads only mail from that site from the
+last 15 minutes and answers one code or one link. Which mail counts:
+
+- Workday: `<company>@myworkday.com`; Greenhouse: its senders, naming this
+  company.
+- Any other site (`site: "other"`): only mail sent from the page's own
+  application system (`icims.com` for an iCIMS page, …), naming the company
+  when the page shows one, or from the employer's own domain on a
+  company-hosted page (`tesla.com` for `www.tesla.com/careers`). Free mail
+  domains never count. So a code from your bank, or from another site, can't
+  land in a job site's form.
+- Verify links must be https, on the page's own system or domain, with a
+  verify / activate / confirm path, and never an unsubscribe, opt-out,
+  preferences, withdraw, decline, delete, remove or cancel link.
+
+The extension holds no Google token and needs no `identity` permission
+(removed in 1.20.0). It still checks the answer: a code must have the shape the
+page asked for, a link must pass the rules above. Never presses submit. The
+portal needs `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` (see HANDOFF.md).
 
 ### Safety rules (enforced in code and covered by tests)
 
@@ -164,19 +227,22 @@ HANDOFF.md).
   submit (a `<button>` in a form without `type="button"`), a link, or any
   control labelled Submit, Apply, Next, Continue, Review, Save, Back, Finish,
   Send, Sign in, Register, Create account, Remove or Delete, even when one is
-  rendered as a dropdown option. The one exception is Workday's own sign-in
-  panel (`autofill-login.js`, below): it may press **Sign in with email** and
-  **Sign In**, and on the create-account form tick Workday's own **I agree**
-  and press **Create Account** once (only after you've interacted with the
-  page, never with a CAPTCHA on the form, never again after a failure until
-  the password changes).
+  rendered as a dropdown option. The exceptions are sign-in pages: Workday's
+  own sign-in panel (`autofill-login.js`, below) may press **Sign in with
+  email** and **Sign In**, and on the create-account form tick Workday's own
+  **I agree** and press **Create Account** once; on other known application
+  systems `autofill-account.js` may press **Sign in** once. Both only after
+  you've interacted with the page, never with a CAPTCHA on the form, never
+  again after a failure until the password changes. Elsewhere, Create account
+  is pressed only when you click it on the notice.
 - **Never touches CAPTCHAs** (reCAPTCHA, hCaptcha, Turnstile) and never ticks
   a checkbox: consent, acknowledgement, privacy, attestation, signature,
   background-check and "share my data" controls are always left to you.
 - **Only on your click**, and only into empty, visible, enabled fields. A
   value already on the form, typed by you or by the ATS, is never replaced.
   Password fields, and any form containing one, are never filled by the form
-  filler; only the Workday sign-in module fills your Workday password there.
+  filler; only the sign-in modules (`autofill-login.js` on Workday,
+  `autofill-account.js` elsewhere) fill your job-site password there.
   Bot-trap (honeypot) fields are never filled.
 - **No guessing on immigration questions.** Sponsorship is filled only from
   your explicit "need sponsorship now" / "in the future" answers, matched to
@@ -231,14 +297,20 @@ site (`careers.`, `jobs.`, a known ATS) or the path mentions careers, jobs,
 search results or openings. Chrome's match patterns can't express "host
 starts with careers.", which is why this isn't done in the manifest.
 
-Autofill's isolated scripts (`autofill-fields.js`, `autofill-adapters.js`,
-`autofill.js`) run at document idle on the six ATS host patterns, in all frames
-so embedded forms work. It has no page-world script. For other sites it uses
-`activeTab` and `scripting`, plus an optional host permission that Chrome asks
-for one site at a time when you click **Autofill this page** (the manifest's
-`optional_host_permissions` only makes asking possible; nothing is granted at
-install). A granted site gets a registered content script so the button
-returns there, and the worker answers it only while the permission stands.
+Autofill's isolated scripts (`application-pages.js`, `autofill-fields.js`,
+`autofill-adapters.js`, `autofill.js`) and the code filler
+(`autofill-codes.js`) run at document idle on every https page (1.22.0),
+in all frames so embedded forms work; the sign-in module
+(`autofill-account.js`) runs in the top frame of every https page but
+Workday's (`autofill-login.js` has those). This needs no new permission: the
+listing-capture scripts already match every page. Each script stays idle unless
+the page is a job application, a job site's sign-in form or a code box. It has
+no page-world script. The worker answers profile requests from any https tab,
+never from plain http or another extension; the profile reaches the page only
+after you click. Pages opened before an update, and the excluded sites, still
+use the older route: `activeTab` and `scripting`, plus an optional host
+permission that Chrome asks for one site at a time when you click **Autofill
+this page**.
 
 **Capture protections.** Listing capture must never pick up an applicant's own
 data, so `application-pages.js` (and a copy of the same rules in `hook.js`,

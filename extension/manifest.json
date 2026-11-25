@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Job Board Capture",
-  "version": "1.21.2",
-  "description": "Sends the job listings a careers page loads to your own job board, and fills job applications from your profile. Personal use; load unpacked.",
+  "version": "1.22.0",
+  "description": "Sends the job listings a careers page loads to your own job board, and fills job applications, sign-ups and emailed codes from your profile. Personal use; load unpacked.",
   "permissions": [
     "storage",
     "alarms",
@@ -58,20 +58,29 @@
     },
     {
       "matches": [
-        "https://*.myworkdayjobs.com/*",
-        "https://*.myworkdaysite.com/*",
-        "https://jobs.ashbyhq.com/*",
-        "https://boards.greenhouse.io/*",
-        "https://job-boards.greenhouse.io/*",
-        "https://jobs.lever.co/*"
+        "https://*/*"
       ],
       "js": [
+        "application-pages.js",
         "autofill-fields.js",
         "autofill-adapters.js",
         "autofill.js"
       ],
       "run_at": "document_idle",
-      "all_frames": true
+      "all_frames": true,
+      "exclude_matches": [
+        "https://mail.google.com/*",
+        "https://docs.google.com/*",
+        "https://drive.google.com/*",
+        "https://calendar.google.com/*",
+        "https://www.google.com/*",
+        "https://www.youtube.com/*",
+        "https://github.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.indeed.com/*",
+        "https://*.glassdoor.com/*",
+        "https://*.vercel.app/*"
+      ]
     },
     {
       "matches": [
@@ -86,16 +95,53 @@
     },
     {
       "matches": [
+        "https://*/*"
+      ],
+      "exclude_matches": [
+        "https://mail.google.com/*",
+        "https://docs.google.com/*",
+        "https://drive.google.com/*",
+        "https://calendar.google.com/*",
+        "https://www.google.com/*",
+        "https://www.youtube.com/*",
+        "https://github.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.indeed.com/*",
+        "https://*.glassdoor.com/*",
+        "https://*.vercel.app/*",
         "https://*.myworkdayjobs.com/*",
-        "https://*.myworkdaysite.com/*",
-        "https://boards.greenhouse.io/*",
-        "https://job-boards.greenhouse.io/*"
+        "https://*.myworkdaysite.com/*"
       ],
       "js": [
+        "application-pages.js",
+        "autofill-account.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*/*"
+      ],
+      "js": [
+        "application-pages.js",
         "autofill-codes.js"
       ],
       "run_at": "document_idle",
-      "all_frames": true
+      "all_frames": true,
+      "exclude_matches": [
+        "https://mail.google.com/*",
+        "https://docs.google.com/*",
+        "https://drive.google.com/*",
+        "https://calendar.google.com/*",
+        "https://www.google.com/*",
+        "https://www.youtube.com/*",
+        "https://github.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.indeed.com/*",
+        "https://*.glassdoor.com/*",
+        "https://*.vercel.app/*"
+      ]
     }
   ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1/3oBLmYCSlotsErQo33k5kB/Xvc0hPvcanjzhQEy+hlBWCFbTbWWdnRberYxCz8a2ukIbhVmCH/QAivM1t+GhFOBu5/pcYeQLNS/lmoDetOK4j2hAusNXqCpAKczgl/Dz4C6BZN6UCjTp0H2YngBqprQ4FUEintAwDLParMef7a9l/XY79zmhNYoeWMxekp2qV0dGW1t2qnTBWYOeM5BSLcrnOdjWJRn4j2YyvKgjBsQThOCW7fCN/QdY3iT+nSvTv0Mz9Ns53q2VDYhKbTEds9bMsYvx5ahLAVep8h4O16VWGY1S4IuLgFq9QbQsumn5TgsKOZufa0hlqdrLmtTwIDAQAB",

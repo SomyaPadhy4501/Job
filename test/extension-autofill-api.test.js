@@ -188,7 +188,7 @@ test('a rejected token tells the user to reconnect', async () => {
   assert.match(r.error, /Token rejected.*[Rr]econnect/);
 });
 
-test('only HTTPS (or loopback) portals, the popup for configuration, and ATS tabs for data', async () => {
+test('only HTTPS (or loopback) portals, the popup for configuration, and https tabs for data', async () => {
   const insecure = load({ portalUrl: 'http://portal.example' });
   assert.match((await insecure.send({ type: 'autofill:configure', token: 't' }, FROM_POPUP)).error, /HTTPS/);
   const loopback = load({ portalUrl: 'http://127.0.0.1:8787' });
@@ -198,7 +198,7 @@ test('only HTTPS (or loopback) portals, the popup for configuration, and ATS tab
   assert.match((await api.send({ type: 'autofill:configure', token: 't' })).error, /popup/);
   await api.send({ type: 'autofill:configure', token: 't' }, FROM_POPUP);
   for (const sender of [
-    { id: 'ext', url: 'https://evil.example/apply', tab: { id: 2 } },
+    { id: 'ext', url: 'https://evil.example/apply' },
     { id: 'ext', url: 'http://jobs.lever.co/acme/1/apply', tab: { id: 2 } },
     { id: 'other', url: ATS_TAB.url, tab: { id: 2 } },
   ])
@@ -222,18 +222,18 @@ test('malformed answers are refused before anything is sent', async () => {
   assert.equal(api.calls.filter((c) => c.init.method === 'POST').length, 0);
 });
 
-test('a site allowed from the popup may ask for the profile; others, and plain http, may not', async () => {
+test('any https tab may ask for the profile; plain http and non-tab senders may not', async () => {
   const api = load({
     routes: { 'GET /api/autofill/profile': json(contractProfile) },
-    granted: ['https://www.tesla.com/*', 'http://insecure.example/*'],
+    granted: ['http://insecure.example/*'],
   });
   await api.send({ type: 'autofill:configure', token: 't' }, FROM_POPUP);
-  const tesla = { id: 'ext', url: 'https://www.tesla.com/careers/search/job/apply/123', tab: { id: 3 } };
-  assert.equal((await api.send({ type: 'autofill:getProfile' }, tesla)).ok, true);
+  for (const url of ['https://www.tesla.com/careers/search/job/apply/123', 'https://www.amazon.jobs/en/jobs/1/apply'])
+    assert.equal((await api.send({ type: 'autofill:getProfile' }, { id: 'ext', url, tab: { id: 3 } })).ok, true, url);
   for (const sender of [
-    { id: 'ext', url: 'https://www.amazon.jobs/en/jobs/1/apply', tab: { id: 3 } },
     { id: 'ext', url: 'http://insecure.example/apply', tab: { id: 3 } },
     { id: 'ext', url: 'https://www.tesla.com/careers/apply' },
+    { id: 'other-extension', url: 'https://www.tesla.com/careers/apply', tab: { id: 3 } },
   ])
     assert.equal((await api.send({ type: 'autofill:getProfile' }, sender)).ok, false, sender.url);
 });
@@ -381,14 +381,14 @@ test('Workday companies are told apart on both Workday hosts', () => {
   assert.equal(pages.workdayTenant('https://jobs.lever.co/acme/1'), '');
 });
 
-test('Gmail: asked through the portal; codes only for Workday and Greenhouse pages', async () => {
+test('Gmail: asked through the portal; other sites only with their own mail domains', async () => {
   const asked = [];
   const gmail = {
-    findCode: async (request, site, tenant, shape, company) =>
-      (asked.push({ site, tenant, shape, company, request: typeof request }), '123456'),
-    openVerifyLink: async (request, tenant) => (asked.push({ verify: tenant }), true),
+    findCode: async (request, site, tenant, shape, company, domains) =>
+      (asked.push({ site, tenant, shape, company, domains, request: typeof request }), '123456'),
+    openVerifyLink: async (request, tenant, other) => (asked.push({ verify: tenant, other }), true),
   };
-  const api = load({ gmail, granted: ['https://careers.example/*'] });
+  const api = load({ gmail });
   const gh = { id: 'ext', url: 'https://job-boards.greenhouse.io/acme/jobs/1', tab: { id: 4 }, frameId: 3 };
   // Not connected to an account yet: nothing to ask.
   assert.match((await api.send({ type: 'autofill:findCode', length: 6 }, gh)).error, /autofill token/);
@@ -397,7 +397,7 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
   assert.equal((await api.send({ type: 'autofill:gmailConnect' }, FROM_POPUP)).ok, false);
   // The popup no longer shows Gmail; status lives on the job board.
   assert.equal((await api.send({ type: 'autofill:gmailStatus' }, FROM_POPUP)).ok, false);
-  for (const sender of [ATS_TAB, { id: 'ext', url: 'https://careers.example/apply', tab: { id: 3 }, frameId: 0 }, FROM_POPUP]) {
+  for (const sender of [FROM_POPUP, { id: 'ext', url: 'http://careers.example/apply', tab: { id: 3 }, frameId: 0 }]) {
     assert.equal((await api.send({ type: 'autofill:findCode', length: 6 }, sender)).ok, false, sender.url);
   }
   assert.deepEqual(
@@ -405,17 +405,31 @@ test('Gmail: asked through the portal; codes only for Workday and Greenhouse pag
     { code: '123456' }
   );
   assert.deepEqual((await api.send({ type: 'autofill:findCode', length: 99 }, WORKDAY())).data, { code: '123456' });
-  assert.deepEqual(JSON.parse(JSON.stringify(asked.slice(0, 2))), [
+  // iCIMS mails for many employers: its domain, and the company on the page.
+  const icims = { id: 'ext', url: 'https://careers-acme.icims.com/jobs/1/login', tab: { id: 5 }, frameId: 0 };
+  assert.equal((await api.send({ type: 'autofill:findCode', length: 6, charset: 'digits', company: 'Acme' }, icims)).ok, true);
+  // A company's own career site: only its own domain, no company needed.
+  const own = { id: 'ext', url: 'https://careers.acme.co.uk/account/verify', tab: { id: 6 }, frameId: 0 };
+  assert.equal((await api.send({ type: 'autofill:findCode', company: 'Acme' }, own)).ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(asked)), [
     // Greenhouse: the board from the page's address and the company it shows.
-    { site: 'greenhouse', tenant: 'acme', company: 'Acme Corp', shape: { length: 8, charset: 'alnum' }, request: 'function' },
+    { site: 'greenhouse', tenant: 'acme', company: 'Acme Corp', domains: [], shape: { length: 8, charset: 'alnum' }, request: 'function' },
     // Workday: the tenant; a company name from the page is never sent.
-    { site: 'workday', tenant: 'acme', company: '', shape: { length: 0, charset: 'alnum' }, request: 'function' },
+    { site: 'workday', tenant: 'acme', company: '', domains: [], shape: { length: 0, charset: 'alnum' }, request: 'function' },
+    { site: 'other', tenant: '', company: 'Acme', domains: ['icims.com'], shape: { length: 6, charset: 'digits' }, request: 'function' },
+    { site: 'other', tenant: '', company: '', domains: ['acme.co.uk'], shape: { length: 0, charset: 'alnum' }, request: 'function' },
   ]);
-  // Verify links: Workday's top frame only.
+  asked.length = 0;
+  // Verify links: the page itself only (top frame), never Greenhouse.
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, gh)).ok, false);
+  assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, { ...gh, frameId: 0 })).ok, false);
   assert.equal((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY({ frameId: 1 }))).ok, false);
   assert.deepEqual((await api.send({ type: 'autofill:openVerifyLink' }, WORKDAY())).data, { opened: true });
-  assert.deepEqual(JSON.parse(JSON.stringify(asked[2])), { verify: 'acme' });
+  assert.deepEqual((await api.send({ type: 'autofill:openVerifyLink', company: 'Acme' }, own)).data, { opened: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(asked)), [
+    { verify: 'acme', other: null },
+    { other: { domains: ['acme.co.uk'], hosts: ['acme.co.uk'], company: '' } },
+  ]);
 });
 
 test("Gmail: the portal's own message reaches the page", async () => {

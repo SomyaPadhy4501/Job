@@ -140,7 +140,7 @@ showConnection();
 // The four ATS hosts are in the manifest. Any other site needs your OK once
 // (an optional host permission for that site only); after that the Autofill
 // button appears there by itself, from a registered content script.
-const FILES = ['autofill-fields.js', 'autofill-adapters.js', 'autofill.js'];
+const FILES = ['application-pages.js', 'autofill-fields.js', 'autofill-adapters.js', 'autofill.js'];
 const scriptId = (pattern) => 'autofill-' + pattern.replace(/[^a-z0-9]+/gi, '-');
 const builtIn = new Set(
   (chrome.runtime.getManifest().host_permissions || []).concat(
@@ -175,10 +175,23 @@ async function activeTab() {
   return tab;
 }
 
+// Since 1.22.0 the autofill script is already on every https page: ask it
+// to open. Only a page it isn't on (opened before the update, or one of the
+// excluded sites) needs it injected, the old way.
+async function openWithLoadedScript(tabId) {
+  const answers = await chrome.tabs.sendMessage(tabId, { type: 'autofill:openHere' }).catch(() => null);
+  return answers ? [answers] : [];
+}
+
 $('fillPage').onclick = async () => {
   $('allowFrames').hidden = true;
   try {
     const tab = await activeTab();
+    const answers = await openWithLoadedScript(tab.id);
+    if (answers.some((a) => a.opened)) {
+      $('fillStatus').textContent = 'Opened Autofill on the page: pick the resume, then press "Fill this page". Nothing is ever submitted for you.';
+      return;
+    }
     const pattern = new URL(tab.url).origin + '/*';
     // Asked first, while the click still counts as your gesture.
     if (!(await chrome.permissions.request({ origins: [pattern] }))) {
@@ -318,9 +331,14 @@ async function showSite() {
   } catch {}
   $('fillPage').disabled = url?.protocol !== 'https:';
   if (url?.protocol !== 'https:') return banner('', 'i', 'Open a job application', 'Autofill works on application forms.');
-  const ready = JobApplicationPages.ats(url.hostname) || (await chrome.permissions.contains({ origins: [url.origin + '/*'] }));
-  if (ready) banner('ready', '✓', 'Autofill is ready on this site', 'Use the tab on the right edge of the page, or the button below.');
-  else banner('setup', '!', 'Autofill isn’t set up on this site', 'Press Autofill once to allow it here.');
+  const here = tab?.id ? await chrome.tabs.sendMessage(tab.id, { type: 'autofill:ping' }, { frameId: 0 }).catch(() => null) : null;
+  const ready =
+    here ||
+    JobApplicationPages.ats(url.hostname) ||
+    (await chrome.permissions.contains({ origins: [url.origin + '/*'] }));
+  if (here?.form) banner('ready', '✓', 'Autofill is ready on this page', 'Use the tab on the right edge of the page, or the button below.');
+  else if (ready) banner('ready', '✓', 'Autofill is on for this site', 'The tab appears on the right edge once the application form shows, or press the button below.');
+  else banner('setup', '!', 'Autofill isn’t loaded on this page', 'Reload the page, or press Autofill once to allow it here.');
 }
 showSite();
 $('fillPage').addEventListener('click', () => setTimeout(showSite, 300));

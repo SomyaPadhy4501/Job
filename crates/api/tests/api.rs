@@ -3105,6 +3105,73 @@ async fn gmail_codes_for_the_extension() {
         .await
         .json();
     assert_eq!(r["code"], Value::Null, "no mail for this company yet");
+
+    // Any other job site: mail only from the page's own domains, and from a
+    // system that mails for many employers only when it names the company.
+    {
+        let mut f = fake.lock().unwrap();
+        f.messages.insert(
+            0,
+            gmail_message(
+                "bank",
+                "Bank <codes@bank.example>",
+                0,
+                "text/plain",
+                "Your one-time code is 999999",
+            ),
+        );
+        f.messages.push(gmail_message(
+            "icims",
+            "Acme Careers <no-reply@talent.icims.com>",
+            1,
+            "text/plain",
+            "Your verification code is 135790",
+        ));
+        f.messages.push(gmail_message(
+            "icimslink",
+            "Acme Careers <no-reply@talent.icims.com>",
+            1,
+            "text/html",
+            "<a href=\"https://evil.example/verify?x=1\">x</a><a href=\"https://careers-acme.icims.com/email/unsubscribe/confirm\">Stop</a><a href=\"https://careers-acme.icims.com/jobs/login?activate=1&amp;t=9\">Verify</a>",
+        ));
+    }
+    let r = code(json!({"site": "other", "domains": ["icims.com"], "company": "Acme", "length": 6, "charset": "digits"}))
+        .await
+        .json();
+    assert_eq!(
+        r,
+        json!({"code": "135790", "messageId": "icims"}),
+        "the page's own system, not the newer bank code"
+    );
+    let r =
+        code(json!({"site": "other", "domains": ["icims.com"], "company": "Globex", "length": 6}))
+            .await
+            .json();
+    assert_eq!(r["code"], Value::Null, "another employer's iCIMS mail");
+    assert_eq!(
+        code(json!({"site": "other", "domains": ["gmail.com"]}))
+            .await
+            .status,
+        StatusCode::BAD_REQUEST,
+        "free mail never vouches for a site"
+    );
+    assert_eq!(
+        code(json!({"site": "other"})).await.status,
+        StatusCode::BAD_REQUEST
+    );
+    let r = ext
+        .json(
+            Method::POST,
+            "/api/autofill/gmail/verify-link",
+            json!({"site": "other", "domains": ["icims.com"], "hosts": ["icims.com"], "company": "Acme"}),
+        )
+        .await
+        .json();
+    assert_eq!(
+        r,
+        json!({"link": "https://careers-acme.icims.com/jobs/login?activate=1&t=9", "messageId": "icimslink"}),
+        "the site's own verify link, never an unsubscribe one"
+    );
     assert_eq!(
         code(json!({"site": "lever"})).await.status,
         StatusCode::BAD_REQUEST

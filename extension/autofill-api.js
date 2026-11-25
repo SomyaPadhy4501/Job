@@ -52,14 +52,11 @@
     // The extension's own pages: the popup, and the resume preview tab.
     const isPopup = sender.url === popup || sender.url.startsWith(previewPage);
     const url = new URL(sender.url);
-    // Pages may ask only from the four ATS hosts, or from a site you allowed
-    // with "Autofill this page" in the popup (an optional host permission).
+    // Autofill runs on every https page (1.22.0); its script shows itself
+    // only on what looks like an application, and fills only on your click.
+    // Plain http and anything outside a tab may not ask.
     if (!isPopup) {
-      const allowed =
-        url.protocol === 'https:' &&
-        sender.tab &&
-        (JobApplicationPages.ats(url.hostname) ||
-          (await chrome.permissions?.contains?.({ origins: [url.origin + '/*'] })));
+      const allowed = url.protocol === 'https:' && sender.tab;
       if (!allowed) throw new Error('Unsupported site.');
     }
     const { portalUrl } = await chrome.storage.local.get({ portalUrl: 'https://job-two-xi.vercel.app' });
@@ -88,16 +85,26 @@
     // ─── Workday sign-in (one email and password, set on the job board) ──
     // Saved on the site (Autofill page → Workday accounts), read from the
     // account here, and given only to the top frame of a Workday page.
+    // The same job-site login also signs in and creates accounts on other
+    // application systems (iCIMS, Taleo, SuccessFactors, …: autofill-account.js),
+    // and on a company's own career site after you press Fill on its notice
+    // (`confirmed`, sent only after a real click). Always the top frame only.
     if (msg.type === 'autofill:sitePassword' || msg.type === 'autofill:loginResult') {
-      const tenant = JobApplicationPages.workdayTenant(sender.url);
+      const isWorkday = JobApplicationPages.ats(url.hostname) === 'workday';
+      const tenant = isWorkday
+        ? JobApplicationPages.workdayTenant(sender.url)
+        : JobApplicationPages.siteDomain(url.hostname) && 'site:' + JobApplicationPages.siteDomain(url.hostname);
+      const known = isWorkday || !!JobApplicationPages.applySystem(url.hostname);
       if (
         isPopup ||
-        JobApplicationPages.ats(url.hostname) !== 'workday' ||
+        url.protocol !== 'https:' ||
+        !sender.tab ||
         !tenant ||
         sender.frameId !== 0 ||
-        (sender.documentLifecycle && sender.documentLifecycle !== 'active')
+        (sender.documentLifecycle && sender.documentLifecycle !== 'active') ||
+        (msg.type === 'autofill:sitePassword' && !known && msg.confirmed !== true)
       )
-        throw new Error('The Workday password is only for Workday sign-in pages.');
+        throw new Error('Your job-site password is only for sign-in and sign-up pages of job sites.');
       const ledger = (await chrome.storage.session.get(LEDGER))[LEDGER] || {};
       const entry = ledger[tenant] || { grants: [], failed: false };
       const now = Date.now();
@@ -115,14 +122,30 @@
     // job page asking is checked, then the portal is asked for the code.
     let gmailAsk = null;
     if (msg.type === 'autofill:findCode' || msg.type === 'autofill:openVerifyLink') {
+      if (isPopup) throw new Error('Codes are read only for job application pages.');
       const site = JobApplicationPages.ats(url.hostname);
-      if (isPopup || !['workday', 'greenhouse'].includes(site))
-        throw new Error('Codes are read only for Workday and Greenhouse pages.');
       const tenant = JobApplicationPages.workdayTenant(sender.url);
       if (site === 'workday' && !tenant) throw new Error('Unknown Workday company.');
+      // Every other site (iCIMS, Taleo, SuccessFactors, company career
+      // sites…): mail only from this page's own system or the employer's own
+      // domain, so another site's code (a bank's, say) never reaches it.
+      const other = site !== 'workday' && site !== 'greenhouse';
+      const domains = other ? JobApplicationPages.mailDomains(sender.url) : [];
+      if (other && !domains.length) throw new Error('Codes are read only for job application pages.');
+      // A system that mails for many employers needs the company named.
+      const shared = other && !!JobApplicationPages.applySystem(url.hostname);
+      const company =
+        typeof msg.company === 'string' ? msg.company.replace(/\s+/g, ' ').trim().slice(0, 100) : '';
       if (msg.type === 'autofill:openVerifyLink') {
-        if (site !== 'workday' || sender.frameId !== 0) throw new Error('Only Workday sign-in pages open verify links.');
-        gmailAsk = { kind: 'link', tenant };
+        if (sender.frameId !== 0) throw new Error('Only the page itself opens verify links.');
+        if (site === 'greenhouse') throw new Error('Greenhouse sends codes, not links.');
+        gmailAsk = other
+          ? { kind: 'link', other: { domains, hosts: JobApplicationPages.linkHosts(sender.url), company: shared ? company : '' } }
+          : { kind: 'link', tenant };
+      } else if (other) {
+        const length = Number.isInteger(msg.length) && msg.length >= 4 && msg.length <= 10 ? msg.length : 0;
+        const charset = msg.charset === 'digits' ? 'digits' : 'alnum';
+        gmailAsk = { kind: 'code', site: 'other', tenant: '', company: shared ? company : '', domains, shape: { length, charset } };
       } else {
         const length = Number.isInteger(msg.length) && msg.length >= 4 && msg.length <= 10 ? msg.length : 0;
         const charset = msg.charset === 'digits' ? 'digits' : 'alnum';
@@ -213,9 +236,19 @@
       const email = typeof saved.email === 'string' && saved.email.includes('@') ? saved.email.slice(0, 254) : null;
       return { email, password: saved.password, autoSignIn: !entry.failed };
     }
-    if (gmailAsk?.kind === 'link') return { opened: await AutofillGmail.openVerifyLink(request, gmailAsk.tenant) };
+    if (gmailAsk?.kind === 'link')
+      return { opened: await AutofillGmail.openVerifyLink(request, gmailAsk.tenant, gmailAsk.other || null) };
     if (gmailAsk?.kind === 'code')
-      return { code: await AutofillGmail.findCode(request, gmailAsk.site, gmailAsk.tenant, gmailAsk.shape, gmailAsk.company) };
+      return {
+        code: await AutofillGmail.findCode(
+          request,
+          gmailAsk.site,
+          gmailAsk.tenant,
+          gmailAsk.shape,
+          gmailAsk.company,
+          gmailAsk.domains || []
+        ),
+      };
     if (msg.type === 'autofill:getProfile') {
       const version = revision;
       const cached = (await chrome.storage.session.get(CACHE))[CACHE];

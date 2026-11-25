@@ -480,3 +480,115 @@ test('EEO, visa, work-authorization and source questions in their common wording
   for (const label of ['How did you hear about OpenAI?', 'How did you hear about this position?', 'Where did you hear about us?'])
     assert.deepEqual(F.resolve({ label, type: 'text' }, profile), ['LinkedIn']);
 });
+
+test('field names inside other wordings fill from the profile', () => {
+  const p = {
+    identity: { firstName: 'Pat', lastName: 'Example', preferredName: 'P' },
+    contact: { email: 'pat@example.invalid', phone: '555-0100' },
+    links: { linkedin: 'https://example.invalid/in/pat', github: 'https://example.invalid/pat', website: 'https://pat.example' },
+    address: { city: 'Boston', state: 'MA', country: 'United States', postalCode: '02115', line1: '1 Main St' },
+    preferences: { salaryExpectation: '150000', earliestStart: '2026-06-01', relocate: true },
+    misc: { over18: true },
+  };
+  for (const [label, want] of [
+    ['What is your first name?', 'Pat'],
+    ['Please enter your First Name *', 'Pat'],
+    ['First Name (required)', 'Pat'],
+    ['Last Name / Surname', 'Example'],
+    ['Mobile Phone Number (include country code)', '555-0100'],
+    ['Your email address', 'pat@example.invalid'],
+    ['Confirm Email Address', 'pat@example.invalid'],
+    ['LinkedIn Profile URL', p.links.linkedin],
+    ['Link to your LinkedIn', p.links.linkedin],
+    ['GitHub URL (optional)', p.links.github],
+    ['Personal website or blog', p.links.website],
+    ['Zip / Postal Code', '02115'],
+    ['Current City', 'Boston'],
+    ['City, State', 'Boston, MA'],
+    ['Street address', '1 Main St'],
+    ['What are your salary expectations?', '150000'],
+    ['Are you willing to relocate?', 'Yes'],
+    ['Are you at least 18 years of age?', 'Yes'],
+  ])
+    assert.equal(F.resolve(field(label), p)[0], want, label);
+  // Someone else's details, a second value, or a question about a field: never.
+  for (const label of [
+    'Referrer email',
+    'Email of the employee who referred you',
+    'Emergency contact phone',
+    'Reference phone number',
+    'Name of your reference',
+    'Previous employer phone',
+    'Legal Name (if different than above)',
+    'Do you have a LinkedIn?',
+    'Have you lived in this state for 2 years?',
+    'Company website',
+    'Phone Type',
+    'Opt in to SMS',
+    'Statement of purpose',
+  ])
+    assert.deepEqual(F.resolve(field(label), p), [], label);
+  assert.equal(F.classify(field('Country of citizenship')).kind, 'manual');
+  // Option lists: states and the US in their own spelling.
+  assert.equal(F.pick(['Massachusetts', 'Maine'], F.resolve(field('State', { type: 'select', members: [] }), p)), 0);
+  assert.equal(
+    F.pick(['Canada', 'United States of America'], F.resolve(field('Country', { type: 'select', members: [] }), p)),
+    1
+  );
+});
+
+test('saved answers match other wordings, never other numbers, negations, technologies or employers', () => {
+  const bank = [
+    { question: 'Why are you interested in this role?', answer: 'Interest' },
+    { question: 'How many years of professional experience do you have with Python?', answer: '5' },
+    { question: 'Are you comfortable working in the office 3 days a week?', answer: 'Yes' },
+    { question: 'Why do you want to work at Ramp?', answer: 'Ramp answer', company: 'ramp' },
+  ];
+  assert.equal(F.savedAnswer('Why are you interested in this position', bank), 'Interest');
+  assert.equal(F.savedAnswer('How many years of experience do you have with Python?', bank), '5');
+  assert.equal(F.savedAnswer('Are you comfortable working in office 3 days per week?', bank), 'Yes');
+  for (const q of [
+    'How many years of experience do you have with Java?',
+    'Are you comfortable working in the office 4 days a week?',
+    'Are you not comfortable working in the office 3 days a week?',
+    'What interests you about our mission?',
+  ])
+    assert.equal(F.savedAnswer(q, bank), null, q);
+  // A company's own answer only for that company.
+  assert.equal(F.savedAnswer('Why do you want to work at Ramp?', bank, 'ramp'), 'Ramp answer');
+  assert.equal(F.savedAnswer('Why do you want to work at Ramp?', bank, 'brex'), null);
+  assert.equal(F.savedAnswer('Why do you want to work at Ramp?', bank), null);
+  // Two different answers just as close: ambiguous, left empty.
+  assert.equal(
+    F.savedAnswer('Why are you interested in this job?', [
+      { question: 'Why are you interested in this role?', answer: 'a' },
+      { question: 'Why are you interested in this position?', answer: 'b' },
+    ]),
+    null
+  );
+});
+
+test('a plain Yes/No picks the one option that only restates it', () => {
+  assert.equal(F.pick(['Yes, I am authorized to work in the US', 'No, I am not'], ['Yes']), 0);
+  assert.equal(F.pick(['Yes - I will need sponsorship', 'No - I will not need sponsorship'], ['No']), 1);
+  assert.equal(F.pick(['Yes, now', 'Yes, in the future', 'No'], ['Yes']), -1);
+  assert.equal(F.pick(['Yes, but only for 12 months', 'No'], ['Yes']), -1);
+  assert.equal(F.pick(['Not sure', 'No'], ['No']), 1);
+});
+
+test('application systems, site domains and where their emails may come from', () => {
+  assert.equal(pages.applySystem('careers-acme.icims.com'), 'icims');
+  assert.equal(pages.applySystem('acme.taleo.net'), 'taleo');
+  assert.equal(pages.applySystem('career8.successfactors.com'), 'successfactors');
+  assert.equal(pages.applySystem('icims.com.evil.example'), '');
+  assert.equal(pages.applySystem('careers.acme.com'), '');
+  assert.equal(pages.siteDomain('careers.acme.com'), 'acme.com');
+  assert.equal(pages.siteDomain('jobs.acme.co.uk'), 'acme.co.uk');
+  assert.equal(pages.siteDomain('localhost'), '');
+  assert.deepEqual(pages.mailDomains('https://careers-acme.icims.com/jobs/1'), ['icims.com']);
+  assert.deepEqual(pages.mailDomains('https://www.tesla.com/careers/apply'), ['tesla.com']);
+  assert.deepEqual(pages.mailDomains('http://www.tesla.com/careers/apply'), []);
+  assert.deepEqual(pages.linkHosts('https://careers.acme.com/verify'), ['acme.com']);
+  assert.ok(pages.hostWithin('https://login.acme.com/activate', ['acme.com']));
+  assert.ok(!pages.hostWithin('https://acme.com.evil.example/activate', ['acme.com']));
+});

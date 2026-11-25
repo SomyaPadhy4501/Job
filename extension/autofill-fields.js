@@ -69,6 +69,87 @@
     'misc.howDidYouHear',
     'how did you hear about us|how did you hear about this job|please tell us how you heard about this opportunity'
   );
+  // Re-typed email ("Confirm email") is the same email.
+  alias('contact.email', 'confirm email|confirm email address|re-enter email|re-enter email address|reenter email|retype email|verify email|verify email address|email confirmation');
+  alias('cityState', 'city, state|city and state|city/state|current city and state|city, state/province');
+
+  // Wording a form wraps around a field name: "Please enter your first name",
+  // "What is your phone number?", "First Name (required)". Only presentation
+  // is removed; a qualifier that changes the field ("if different than
+  // above", "of your reference") stays, so the label then matches nothing.
+  const HARMLESS_PAREN =
+    /\s*\((?:optional|required|mandatory|if applicable|e\.?g\.?[^)]*|i\.?e\.?[^)]*|example[^)]*|include[^)]*code[^)]*|with[^)]*code[^)]*|mm\/dd\/yyyy|mm\/yyyy|dd\/mm\/yyyy|yyyy|url|full url|link|https?:[^)]*|preferred|primary)\)/g;
+  function labelKey(value) {
+    let k = key(value)
+      .replace(HARMLESS_PAREN, '')
+      .replace(/\s*[-–—|:]\s*(?:required|optional)$/, '')
+      .replace(/\s+(?:required|optional)$/, '')
+      .replace(/[\s✱*?:.]+$/, '')
+      .trim();
+    for (let i = 0; i < 3; i++) {
+      const before = k;
+      k = k
+        .replace(/^(?:please |kindly )/, '')
+        .replace(/^(?:enter|provide|type|input|add|share|list|give|include|tell us|let us know|fill in|specify|indicate|select|choose)\s+/, '')
+        .replace(/^(?:what is|what's|what are|whats)\s+/, '')
+        .replace(/^(?:your|the applicant's|applicant|candidate|candidate's)\s+/, '')
+        .replace(/\s+(?:here|below)$/, '')
+        .trim();
+      if (k === before) break;
+    }
+    return k;
+  }
+  // Field names inside a longer label ("Mobile phone number for SMS
+  // updates", "LinkedIn profile URL"). Never for someone else's details
+  // (a referrer, a reference, an emergency contact), a second or other
+  // value, or a long sentence: those stay questions.
+  const SOMEONE_ELSE =
+    /\b(?:refer(?:red|ral|rer|rer's|ring)?|reference|emergency|manager|supervisor|recruiter|parent|guardian|spouse|partner|contact person|next of kin|hiring|previous|former|prior|past|other|alternate|alternative|secondary|second|additional|another|if different|company's|employer's|school's|university's)\b/;
+  const keywordPaths = [
+    ['identity.preferredName', /\b(?:preferred (?:first )?name|nickname|name you (?:go by|prefer))\b/],
+    ['identity.firstName', /\b(?:first name|given name|forename|first legal name|legal first name)\b/],
+    ['identity.lastName', /\b(?:last name|family name|surname|last legal name|legal last name)\b/],
+    ['identity.middleName', /\bmiddle name\b/],
+    ['identity.pronouns', /\bpronouns?\b/],
+    ['contact.phoneCountryCode', /\b(?:phone|mobile|dialing|calling) (?:country )?code\b|\bcountry (?:dialing |calling )?code\b/],
+    ['contact.email', /\be-?mail\b/],
+    ['contact.phone', /\b(?:phone|mobile|cell|cellphone|telephone|contact number)\b/],
+    ['links.linkedin', /\blinked ?in\b/],
+    ['links.github', /\bgit ?hub\b/],
+    ['links.portfolio', /\bportfolio\b/],
+    ['links.website', /\b(?:website|web site|personal site|homepage|blog)\b/],
+    ['address.postalCode', /\b(?:zip|postal|postcode|post code)\b/],
+    ['address.line2', /\b(?:address line 2|address 2|apartment|apt|suite|unit)\b/],
+    ['address.line1', /\b(?:street|address line 1|address 1|street address|home address|mailing address|residential address|address)\b/],
+    ['cityState', /\bcity\b.*\bstate\b/],
+    ['address.city', /\b(?:city|town)\b/],
+    ['address.state', /\b(?:state|province|region)\b/],
+    ['address.country', /\bcountry\b/],
+    ['currentCompany', /\b(?:current|present|most recent|latest) (?:company|employer|organization|organisation)\b/],
+    ['preferences.salaryExpectation', /\b(?:salary|compensation|pay)\b.*\b(?:expect|expectation|requirement|desired|range)|\b(?:expected|desired|target) (?:salary|compensation|pay|base)\b/],
+    ['preferences.earliestStart', /\b(?:start date|available to start|availability to start|able to start|can you start|could you start|date available|available start)\b/],
+  ];
+  const keywordBlock = {
+    'contact.email': /\b(?:opt|subscribe|newsletter|marketing)\b/,
+    'contact.phone': /\b(?:type|device|extension|ext|country|code|opt|consent|sms|text me|whatsapp)\b/,
+    'address.line1': /\b(?:e-?mail|web|ip|ethereum|wallet|line 2|address 2)\b/,
+    'address.state': /\b(?:united states|statement|status|state of (?:the|your)|license|licence|issued|birth)\b/,
+    'address.country': /\b(?:code|citizen|citizenship|nationality|birth|passport|issued|other than|outside)\b/,
+    'address.city': /\b(?:birth|born)\b/,
+    'links.website': /\b(?:company|employer|school)\b/,
+  };
+  function keywordPath(plain) {
+    if (!plain || plain.split(' ').length > 9 || SOMEONE_ELSE.test(plain)) return null;
+    // A question, not a field name: "Have you lived in this state…?"
+    if (/^(?:do|does|did|are|is|have|has|will|would|can|could|should|were|was|if|how|why|when|which|describe|explain)\b/.test(plain))
+      return null;
+    for (const [path, re] of keywordPaths) {
+      if (!re.test(plain)) continue;
+      if (keywordBlock[path]?.test(plain)) continue;
+      return path;
+    }
+    return null;
+  }
 
   // HTML autocomplete tokens (the last token, after any section-/billing
   // prefix). Used only when the label isn't one listed above: company-built
@@ -430,6 +511,7 @@
 
   function classify(d) {
     const label = key(d.label);
+    const plain = labelKey(d.label);
     const ids = [d.automationId, d.name, d.id].filter(Boolean).map(idKey);
     const context = [label, ...ids, d.safetyText, ...(d.options || [])].join(' ');
     if (d.type === 'checkbox' && d.row?.section === 'experience' && CURRENT_JOB.test(label) && !protectedText.test(context))
@@ -455,10 +537,11 @@
       const names = rows[d.row.section];
       if (names) {
         for (const [field, labels] of Object.entries(names)) {
-          if (labels.split('|').includes(label)) return { kind: 'row', field };
+          const list = labels.split('|');
+          if (list.includes(label) || list.includes(plain)) return { kind: 'row', field };
         }
-        if (START_LABEL.test(label)) return { kind: 'row', field: 'startDate' };
-        if (END_LABEL.test(label)) return { kind: 'row', field: 'endDate' };
+        if (START_LABEL.test(label) || START_LABEL.test(plain)) return { kind: 'row', field: 'startDate' };
+        if (END_LABEL.test(label) || END_LABEL.test(plain)) return { kind: 'row', field: 'endDate' };
         const boxIds = [d.boxId].filter(Boolean).map(idKey).join(' ');
         if (/^(?:month|year)$/.test(label) || /date section (?:month|year)/.test(ids.join(' '))) {
           const group = [key(d.safetyText || ''), boxIds].join(' ');
@@ -475,16 +558,24 @@
       if (pattern.test(label)) return { kind: 'eeo', field };
     }
     if (eeoText.test(label) || d.eeo || ids.some((id) => id.startsWith('eeo '))) return { kind: 'manual' };
-    const edu = eduQuestion(label);
+    const edu = eduQuestion(label) || (plain !== label && eduQuestion(plain));
     if (edu && d.type !== 'file') return edu;
-    if (/^(?:how|where) did you (?:first )?(?:hear|learn|find out) about (?:us|this|the|our|[a-z0-9.&' -]{1,40}$)/.test(label) || /^(?:referral )?source$|^how did you hear$/.test(label))
+    if (/^(?:how|where) did you (?:first )?(?:hear|learn|find out) about (?:us|this|the|our|[a-z0-9.&' -]{1,40}$)/.test(label) || /^(?:referral )?source$|^how did you hear$|^(?:source|how you heard)(?: of (?:application|referral))?$/.test(plain))
       return { kind: 'profile', path: 'misc.howDidYouHear' };
     if (label === 'preferred name | what would you like us to call you')
       return { kind: 'profile', path: 'identity.preferredName' };
+    if (/^(?:are you|confirm (?:that )?you are|i am) (?:at least |over )?(?:18|eighteen)(?: years(?: of age| old)?)?(?: or older| and older| or over)?$/.test(plain))
+      return { kind: 'profile', path: 'misc.over18' };
+    if (/^(?:are you |would you be )?(?:willing|open|able) to relocate(?: for this (?:role|position|job|opportunity))?$/.test(plain))
+      return { kind: 'profile', path: 'preferences.relocate' };
     const path =
       aliases.get(label) ||
+      aliases.get(plain) ||
       (!label && ids.map((id) => aliases.get(id)).find(Boolean)) ||
-      (!aliases.has(label) && autocompletePath(d.autocomplete));
+      (!aliases.has(label) && autocompletePath(d.autocomplete)) ||
+      keywordPath(plain) ||
+      // Unlabelled-looking fields named for what they hold ("phoneNumber").
+      (label.split(' ').length <= 2 && ids.map((id) => aliases.get(id) || keywordPath(id)).find(Boolean));
     if (path && d.type !== 'textarea') return { kind: 'profile', path };
     return { kind: label ? 'question' : 'manual' };
   }
@@ -500,15 +591,98 @@
       .replace(/^what's\b/, 'what is')
       .replace(/[?.✱\s]+$/g, '');
   }
-  function savedAnswer(question, answers) {
+  // The same question in other words: "Why are you interested in this
+  // role?" ≈ "Why are you interested in this position". Words that don't
+  // change the question are dropped and plurals folded; every number, negation
+  // and symbol-bearing word (7+, C++, C#) must be the same on both sides, and
+  // most remaining words must be shared. A different employer or technology
+  // named in the question is a different question.
+  const STOP = new Set(
+    'a an the please kindly your you you\'re yours our us we this that these those of to for in on at by with about and or is are am be been being do does did will would can could should may might shall there here it its any some if as so me my i please tell describe explain share let know briefly'.split(
+      ' '
+    )
+  );
+  const NEGATION = /^(?:no|not|never|none|nor|without|except|cannot|can't|don't|doesn't|didn't|won't|wouldn't|isn't|aren't|wasn't|weren't|haven't|hasn't|hadn't|unable|non)$/;
+  const FOLD = {
+    position: 'role',
+    job: 'role',
+    opportunity: 'role',
+    company: 'org',
+    organization: 'org',
+    organisation: 'org',
+    employer: 'org',
+    interested: 'interest',
+    interesting: 'interest',
+    excites: 'excite',
+    excited: 'excite',
+    exciting: 'excite',
+    motivates: 'motivate',
+    motivated: 'motivate',
+    applying: 'apply',
+    'e-mail': 'email',
+    yrs: 'year',
+    years: 'year',
+    experiences: 'experience',
+  };
+  function words(text) {
+    return questionKey(text)
+      .replace(/[“”"]/g, '')
+      .split(/[^\p{L}\p{N}+#']+/u)
+      .map((w) => w.replace(/^'+|'+$/g, ''))
+      .filter(Boolean)
+      .map((w) => FOLD[w] || (w.length > 4 && /[^s]s$/.test(w) && !/(?:ss|us|is)$/.test(w) ? w.slice(0, -1) : w))
+      .map((w) => FOLD[w] || w);
+  }
+  function similar(a, b) {
+    const wa = words(a),
+      wb = words(b);
+    const strict = (list) => list.filter((w) => NEGATION.test(w) || /\d|[+#]/.test(w)).sort().join(' ');
+    if (strict(wa) !== strict(wb)) return 0;
+    const ca = new Set(wa.filter((w) => !STOP.has(w))),
+      cb = new Set(wb.filter((w) => !STOP.has(w)));
+    if (ca.size < 3 || cb.size < 3) return 0;
+    let shared = 0;
+    for (const w of ca) if (cb.has(w)) shared++;
+    // Each side may add at most one word the other lacks (or two in a long
+    // question), and those words must be short connectives, not names.
+    const extra = [...ca].filter((w) => !cb.has(w)).concat([...cb].filter((w) => !ca.has(w)));
+    const allowed = Math.max(ca.size, cb.size) >= 7 ? 2 : 1;
+    if (extra.length > allowed) return 0;
+    return shared / (ca.size + cb.size - shared);
+  }
+  // A saved answer for this question: the same wording first, else the one
+  // most similar wording. Answers saved for one company are used only there.
+  function savedAnswer(question, answers, company = '') {
     const k = questionKey(question);
-    const matches = new Set(
-      (answers || [])
-        .filter((a) => k && questionKey(a.question) === k)
-        .map((a) => clean(a.answer))
-        .filter(Boolean)
-    );
-    return matches.size === 1 ? matches.values().next().value : null;
+    if (!k) return null;
+    const here = clean(company).toLowerCase();
+    const usable = (answers || []).filter((a) => {
+      const only = clean(a.company).toLowerCase();
+      return clean(a.answer) && (!only || (here && only === here));
+    });
+    // An answer saved for this company outranks a general one.
+    const ranked = [...usable].sort((a, b) => Number(!!clean(b.company)) - Number(!!clean(a.company)));
+    const decide = (list) => {
+      const values = new Set(list.map((a) => clean(a.answer)));
+      return values.size === 1 ? values.values().next().value : values.size > 1 ? false : null;
+    };
+    for (const scoped of [ranked.filter((a) => clean(a.company)), ranked.filter((a) => !clean(a.company))]) {
+      const exact = decide(scoped.filter((a) => questionKey(a.question) === k));
+      if (exact === false) return null;
+      if (exact) return exact;
+    }
+    let best = 0,
+      found = [];
+    for (const a of ranked) {
+      const s = similar(question, a.question);
+      if (s < 0.6) continue;
+      if (s > best + 1e-9) {
+        best = s;
+        found = [a];
+      } else if (Math.abs(s - best) < 1e-9) found.push(a);
+    }
+    const fuzzy = decide(found);
+    return fuzzy || null;
   }
 
   const visaLabels = {
@@ -571,6 +745,10 @@
       const { firstName, middleName, lastName } = profile.identity || {};
       return firstName && lastName && [firstName, middleName, lastName].filter(Boolean).join(' ');
     }
+    if (path === 'cityState') {
+      const { city, state } = profile.address || {};
+      return city && state ? `${city}, ${state}` : null;
+    }
     if (path === 'location' || path === 'fullLocation') {
       const { city, state, country } = profile.address || {};
       if (path === 'fullLocation' && !(city && state && country)) return null;
@@ -591,13 +769,18 @@
     if (now === true || future === true) return true;
     return now === false && future === false ? false : null;
   }
-  function resolve(d, profile = {}, answers = []) {
+  function resolve(d, profile = {}, answers = [], company = '') {
     const c = classify(d);
     let value;
     switch (c.kind) {
       case 'profile':
         value = profileValue(profile, c.path);
         if (c.path === 'preferences.workMode') return workModeLabels[value] || [];
+        // Option lists spell states and the US their own way.
+        if (d.members && typeof value === 'string' && clean(value)) {
+          if (c.path === 'address.state') return stateValues(value);
+          if (c.path === 'address.country') return countryValues(value);
+        }
         break;
       case 'row':
         if (d.row.section === 'education' || d.row.section === 'experience')
@@ -629,7 +812,7 @@
           return raceLabels(value, profile.eeo?.hispanicLatino);
         break;
       case 'question':
-        value = savedAnswer(d.label, answers);
+        value = savedAnswer(d.label, answers, company);
         break;
       default:
         return [];
@@ -641,9 +824,37 @@
   }
   function pick(options, values) {
     const norm = norms[values.match] || key;
-    for (const tier of values.tiers || [values]) {
+    const tiers = values.tiers || [values];
+    for (const tier of tiers) {
       const acceptable = new Set(tier.map(norm).filter(Boolean));
       const matches = options.map((label, i) => (acceptable.has(norm(label)) ? i : -1)).filter((i) => i >= 0);
+      if (matches.length === 1) return matches[0];
+      if (matches.length > 1) return -1;
+    }
+    // Options that say more than the value: "Yes" → "Yes, I am authorized
+    // to work in the US", "No" → "No, I will not require sponsorship". Only
+    // plain-text values, only an option that starts with the whole value, and
+    // only when exactly one option does.
+    if (values.match) return -1;
+    for (const tier of tiers) {
+      const wanted = tier.map(key).filter((v) => v && v.length <= 40);
+      const matches = options
+        .map((label, i) => {
+          const o = key(label);
+          // "Yes, but only for 12 months" is a different answer from "Yes".
+          return wanted.some((v) => {
+            const rest = o.slice(v.length);
+            return (
+              o.length > v.length &&
+              o.startsWith(v) &&
+              /^[\s,.;:(—–-]/.test(rest) &&
+              !/\b(?:but|only|except|unless|however|although|though|limited|partial(?:ly)?|conditional(?:ly)?|with|after|until|pending|some|temporar\w*|depending|maybe|possibly|\d+)\b/.test(rest)
+            );
+          })
+            ? i
+            : -1;
+        })
+        .filter((i) => i >= 0);
       if (matches.length === 1) return matches[0];
       if (matches.length > 1) return -1;
     }
@@ -663,6 +874,20 @@
     sc: 'south carolina', sd: 'south dakota', tn: 'tennessee', tx: 'texas', ut: 'utah', vt: 'vermont',
     va: 'virginia', wa: 'washington', wv: 'west virginia', wi: 'wisconsin', wy: 'wyoming',
   };
+  const titleCase = (s) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+  function stateValues(value) {
+    const v = clean(value);
+    const k = v.toLowerCase();
+    const full = Object.hasOwn(usStates, k) ? usStates[k] : null;
+    const abbr = Object.keys(usStates).find((a) => usStates[a] === k);
+    return tiered([[v], full ? [titleCase(full)] : abbr ? [abbr.toUpperCase()] : []]);
+  }
+  const US_NAMES = ['United States', 'United States of America', 'USA', 'US', 'U.S.', 'U.S.A.'];
+  function countryValues(value) {
+    const v = clean(value);
+    const us = US_NAMES.some((n) => key(n) === key(v) || n.toLowerCase() === v.toLowerCase());
+    return tiered([[v], us ? US_NAMES : []]);
+  }
   const placePart = (part) => {
     const k = key(part)
       .normalize('NFD')
@@ -731,6 +956,8 @@
     placeQuery,
     usDate,
     savedAnswer,
+    similar,
+    labelKey,
     rankResumes,
     degreeLevel,
     primaryEducation,

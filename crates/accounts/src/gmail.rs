@@ -395,6 +395,9 @@ pub fn is_message_id(id: &str) -> bool {
 pub enum Site {
     Workday,
     Greenhouse,
+    /// Any other application site: mail only from the domains the extension
+    /// names for the page (its application system's, or the employer's own).
+    Other,
 }
 
 impl Site {
@@ -402,6 +405,7 @@ impl Site {
         match s {
             "workday" => Some(Site::Workday),
             "greenhouse" => Some(Site::Greenhouse),
+            "other" => Some(Site::Other),
             _ => None,
         }
     }
@@ -413,9 +417,120 @@ impl Site {
         let from = match self {
             Site::Workday => "from:myworkday.com",
             Site::Greenhouse => "from:(greenhouse.io OR greenhouse-mail.io)",
+            // Needs the page's domains: see `domain_query`.
+            Site::Other => return format!("from:invalid.invalid after:{since}"),
         };
         format!("{from} after:{since}")
     }
+}
+
+/// The search for `Site::Other`: mail from these domains (each already
+/// checked by `mail_domain`), received after `since`. Gmail's `from:` is
+/// loose, so each sender is checked again with `from_domains`.
+pub fn domain_query(domains: &[String], since: i64) -> String {
+    format!("from:({}) after:{since}", domains.join(" OR "))
+}
+
+/// Free mail providers: anyone can send from them, so they never vouch for
+/// a job site.
+const FREEMAIL: &[&str] = &[
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "msn.com",
+    "yahoo.com",
+    "ymail.com",
+    "icloud.com",
+    "me.com",
+    "mac.com",
+    "aol.com",
+    "proton.me",
+    "protonmail.com",
+    "gmx.com",
+    "gmx.net",
+    "mail.com",
+    "yandex.com",
+    "zoho.com",
+    "fastmail.com",
+];
+
+/// A plain domain name ("icims.com", "acme.co.uk"), lowercased, that isn't
+/// a free mail provider; else None.
+pub fn mail_domain(raw: &str) -> Option<String> {
+    let d = raw.trim().trim_end_matches('.').to_ascii_lowercase();
+    let labels: Vec<&str> = d.split('.').collect();
+    let ok = (4..=253).contains(&d.len())
+        && labels.len() >= 2
+        && labels.iter().all(|l| {
+            !l.is_empty()
+                && l.len() <= 63
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        })
+        && labels
+            .last()
+            .is_some_and(|tld| tld.len() >= 2 && tld.bytes().all(|b| b.is_ascii_lowercase()));
+    (ok && !FREEMAIL.contains(&d.as_str())).then_some(d)
+}
+
+/// The domain of a From header's address ("Acme <no-reply@talent.icims.com>"
+/// gives "talent.icims.com").
+pub fn sender_domain(from: &str) -> Option<String> {
+    let address = match (from.rfind('<'), from.rfind('>')) {
+        (Some(a), Some(b)) if a < b => &from[a + 1..b],
+        _ => from.trim(),
+    };
+    let (_, domain) = address.rsplit_once('@')?;
+    mail_domain(domain)
+}
+
+/// Whether the sender's domain is one of these, or below one of them.
+pub fn from_domains(from: &str, domains: &[String]) -> bool {
+    sender_domain(from).is_some_and(|d| {
+        domains
+            .iter()
+            .any(|want| d == *want || d.ends_with(&format!(".{want}")))
+    })
+}
+
+/// Whether a mail from a system that sends for many employers (iCIMS,
+/// SmartRecruiters, ...) is for this company: the company name in its
+/// subject, sender name or first lines. With no company known, any is taken.
+pub fn company_named(m: &Message, company: &str) -> bool {
+    let want = squash(company);
+    if want.len() < 2 {
+        return true;
+    }
+    greenhouse_company_matches(m, "", company) || squash(&m.from).contains(want.as_str())
+}
+
+/// A "verify your email" link on one of these hosts (or below them), https
+/// only, with a verify, activate or confirm path.
+pub fn verify_link_on(hrefs: &[String], hosts: &[String]) -> Option<String> {
+    hrefs
+        .iter()
+        .find(|h| {
+            let Ok(u) = url::Url::parse(h) else {
+                return false;
+            };
+            let Some(host) = u.host_str().map(str::to_ascii_lowercase) else {
+                return false;
+            };
+            let target = format!("{}?{}", u.path(), u.query().unwrap_or(""));
+            u.scheme() == "https"
+                && u.username().is_empty()
+                && u.password().is_none()
+                && hosts
+                    .iter()
+                    .any(|want| host == *want || host.ends_with(&format!(".{want}")))
+                && VERIFY_PATH.is_match(&target)
+                && !NOT_VERIFY_PATH.is_match(&target)
+        })
+        .cloned()
 }
 
 /// A message reduced to what's needed: its sender, plain text and links.
@@ -445,6 +560,10 @@ static WORKDAY_SITE_PATH: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^/(?:[a-z]{2}(?:-[a-z]{2})?/)?recruiting/([^/]+)").unwrap());
 static VERIFY_PATH: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)verif|activat|confirm").unwrap());
+/// Links that change mail settings or an application are never verify links.
+static NOT_VERIFY_PATH: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)unsubscri|opt-?out|preference|withdraw|decline|delete|remove|cancel").unwrap()
+});
 
 const B64_ANY_PADDING: GeneralPurpose = GeneralPurpose::new(
     &base64::alphabet::URL_SAFE,
@@ -892,6 +1011,69 @@ mod tests {
                 .query(5)
                 .starts_with("from:(greenhouse.io OR greenhouse-mail.io) after:5")
         );
+    }
+
+    #[test]
+    fn other_sites_take_mail_only_from_their_own_domains() {
+        assert_eq!(mail_domain(" ICIMS.com. ").as_deref(), Some("icims.com"));
+        assert_eq!(mail_domain("acme.co.uk").as_deref(), Some("acme.co.uk"));
+        for bad in [
+            "gmail.com",
+            "localhost",
+            "a..b",
+            "-x.com",
+            "x.c0m",
+            "",
+            "acme.com/evil",
+        ] {
+            assert_eq!(mail_domain(bad), None, "{bad}");
+        }
+        let icims = vec!["icims.com".to_owned()];
+        assert!(from_domains(
+            "Acme Careers <no-reply@talent.icims.com>",
+            &icims
+        ));
+        assert!(from_domains("no-reply@icims.com", &icims));
+        assert!(!from_domains("x@icims.com.evil.example", &icims));
+        assert!(!from_domains("x@noticims.com", &icims));
+        assert!(!from_domains("Bank <codes@bank.example>", &icims));
+        assert_eq!(
+            domain_query(&["icims.com".into(), "acme.com".into()], 5),
+            "from:(icims.com OR acme.com) after:5"
+        );
+        assert_eq!(Site::parse("other"), Some(Site::Other));
+    }
+
+    #[test]
+    fn shared_senders_must_name_the_company() {
+        let m = Message {
+            from: "Acme Careers <no-reply@icims.com>".into(),
+            subject: "Your verification code".into(),
+            text: "Use 123456 to continue.".into(),
+            ..Message::default()
+        };
+        assert!(company_named(&m, "Acme"));
+        assert!(company_named(&m, ""));
+        assert!(!company_named(&m, "Globex"));
+    }
+
+    #[test]
+    fn verify_links_only_on_the_pages_own_hosts() {
+        let hrefs: Vec<String> = [
+            "https://evil.example/verify?t=1",
+            "http://careers.acme.com/verify?t=2",
+            "https://careers.acme.com/jobs",
+            "https://careers.acme.com/email/unsubscribe/confirm?t=4",
+            "https://careers.acme.com/account/activate?t=3",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert_eq!(
+            verify_link_on(&hrefs, &["acme.com".to_owned()]).as_deref(),
+            Some("https://careers.acme.com/account/activate?t=3")
+        );
+        assert_eq!(verify_link_on(&hrefs, &["icims.com".to_owned()]), None);
     }
 
     #[test]

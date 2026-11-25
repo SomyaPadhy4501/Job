@@ -14,6 +14,8 @@
 (() => {
   const USED = 'gmailUsed';
   const VERIFY = /verif|activat|confirm/i;
+  // A link that changes your mail settings or application is never opened.
+  const NOT_VERIFY = /unsubscri|opt-?out|preference|withdraw|decline|delete|remove|cancel/i;
 
   // Left over from 1.19 and earlier, when the extension held a Gmail token.
   chrome.storage.session.remove('gmailToken').catch(() => {});
@@ -41,11 +43,14 @@
   // `request` is autofill-api.js's authenticated call to the portal.
   // `tenant`: the Workday tenant or Greenhouse board; `company`: the name on
   // the page (Greenhouse), so the portal only takes that company's mail.
-  async function findCode(request, site, tenant, { length, charset }, company = '') {
+  // `domains` (site 'other'): where this page's mail may come from, its
+  // application system's mail domains or the employer's own domain.
+  async function findCode(request, site, tenant, { length, charset }, company = '', domains = []) {
     const r = await ask(request, 'code', {
       site,
       ...(tenant ? { tenant } : {}),
       ...(company ? { company } : {}),
+      ...(domains.length ? { domains } : {}),
       ...(length ? { length } : {}),
       charset,
       skip: await used(),
@@ -60,22 +65,27 @@
 
   // Opens this company's Workday verification link in a background tab and
   // closes it shortly after it loads. The page never sees the link.
-  async function openVerifyLink(request, tenant) {
-    const r = await ask(request, 'verify-link', { tenant, skip: await used() });
+  // `other` (any site but Workday): { domains, hosts, company }: mail from
+  // the page's own domains, a link only to the page's own hosts.
+  async function openVerifyLink(request, tenant, other = null) {
+    const r = await ask(
+      request,
+      'verify-link',
+      other
+        ? { site: 'other', domains: other.domains, hosts: other.hosts, ...(other.company ? { company: other.company } : {}), skip: await used() }
+        : { tenant, skip: await used() }
+    );
     let url;
     try {
       url = new URL(r?.link);
     } catch {
       return false;
     }
-    // Checked again here: https, this company's own Workday, a verify path.
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      JobApplicationPages.workdayTenant(url.href) !== tenant ||
-      !VERIFY.test(url.pathname + url.search)
-    )
+    // Checked again here: https, this company's own site, a verify path.
+    const own = other
+      ? JobApplicationPages.hostWithin(url.href, other.hosts)
+      : JobApplicationPages.workdayTenant(url.href) === tenant;
+    if (url.protocol !== 'https:' || url.username || url.password || !own || !VERIFY.test(url.pathname + url.search) || NOT_VERIFY.test(url.pathname + url.search))
       return false;
     await markUsed(r.messageId);
     const tab = await chrome.tabs.create({ url: url.href, active: false });
